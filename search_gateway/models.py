@@ -1,0 +1,26 @@
+# -*- coding: utf-8 -*-
+"""Normalized result schema shared by all sources."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, asdict
+from typing import Any, Optional
+
+
+@dataclass
+class Result:
+    title: str
+    url: str
+    snippet: str = ""
+    source: str = ""      # searxng | exa | twitter | reddit | github | youtube | web
+    engine: str = ""      # underlying engine/backend (bing, twitter-cli, opencli, ...)
+    published: Optional[str] = None
+    score: float = 0.0    # final score (RRF and/or re-rank)
+    meta: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    def identity(self) -> str:
+        """Stable key for cross-source dedup."""
+        return self.url.strip().rstrip("/") if self.url else self.title.strip().lower()

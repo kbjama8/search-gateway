@@ -1,0 +1,31 @@
+# Search Gateway MCP server — long-running HTTP host process.
+#
+# User-level template unit. The instance name is the HTTP port:
+#
+#   mkdir -p ~/.config/search-gateway && touch ~/.config/search-gateway/gateway.env
+#   chmod 600 ~/.config/search-gateway/gateway.env
+#   systemctl --user enable --now search-gateway@8765.service
+#   search-gateway doctor   # or: curl http://127.0.0.1:8765/mcp/
+#
+# Assumes the console script is installed at ~/.local/bin (pip install . /
+# pip install --user .). Clients register the URL in mcp.json (see
+# docs/mcp-registration.md).
+[Unit]
+Description=Search Gateway MCP server (HTTP) on port %i
+After=network.target
+
+[Service]
+Type=simple
+# Secrets (DEEPSEEK_API_KEY, TWITTER_AUTH_FILE, ...) — keep this file 0600.
+EnvironmentFile=%h/.config/search-gateway/gateway.env
+Environment=SEARCH_GATEWAY_LOG_FMT=json
+ExecStartPre=%h/.local/bin/search-gateway check
+ExecStart=%h/.local/bin/search-gateway serve --transport http --host 127.0.0.1 --port %i
+Restart=on-failure
+RestartSec=3
+# Models stay warm across client disconnects; there is no local state to flush,
+# so a short stop window is safe.
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

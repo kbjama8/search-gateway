@@ -1,0 +1,43 @@
+# Redis + SearXNG — the two service dependencies the search-gateway needs.
+#
+# The gateway itself runs as a **host process** (it shells out to CLIs +
+# Chromium and uses a warm local model cache), so it is deliberately NOT a
+# container here. See docs/deployment.md for the full tier model.
+#
+#   docker compose up -d      # brings up redis + searxng
+#   search-gateway doctor     # confirm both report ok
+
+services:
+  redis:
+    image: redis:7-alpine
+    # AOF so `saved_queries` (user state) survive a Redis restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://127.0.0.1:8888/
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    restart: unless-stopped
+
+volumes:
+  redis-data:

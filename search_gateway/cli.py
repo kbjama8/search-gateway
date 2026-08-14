@@ -1,0 +1,106 @@
+# -*- coding: utf-8 -*-
+"""Console entry point: `search-gateway serve|doctor|check|version|warm`."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import signal
+import sys
+from typing import Optional, Sequence
+
+from . import __version__, health
+from .config import MCP_HOST, MCP_PORT
+from .log import configure_logging
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    from .server import main
+
+    def _graceful(_signum, _frame):
+        raise KeyboardInterrupt
+
+    # Map SIGTERM (systemd stop) to the same clean unwind FastMCP uses for
+    # SIGINT, so the running loop cancels tasks and exits without corruption.
+    signal.signal(signal.SIGTERM, _graceful)
+
+    # `--transport/--host/--port` live on the `serve` subparser, so the bare
+    # `search-gateway` command (no subcommand) — which also routes here — does
+    # not have them. Fall back to defaults.
+    transport = getattr(args, "transport", "stdio")
+    if transport in ("http", "sse"):
+        main(transport=transport,
+             host=getattr(args, "host", MCP_HOST),
+             port=getattr(args, "port", MCP_PORT))
+    else:
+        main()
+    return 0
+
+
+def _cmd_doctor(_args: argparse.Namespace) -> int:
+    report = asyncio.run(health.report())
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("redis", {}).get("ok") else 1
+
+
+def _cmd_check(_args: argparse.Namespace) -> int:
+    ok, report = asyncio.run(health.check())
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if not report.get("llm", {}).get("available"):
+        print("warning: DEEPSEEK_API_KEY not set — answer synthesis disabled",
+              file=sys.stderr)
+    return 0 if ok else 1
+
+
+def _cmd_version(_args: argparse.Namespace) -> int:
+    print(__version__)
+    return 0
+
+
+def _cmd_warm(_args: argparse.Namespace) -> int:
+    from . import embeddings, rerank
+
+    rerank._get_model()          # same-package preload (private, intentional)
+    embeddings._get_model()      # same-package preload (private, intentional)
+    print(json.dumps({"rerank": rerank.status(), "embed": embeddings.status()},
+                     ensure_ascii=False, indent=2))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="search-gateway",
+        description="Unified web-search & research MCP server.",
+    )
+    parser.add_argument("--version", action="version", version=__version__)
+    sub = parser.add_subparsers(dest="command")
+    serve = sub.add_parser("serve", help="run the MCP server (default: stdio)")
+    serve.add_argument("--transport", choices=["stdio", "http", "sse"],
+                       default="stdio", help="stdio (default) | http | sse")
+    serve.add_argument("--host", default=MCP_HOST,
+                       help=f"bind host for http/sse (default: {MCP_HOST})")
+    serve.add_argument("--port", type=int, default=MCP_PORT,
+                       help=f"bind port for http/sse (default: {MCP_PORT})")
+    sub.add_parser("doctor", help="print the full health report as JSON")
+    sub.add_parser("check", help="gate: 18 sources + Redis reachable (non-zero on failure)")
+    sub.add_parser("version", help="print the package version")
+    sub.add_parser("warm", help="preload the rerank + embed models")
+    return parser
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    configure_logging()
+    args = build_parser().parse_args(argv)
+    handlers = {
+        "serve": _cmd_serve,
+        "doctor": _cmd_doctor,
+        "check": _cmd_check,
+        "version": _cmd_version,
+        "warm": _cmd_warm,
+    }
+    return handlers[args.command or "serve"](args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

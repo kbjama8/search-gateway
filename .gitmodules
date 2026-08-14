@@ -1,0 +1,3 @@
+[submodule "diagram-design"]
+	path = diagram-design
+	url = https://github.com/cathrynlavery/diagram-design

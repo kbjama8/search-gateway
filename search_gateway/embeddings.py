@@ -1,0 +1,117 @@
+# -*- coding: utf-8 -*-
+"""Document embeddings (bi-encoder) for MMR diversity + embedding dedup.
+
+Lazy-loads sentence-transformers/all-MiniLM-L6-v2 (already cached) for the fast
+default path. For CJK-dominant runs (bilibili/v2ex/XHS), lazily loads
+BAAI/bge-m3 (multilingual) so dedup/MMR embed Chinese/Japanese/Korean text
+meaningfully instead of degrading to the English-only MiniLM vectors.
+
+Used for document↔document similarity — the re-ranker (bge-reranker-v2-m3) is a
+cross-encoder and can't produce standalone vectors.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
+import numpy as np
+
+from .config import (CJK_SHARE_THRESHOLD, EMBED_CJK, EMBED_CJK_REVISION,
+                     EMBED_MODEL, EMBED_MODEL_CJK, EMBED_REVISION)
+
+logger = logging.getLogger("search_gateway.embeddings")
+
+_model: Optional[object] = None
+_model_error: Optional[str] = None
+_cjk_model: Optional[object] = None
+_cjk_model_error: Optional[str] = None
+
+
+def _load(model_name: str, revision: str = "") -> tuple[Optional[object], Optional[str]]:
+    try:
+        from huggingface_hub import snapshot_download
+        from sentence_transformers import SentenceTransformer
+        logger.info("loading embed model %s ...", model_name)
+        # Resolve to a local snapshot first, skipping the redundant
+        # pytorch_model.bin (models ship model.safetensors) and onnx exports —
+        # otherwise SentenceTransformer fetches the ~2.3GB .bin too. Pin to a
+        # revision when configured so commit-churn doesn't force a re-download.
+        kwargs = {"revision": revision} if revision else {}
+        local = snapshot_download(model_name, ignore_patterns=["*.bin", "onnx/*"], **kwargs)
+        m = SentenceTransformer(local)
+        logger.info("embed model loaded: %s", model_name)
+        return m, None
+    except Exception as exc:  # noqa: BLE001
+        err = f"{type(exc).__name__}: {exc}"
+        logger.error("embed model load failed (%s): %s", model_name, err)
+        return None, err
+
+
+def _get_model():
+    global _model, _model_error
+    if _model is None and _model_error is None:
+        _model, _model_error = _load(EMBED_MODEL, EMBED_REVISION)
+    return _model
+
+
+def _get_cjk_model():
+    global _cjk_model, _cjk_model_error
+    if _cjk_model is None and _cjk_model_error is None:
+        _cjk_model, _cjk_model_error = _load(EMBED_MODEL_CJK, EMBED_CJK_REVISION)
+    return _cjk_model
+
+
+def _is_cjk(ch: str) -> bool:
+    return ("\u4e00" <= ch <= "\u9fff"       # CJK unified ideographs
+            or "\u3040" <= ch <= "\u30ff"    # hiragana/katakana
+            or "\uac00" <= ch <= "\ud7af")   # hangul
+
+
+def cjk_dominant(texts: list[str]) -> bool:
+    """True when the combined CJK character share across `texts` exceeds the
+    threshold — the signal to switch to the multilingual embed model."""
+    if not EMBED_CJK or not texts:
+        return False
+    total = 0
+    cjk = 0
+    for t in texts:
+        if not t:
+            continue
+        total += len(t)
+        cjk += sum(1 for ch in t if _is_cjk(ch))
+    if total == 0:
+        return False
+    return (cjk / total) >= CJK_SHARE_THRESHOLD
+
+
+def encode(texts: list[str], multilingual: bool = False) -> Optional[np.ndarray]:
+    """Return normalized document vectors (or None if the model is unavailable).
+
+    `multilingual=True` selects the CJK model (bge-m3); leave False for the fast
+    English-dominant default.
+    """
+    if not texts:
+        return None
+    model = _get_cjk_model() if multilingual else _get_model()
+    if model is None:
+        return None
+    try:
+        vecs = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
+        return np.asarray(vecs)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("embed failed: %s", exc)
+        return None
+
+
+def cosine_matrix(vecs: np.ndarray) -> np.ndarray:
+    """Pairwise cosine similarity (vecs assumed normalized)."""
+    return vecs @ vecs.T
+
+
+def status() -> dict:
+    return {
+        "model": EMBED_MODEL, "loaded": _model is not None, "error": _model_error,
+        "cjk_model": EMBED_MODEL_CJK, "cjk_loaded": _cjk_model is not None,
+        "cjk_error": _cjk_model_error, "cjk_enabled": EMBED_CJK,
+    }
