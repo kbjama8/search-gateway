@@ -42,6 +42,7 @@ def test_onnx_rerank_backend():
     script = (
         "import os\n"
         "os.environ['SEARCH_GATEWAY_INFERENCE_BACKEND'] = 'onnx_int8'\n"
+        "os.environ['SEMANTIC_RERANK'] = '1'\n"  # test_smoke leaks SEMANTIC_RERANK=0
         "from search_gateway import rerank\n"
         "from search_gateway.models import Result\n"
         "rs = [Result(title=f't{i}', url=f'u{i}', snippet=f's{i}') for i in range(5)]\n"

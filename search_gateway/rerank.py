@@ -21,7 +21,8 @@ logger = logging.getLogger("search_gateway.rerank")
 
 _model: Optional[object] = None
 _model_error: Optional[str] = None
-_effective_model: str = RERANK_MODEL
+_effective_model: str = (RERANK_ONNX_MODEL if INFERENCE_BACKEND in _ONNX_FILE
+                         else RERANK_MODEL)
 
 
 def _get_model():
