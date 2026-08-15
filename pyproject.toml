@@ -28,6 +28,11 @@ report = [
     "python-docx",
     "playwright",
 ]
+# ONNX inference backend — ~2x faster re-rank than torch (see docs/deployment.md).
+onnx = [
+    "optimum[onnxruntime]",
+    "onnxruntime",
+]
 
 [tool.setuptools]
 packages = ["search_gateway", "search_gateway.sources"]

@@ -75,6 +75,18 @@ EMBED_REVISION = _env("SEARCH_GATEWAY_EMBED_REVISION",
 EMBED_CJK_REVISION = _env("SEARCH_GATEWAY_EMBED_CJK_REVISION",
                           "5617a9f61b028005a4858fdac845db406aefb181")
 EMBED_CJK = _env_bool("SEARCH_GATEWAY_EMBED_CJK", True)
+
+# --- inference backend (ONNX, ~2x faster rerank) ---
+# torch | onnx (fp32) | onnx_int8 (dynamic-quantized). ONNX needs the
+# `.[onnx]` extra (optimum + onnxruntime); if the ONNX model cannot load, the
+# reranker falls back to torch automatically.
+INFERENCE_BACKEND = _env("SEARCH_GATEWAY_INFERENCE_BACKEND", "torch")
+RERANK_ONNX_MODEL = _env("SEARCH_GATEWAY_RERANK_ONNX_MODEL",
+                         "onnx-community/bge-reranker-v2-m3-ONNX")
+RERANK_ONNX_REVISION = _env("SEARCH_GATEWAY_RERANK_ONNX_REVISION",
+                            "6f5ff65298512715a1e669753bc754d2bc8f367b")
+# onnx -> model.onnx (fp32); onnx_int8 -> model_int8.onnx (dynamic-quantized).
+_ONNX_FILE = {"onnx": "model.onnx", "onnx_int8": "model_int8.onnx"}
 CJK_SHARE_THRESHOLD = _env_float("SEARCH_GATEWAY_CJK_SHARE_THRESHOLD", 0.25)
 SEMANTIC_RERANK = _env_bool("SEMANTIC_RERANK", True)
 RERANK_CANDIDATES = _env_int("SEARCH_GATEWAY_RERANK_CANDIDATES", 30)

@@ -30,3 +30,26 @@ def test_rerank_path_if_cached():
     rs = [Result(title=f"t{i}", url=f"u{i}", snippet=f"s{i}") for i in range(3)]
     out = rerank.rerank("query", rs)
     assert len(out) == 3
+
+
+@pytest.mark.slow
+def test_onnx_rerank_backend():
+    """The ONNX backend loads (or falls back to torch) and re-ranks. Runs in a
+    fresh interpreter so the module-level singleton is not polluted."""
+    import subprocess
+    import sys
+
+    script = (
+        "import os\n"
+        "os.environ['SEARCH_GATEWAY_INFERENCE_BACKEND'] = 'onnx_int8'\n"
+        "from search_gateway import rerank\n"
+        "from search_gateway.models import Result\n"
+        "rs = [Result(title=f't{i}', url=f'u{i}', snippet=f's{i}') for i in range(5)]\n"
+        "assert len(rerank.rerank('query', rs)) == 5\n"
+        "assert rerank.status()['loaded'] is True\n"
+        "print('onnx backend:', rerank.status()['backend'], '->', rerank.status()['model'])\n"
+    )
+    r = subprocess.run([sys.executable, "-c", script],
+                       capture_output=True, text=True, timeout=600)
+    assert r.returncode == 0, r.stderr
+    assert "onnx backend:" in r.stdout

@@ -12,29 +12,59 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from .config import RERANK_MODEL, RERANK_REVISION, SEMANTIC_RERANK
+from .config import (INFERENCE_BACKEND, RERANK_MODEL, RERANK_ONNX_MODEL,
+                     RERANK_ONNX_REVISION, RERANK_REVISION, SEMANTIC_RERANK,
+                     _ONNX_FILE)
 from .models import Result
 
 logger = logging.getLogger("search_gateway.rerank")
 
 _model: Optional[object] = None
 _model_error: Optional[str] = None
+_effective_model: str = RERANK_MODEL
 
 
 def _get_model():
-    global _model, _model_error
+    global _model, _model_error, _effective_model
     if _model is not None or _model_error is not None:
         return _model
+
+    def _load_torch() -> object:
+        from sentence_transformers import CrossEncoder
+        kwargs = {"revision": RERANK_REVISION} if RERANK_REVISION else {}
+        return CrossEncoder(RERANK_MODEL, **kwargs)
+
     try:
         from sentence_transformers import CrossEncoder
-        logger.info("loading cross-encoder %s ...", RERANK_MODEL)
-        kwargs = {"revision": RERANK_REVISION} if RERANK_REVISION else {}
-        _model = CrossEncoder(RERANK_MODEL, **kwargs)
+        if INFERENCE_BACKEND in _ONNX_FILE:
+            fname = _ONNX_FILE[INFERENCE_BACKEND]
+            _effective_model = RERANK_ONNX_MODEL
+            logger.info("loading cross-encoder %s (backend=%s, %s) ...",
+                        RERANK_ONNX_MODEL, INFERENCE_BACKEND, fname)
+            kwargs = {"revision": RERANK_ONNX_REVISION} if RERANK_ONNX_REVISION else {}
+            _model = CrossEncoder(RERANK_ONNX_MODEL, backend="onnx",
+                                  model_kwargs={"file_name": fname}, **kwargs)
+        else:
+            logger.info("loading cross-encoder %s ...", RERANK_MODEL)
+            _model = _load_torch()
         logger.info("cross-encoder loaded")
     except Exception as exc:  # noqa: BLE001 — never crash the search
-        _model_error = f"{type(exc).__name__}: {exc}"
-        logger.error("cross-encoder load failed: %s", _model_error)
-        _model = None
+        if INFERENCE_BACKEND in _ONNX_FILE:
+            # ONNX unavailable (missing `.[onnx]` extra, model not cached) —
+            # fall back to torch rather than silently dropping re-rank.
+            logger.warning("ONNX cross-encoder load failed (%s); falling back to torch", exc)
+            try:
+                _effective_model = RERANK_MODEL
+                _model = _load_torch()
+                logger.info("cross-encoder loaded (torch fallback)")
+            except Exception as exc2:  # noqa: BLE001
+                _model_error = f"{type(exc2).__name__}: {exc2}"
+                logger.error("cross-encoder load failed: %s", _model_error)
+                _model = None
+        else:
+            _model_error = f"{type(exc).__name__}: {exc}"
+            logger.error("cross-encoder load failed: %s", _model_error)
+            _model = None
     return _model
 
 
@@ -65,5 +95,6 @@ def rerank(query: str, candidates: list[Result], top_k: Optional[int] = None) ->
 
 
 def status() -> dict:
-    return {"enabled": SEMANTIC_RERANK, "model": RERANK_MODEL,
-            "loaded": _model is not None, "error": _model_error}
+    return {"enabled": SEMANTIC_RERANK, "backend": INFERENCE_BACKEND,
+            "model": _effective_model, "loaded": _model is not None,
+            "error": _model_error}

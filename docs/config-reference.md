@@ -147,6 +147,22 @@ triggers a silent re-download (verified: models load from cache with the pinned
 
 `docs/adrs/0005-pinned-model-revisions.md` has the incident this fixed.
 
+## Inference backend
+
+*The cross-encoder can run on ONNX Runtime instead of torch — ~2× faster re-rank
+and a smaller memory footprint, measured at roughly equal ranking quality
+(Spearman ≈ 0.96). Requires the `.[onnx]` extra (`optimum` + `onnxruntime`).*
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_INFERENCE_BACKEND` | `torch` | `torch` \| `onnx` (fp32) \| `onnx_int8` (dynamic-quantized) |
+| `SEARCH_GATEWAY_RERANK_ONNX_MODEL` | `onnx-community/bge-reranker-v2-m3-ONNX` | pre-exported ONNX cross-encoder |
+| `SEARCH_GATEWAY_RERANK_ONNX_REVISION` | `6f5ff65…` | pinned revision of the ONNX model |
+
+`onnx` selects `model.onnx` (fp32); `onnx_int8` selects `model_int8.onnx`.
+If the ONNX model can't load (missing extra, not cached), the reranker falls
+back to torch automatically rather than silently dropping re-rank.
+
 ## Two-tier / opencli parallelism
 
 *Isolating the slow, browser-backed sources so they don't block the fast
