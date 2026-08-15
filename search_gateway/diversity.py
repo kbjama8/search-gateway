@@ -46,6 +46,10 @@ def mmr_select(candidates: list[Result], embeddings, limit: int,
     if emb is not None:
         cos = emb @ emb.T  # normalized vectors → cosine matrix
 
+    # Precompute domains once — urlparse/removeprefix in the inner loop below
+    # would re-parse the same URL on every (candidate, selected) pair.
+    domains = [_domain(r.url) for r in candidates]
+
     selected_idx: list[int] = []
     remaining = set(range(n))
 
@@ -58,7 +62,7 @@ def mmr_select(candidates: list[Result], embeddings, limit: int,
                 continue  # below relevance floor — skip even if "diverse"
             div = 0.0
             for j in selected_idx:
-                sim = 1.0 if _domain(candidates[i].url) == _domain(candidates[j].url) else 0.0
+                sim = 1.0 if domains[i] == domains[j] else 0.0
                 if cos is not None:
                     sim = max(sim, float(cos[i][j]))
                 div = max(div, sim)

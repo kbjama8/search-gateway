@@ -7,6 +7,7 @@ Run:  search-gateway serve      (console script)
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastmcp import FastMCP
@@ -96,17 +97,21 @@ async def get_paper(identifier: str) -> dict:
             return {"error": str(exc)}
 
     if kind == "arxiv":
-        ar = await try_source(lambda: ALL_SOURCES["arxiv"].get(val))
+        ar, oa = await asyncio.gather(
+            try_source(lambda: ALL_SOURCES["arxiv"].get(val)),
+            try_source(lambda: ALL_SOURCES["openalex"].get(f"10.48550/arxiv.{val}")),
+        )
         merged["arxiv"] = ar
         merged.update(_pick_fields(ar))
-        oa = await try_source(lambda: ALL_SOURCES["openalex"].get(f"10.48550/arxiv.{val}"))
         merged["openalex"] = oa
         merged.update(_pick_fields(oa))
     elif kind == "doi":
-        cr = await try_source(lambda: ALL_SOURCES["crossref"].get(val))
+        cr, oa = await asyncio.gather(
+            try_source(lambda: ALL_SOURCES["crossref"].get(val)),
+            try_source(lambda: ALL_SOURCES["openalex"].get(val)),
+        )
         merged["crossref"] = cr
         merged.update(_pick_fields(cr))
-        oa = await try_source(lambda: ALL_SOURCES["openalex"].get(val))
         merged["openalex"] = oa
         merged.update(_pick_fields(oa))
     else:  # title/query → OpenAlex best match

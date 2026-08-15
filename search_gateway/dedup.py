@@ -14,6 +14,8 @@ import re
 from difflib import SequenceMatcher
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
+import numpy as np
+
 from .config import EMBEDDING_DEDUP
 from .models import Result
 
@@ -86,7 +88,6 @@ def dedup(results: list[Result], embeddings=None,
             if use_emb and existing_key in emb_vec:
                 doc = r.title + " " + r.snippet[:200]
                 if _is_ascii_dominant(doc) and _is_ascii_dominant(emb_doc[existing_key]):
-                    import numpy as np
                     sim = float(np.dot(np.asarray(emb_vec[existing_key]), np.asarray(embeddings[idx])))
                     if sim >= _EMBED_THRESHOLD:
                         _merge(seen[existing_key], r)

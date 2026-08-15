@@ -30,16 +30,20 @@ _cjk_model_error: Optional[str] = None
 
 def _load(model_name: str, revision: str = "") -> tuple[Optional[object], Optional[str]]:
     try:
-        from huggingface_hub import snapshot_download
         from sentence_transformers import SentenceTransformer
         logger.info("loading embed model %s ...", model_name)
-        # Resolve to a local snapshot first, skipping the redundant
-        # pytorch_model.bin (models ship model.safetensors) and onnx exports —
-        # otherwise SentenceTransformer fetches the ~2.3GB .bin too. Pin to a
-        # revision when configured so commit-churn doesn't force a re-download.
         kwargs = {"revision": revision} if revision else {}
-        local = snapshot_download(model_name, ignore_patterns=["*.bin", "onnx/*"], **kwargs)
-        m = SentenceTransformer(local)
+        try:
+            # Fast path: resolve straight from the local cache (no Hugging Face
+            # API round-trip). SentenceTransformer prefers safetensors, so the
+            # redundant pytorch_model.bin is never pulled.
+            m = SentenceTransformer(model_name, local_files_only=True, **kwargs)
+        except Exception:  # noqa: BLE001 — cache miss → fetch below
+            # Cache miss → download, skipping the ~2.3GB .bin and onnx exports.
+            from huggingface_hub import snapshot_download
+            local = snapshot_download(model_name, ignore_patterns=["*.bin", "onnx/*"],
+                                      **kwargs)
+            m = SentenceTransformer(local)
         logger.info("embed model loaded: %s", model_name)
         return m, None
     except Exception as exc:  # noqa: BLE001
