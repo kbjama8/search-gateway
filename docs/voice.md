@@ -23,6 +23,40 @@ Which one a document uses depends on the job it's doing.
   plainly. That is the `research_answer` rule: "if the sources don't answer it,
   say so rather than guessing."
 
+### Worked example
+
+**Before (templated):**
+
+> This section describes the search tool. The search tool is used to perform
+> searches. It is important to note that the search tool has several parameters.
+
+**After (in-voice):**
+
+> `search(query, sources?, category, limit, freshness?)` fans out to 18 sources
+> and fuses the survivors. `tests/test_contract.py` asserts the surface against
+> the live `tools/list`. A source that times out does not fail the request — the
+> fan-out keeps whatever completed (`server.py`, `orchestrator.py`).
+
+**Why it works:** the first sentence *is* the signature, not an introduction to
+it. "Fuses the survivors" names the actual behavior instead of gesturing at
+"search functionality." The test that guards the claim is named inline, not
+footnoted. And the timeout behavior — the one fact a reader actually needs
+before depending on this tool — is stated as a fact with its file anchors, not
+buried in a caveats section at the bottom.
+
+**A second before/after, showing calibrated certainty on a config claim:**
+
+**Before:** "The timeout can be configured with an environment variable."
+
+**After:** "`SEARCH_GATEWAY_TIMEOUT=50` bounds the whole fan-out in seconds
+(`config.py`). Lower it when sources hang; raise it for slow verticals."
+
+**Why it works:** the before-sentence is true of every env var in the file and
+says nothing — it doesn't even name the variable. The after-sentence gives the
+exact default, the exact unit, the file that defines it, and — the part a
+reference doc is supposed to supply — the operational reason you'd move it in
+either direction.
+
 ## Narrative docs — the thesis register
 
 `README.md` · `docs/architecture.md`
@@ -38,6 +72,43 @@ Which one a document uses depends on the job it's doing.
   `likely` (signals align, no proof). Never inflate a `suggests` into a `shows`.
 - **A point of view.** The document takes a position and defends it with
   evidence — it does not bury the reader in a neutral inventory.
+
+### Worked example
+
+**Before (throat-clearing):**
+
+> This document describes the architecture of the search gateway. The gateway
+> has many components. These components work together to provide search.
+
+**After (in-voice):**
+
+> The gateway's entire design bet is this: the conformance check is the protocol
+> handshake, so no client is the source of truth. That is why OpenCode, Claude
+> Code, and a bespoke script all see the same 14 tools — and why the server
+> never needs to know any of them exist.
+
+**Why it works:** "many components... work together" is true of every piece of
+software ever written and therefore says nothing; "the conformance check is the
+protocol handshake" is a specific, falsifiable claim about *this* system. The
+second sentence doesn't restate the first — it draws the consequence ("that is
+why...") and names the three concrete parties (OpenCode, Claude Code, a bespoke
+script) the abstract claim would otherwise leave vague.
+
+**A second before/after, showing the difference a number makes:**
+
+**Before:** "The pipeline uses several techniques to improve search quality,
+including deduplication and reranking."
+
+**After:** "Weighted RRF fuses 18 sources by their rolling 24-hour success
+rate; a cross-encoder then re-ranks the top 30 candidates — never the full
+set, to bound CPU latency on a 16 GB host."
+
+**Why it works:** "several techniques... to improve search quality" is a
+sentence that could describe almost any search system. Naming the fusion
+method, the exact candidate count, the hardware constraint, and *why* the
+scope is limited to 30 turns a vague quality claim into a specific, checkable
+design decision — which is what a narrative doc is for: not just saying what
+exists, but why it was built that way.
 
 ## Diagrams
 

@@ -9,7 +9,54 @@ One invariant, restated because it matters: **logs go to stderr — stdout is th
 MCP stdio protocol wire.** `SEARCH_GATEWAY_LOG_FMT=json` emits one JSON object
 per line to stderr for systemd/journald.
 
+## Override precedence
+
+For every setting, resolution happens in this order, highest wins:
+
+```mermaid
+flowchart LR
+    A["1. environment variable (set at process launch)"] -.->|"wins if set"| D["effective value"]
+    B["2. auth-file fallback (DEEPSEEK_API_KEY only)"] -.->|"wins if A unset"| D
+    C["3. hardcoded default (config.py)"] -.->|"wins if A and B unset"| D
+```
+
+Almost every variable is `env var > default` — two levels, checked by
+`_env`/`_env_bool`/`_env_int`/`_env_float` in `config.py`. Exactly one setting
+has a third level: `DEEPSEEK_API_KEY`. `llm.get_api_key()` reads the env var
+first and, only if that's empty, falls back to `load_env_file(DEEPSEEK_AUTH_FILE,
+...)` — so a value exported in the shell always overrides whatever sits in
+`~/.agent-reach/deepseek.env`. `TWITTER_AUTH_FILE` is different: it only sets
+*where* Twitter reads its tokens from — the tokens themselves
+(`TWITTER_AUTH_TOKEN` / `TWITTER_CT0`) come from that file and have no env-var
+override. Every other variable — `SEARXNG_BASE`, all the fusion/rerank knobs,
+the cache TTLs — has no file-based fallback; if the env var isn't set, you get
+the hardcoded default, full stop.
+
+## Rationale by group + tier mapping
+
+Each group below exists to solve one operational problem, and each maps to a
+point in the capability-tier ladder from `docs/deployment.md` — most vars
+matter starting at a specific tier, not from `minimal` onward.
+
+| Group | Solves | Matters starting at tier |
+|-------|--------|---------------------------|
+| Infrastructure | Where Redis/SearXNG live; GitHub rate-limit relief | **minimal** |
+| Search behaviour | Fan-out budget and the polite-pool contact email | **minimal** |
+| Retry | Distinguishing a transient failure from a permanent one | **minimal** |
+| Rate limiting | Protecting cookie-authenticated accounts from bans | **social/vertical** |
+| Fusion / re-rank / diversity | Turning 18 raw result lists into one ranked, deduped, diverse list | **web+neural** (rerank/embed models apply to any multi-source fan-out) |
+| Pinned model revisions | Stopping silent re-downloads when a model repo's HEAD moves | **web+neural** |
+| Two-tier / opencli parallelism | Isolating slow, browser-backed sources from the fast default fan-out | **social/vertical** |
+| Cache | Bounding repeat-query cost and staleness | **minimal** |
+| LLM / answer synthesis | `research_answer` + query expansion | **answer synthesis** |
+| Auth files | Keeping tokens out of shell history and process listings | **social/vertical**, **answer synthesis** |
+| Observability / serving | Log format/level; HTTP bind address for a host-process deployment | **minimal** (logging), **any tier running `--transport http/sse`** (host/port) |
+| Ledger health | Read-only visibility into `deep-research` skill run health | optional, any tier |
+
 ## Infrastructure
+
+*Where the gateway's two hard service dependencies live, plus an optional
+GitHub token.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -19,32 +66,56 @@ per line to stderr for systemd/journald.
 
 ## Search behaviour
 
+*The fan-out budget and the one non-secret "identity" var — a courtesy email
+some academic APIs ask for, not an API key.*
+
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SEARCH_GATEWAY_MAILTO` | `kaichen.research@proton.me` | polite-pool email for OpenAlex/Crossref (not a key) |
 | `SEARCH_GATEWAY_TIMEOUT` | `50` | global fan-out budget (seconds per search) |
 | `SEARCH_GATEWAY_SOURCE_TIMEOUT` | `18` | per-source timeout (seconds) |
 
+`SEARCH_GATEWAY_TIMEOUT=50` bounds the whole fan-out in seconds (`config.py`).
+Lower it when sources hang; raise it for slow verticals.
+
 ## Retry
+
+*How many times, and how long to wait, before giving up on one source for one
+query — scoped to transient failures only.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SEARCH_GATEWAY_RETRY_COUNT` | `1` | retries per source |
 | `SEARCH_GATEWAY_RETRY_BACKOFF` | `1.5` | backoff multiplier (×2 per retry) |
 
+Retries apply only to `RETRYABLE_EXIT_CODES = (1, 8, 52, 56)` — curl-style
+transient codes. An auth failure or a 404 is not retried; retrying a
+permanent failure just burns the fan-out budget.
+
 ## Rate limiting (cookie-logged sources)
+
+*A floor on request frequency to the four cookie-authenticated sources, so
+burst traffic doesn't read as bot behavior to the platform.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SEARCH_GATEWAY_RATE_LIMIT` | `2.5` | min seconds between queries to cookie-logged sources |
 
+Applies to `RATE_LIMITED_SOURCES = {twitter, reddit, facebook, instagram}`
+specifically — the four other social/video sources (xiaohongshu, linkedin,
+youtube, bilibili) authenticate differently and aren't gated by this variable.
+
 ## Fusion / re-rank / diversity
+
+*The knobs that turn 18 raw ranked lists into one fused, deduped, re-ranked,
+diverse list.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SEARCH_GATEWAY_RERANK_MODEL` | `BAAI/bge-reranker-v2-m3` | cross-encoder for re-rank |
 | `SEARCH_GATEWAY_EMBED_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | bi-encoder (dedup/MMR) |
 | `SEARCH_GATEWAY_EMBED_MODEL_CJK` | `BAAI/bge-m3` | multilingual bi-encoder for CJK-heavy runs (lazy) |
+| `SEARCH_GATEWAY_EMBED_CJK` | `1` | enable/disable the CJK-dominant detection + multilingual model switch |
 | `SEARCH_GATEWAY_CJK_SHARE_THRESHOLD` | `0.25` | CJK char share that triggers the multilingual model |
 | `SEMANTIC_RERANK` | `1` | `0` = RRF-only |
 | `SEARCH_GATEWAY_RERANK_CANDIDATES` | `30` | top-RRF candidates re-ranked |
@@ -53,6 +124,14 @@ per line to stderr for systemd/journald.
 | `SEARCH_GATEWAY_EMBEDDING_DEDUP` | `1` | embedding near-dup collapse |
 | `SEARCH_GATEWAY_WEIGHTED_RRF` | `1` | reliability-weighted fusion |
 | `SEARCH_GATEWAY_FRESHNESS` | `1` | freshness filter |
+
+`SEARCH_GATEWAY_MMR_LAMBDA=0.75` weighs relevance 75% against diversity 25% in
+the greedy MMR selection (`diversity.py`) — raise it toward `1.0` if results
+feel too scattered across unrelated domains, lower it if the top-k feels like
+five copies of the same article.
+`SEARCH_GATEWAY_EMBED_CJK` is the master switch: with it off, `cjk_dominant()`
+always returns `False` and the multilingual model never loads, regardless of
+how much Chinese/Japanese/Korean text is in the fused set.
 
 ## Pinned model revisions
 
@@ -66,7 +145,12 @@ triggers a silent re-download (verified: models load from cache with the pinned
 | `SEARCH_GATEWAY_EMBED_REVISION` | `1110a243fdf4706b3f48f1d95db1a4f5529b4d41` |
 | `SEARCH_GATEWAY_EMBED_CJK_REVISION` | `5617a9f61b028005a4858fdac845db406aefb181` |
 
+`docs/adrs/0005-pinned-model-revisions.md` has the incident this fixed.
+
 ## Two-tier / opencli parallelism
+
+*Isolating the slow, browser-backed sources so they don't block the fast
+default fan-out.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -75,12 +159,21 @@ triggers a silent re-download (verified: models load from cache with the pinned
 
 ## Cache
 
+*How long a result is trusted before the gateway re-fetches it.*
+
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SEARCH_GATEWAY_CACHE_TTL` | `3600` | final-result TTL (seconds) |
 | `SEARCH_GATEWAY_SOURCE_CACHE_TTL` | `900` | per-source TTL (seconds) |
 
+The final-result TTL outlives the per-source TTL by 4×: a per-source result
+is reusable across many different fused queries, so it refreshes more often;
+the expensive fused-and-reranked output is worth holding onto longer.
+
 ## LLM / answer synthesis
+
+*Everything `research_answer` and query expansion need — and nothing else
+needs.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -91,12 +184,21 @@ triggers a silent re-download (verified: models load from cache with the pinned
 | `DEEPSEEK_API_KEY` | `""` | DeepSeek key (also read from `DEEPSEEK_AUTH_FILE`) |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API base URL |
 
+Every other tool works with none of these set. `search`, `search_web`,
+`search_academic`, and the rest never touch DeepSeek; only `research_answer`'s
+synthesis step and the optional query-expansion pass inside `orchestrator.py`
+do (`docs/faq.md`).
+
 ## Auth files (paths, not inline secrets)
 
 | Variable | Default |
 |----------|---------|
 | `TWITTER_AUTH_FILE` | `~/.agent-reach/twitter-auth.env` |
 | `DEEPSEEK_AUTH_FILE` | `~/.agent-reach/deepseek.env` |
+
+These are *paths* to files containing `KEY=VALUE` secrets, parsed by
+`load_env_file()` (export-aware, quote-stripped) — not secrets themselves.
+Env var still wins if both are set (see override precedence above).
 
 ## Observability / serving
 
@@ -107,10 +209,18 @@ triggers a silent re-download (verified: models load from cache with the pinned
 | `SEARCH_GATEWAY_HOST` | `127.0.0.1` | bind host for `serve --transport http/sse` |
 | `SEARCH_GATEWAY_PORT` | `8765` | bind port for `serve --transport http/sse` |
 
+`SEARCH_GATEWAY_HOST`/`_PORT` are read only when `--transport http` or
+`--transport sse` is passed to `serve` — the stdio default (no flag) ignores
+both.
+
 ## Ledger health
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SEARCH_GATEWAY_LEDGER_DIR` | `~/research_runs` | dir scanned by `doctor`/`stats_report` for run health |
+
+Read-only: `stats.ledger_health()` walks this directory for `ledger.json`
+files and never writes to it. A missing directory or a malformed
+`ledger.json` is skipped, not raised.
 
 > Logs always go to **stderr** — stdout is the MCP stdio protocol wire.
