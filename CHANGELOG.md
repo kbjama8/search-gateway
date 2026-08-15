@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-15
+
+### Added
+- ONNX Runtime inference backend for the cross-encoder, on by default
+  (`SEARCH_GATEWAY_INFERENCE_BACKEND=onnx_int8`): ~2× faster re-rank and ~1GB
+  smaller RSS than torch at Spearman ≈ 0.96 ranking agreement. `onnx`
+  (fp32) and `torch` remain available; the reranker falls back to torch
+  automatically if the ONNX model can't load.
+- `scripts/bench.py` — micro/model/search benchmark harness (p50/p90, RSS,
+  subprocess cold-start measurement).
+
+### Changed
+- `optimum[onnxruntime]` + `onnxruntime` are now core dependencies (was the
+  `.[onnx]` optional extra).
+- Docs rewritten in the hybrid answer-synthesis voice with Mermaid diagrams;
+  six ADRs, a FAQ, and a CONTRIBUTING guide added.
+
+### Fixed
+- `saved_queries` MCP tool crashed with `AttributeError` (module shadowed by
+  the same-named tool function) — now aliased and regression-guarded.
+- `diversity._domain` misused `str.lstrip("www.")` (character-set semantics,
+  mangling domains like `worldwide.com`) — now `removeprefix`.
+- Embedding loader cold-start hits the Hugging Face API even on a warm cache —
+  now `local_files_only=True` fast path with `snapshot_download` on miss.
+- `get_paper` awaited its independent sub-lookups sequentially — now
+  `asyncio.gather`.
+
 ## [0.2.0] - 2026-08-14
 
 Standalone, client-agnostic release: the gateway decouples from OpenCode into

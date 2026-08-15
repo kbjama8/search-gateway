@@ -63,17 +63,19 @@ Optional report-tooling extras:
 pip install '.[report]'        # matplotlib, weasyprint, python-docx, playwright
 ```
 
-Faster re-rank (ONNX Runtime — ~2× on the cross-encoder, smaller RSS):
+The re-ranker runs on ONNX Runtime by default (dynamic-quantized INT8),
+~2× faster than torch with a smaller footprint — no extra install step, it's a
+core dependency:
 
 ```bash
-pip install '.[onnx]'                                       # optimum + onnxruntime
-SEARCH_GATEWAY_INFERENCE_BACKEND=onnx_int8 search-gateway serve
+search-gateway serve                                        # onnx_int8 by default
+SEARCH_GATEWAY_INFERENCE_BACKEND=torch search-gateway serve # original torch path
 ```
 
 `onnx_int8` uses the pre-exported `onnx-community/bge-reranker-v2-m3-ONNX`
-model (dynamic-quantized), downloaded on first load; if it can't load, the
-reranker falls back to torch automatically. Measured: rerank 30 pairs ~3s vs
-~6s on torch, RSS ~1.5GB vs ~2.6GB, ranking agreement Spearman ≈ 0.96.
+model, downloaded on first load; if it can't load, the reranker falls back to
+torch automatically. Measured: rerank 30 pairs ~3s vs ~6s on torch, RSS ~1.6GB
+vs ~2.6GB, ranking agreement Spearman ≈ 0.96.
 
 ## 2. Services (Redis + SearXNG)
 

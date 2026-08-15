@@ -77,10 +77,11 @@ EMBED_CJK_REVISION = _env("SEARCH_GATEWAY_EMBED_CJK_REVISION",
 EMBED_CJK = _env_bool("SEARCH_GATEWAY_EMBED_CJK", True)
 
 # --- inference backend (ONNX, ~2x faster rerank) ---
-# torch | onnx (fp32) | onnx_int8 (dynamic-quantized). ONNX needs the
-# `.[onnx]` extra (optimum + onnxruntime); if the ONNX model cannot load, the
-# reranker falls back to torch automatically.
-INFERENCE_BACKEND = _env("SEARCH_GATEWAY_INFERENCE_BACKEND", "torch")
+# onnx_int8 | onnx | torch. Default onnx_int8 (dynamic-quantized ONNX) — ~2x
+# faster + smaller RSS than torch, ranking quality preserved (Spearman ≈ 0.96).
+# optimum + onnxruntime are core dependencies; if the ONNX model cannot load,
+# the reranker falls back to torch automatically.
+INFERENCE_BACKEND = _env("SEARCH_GATEWAY_INFERENCE_BACKEND", "onnx_int8")
 RERANK_ONNX_MODEL = _env("SEARCH_GATEWAY_RERANK_ONNX_MODEL",
                          "onnx-community/bge-reranker-v2-m3-ONNX")
 RERANK_ONNX_REVISION = _env("SEARCH_GATEWAY_RERANK_ONNX_REVISION",

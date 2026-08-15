@@ -42,3 +42,8 @@ globals (`_model`, `_cjk_model` in `embeddings.py`; `_model` in `rerank.py`).
   (`cjk_dominant()` decides once per search, and both stages reuse that
   decision) — so the CJK/English model choice is consistent within one
   request, never mixed mid-pipeline.
+- The cross-encoder runs on **ONNX Runtime** (dynamic-quantized INT8) by
+  default — `SEARCH_GATEWAY_INFERENCE_BACKEND` selects `onnx_int8`, `onnx`
+  (fp32), or `torch`. Measured ~2× faster and ~1GB smaller RSS than torch at
+  Spearman ≈ 0.96 ranking agreement; `torch` remains the fallback if the ONNX
+  model can't load.
