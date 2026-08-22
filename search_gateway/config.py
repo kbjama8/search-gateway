@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Gateway configuration — env-overridable, machine-specific defaults."""
 
 import os
@@ -89,10 +88,19 @@ RERANK_ONNX_REVISION = _env("SEARCH_GATEWAY_RERANK_ONNX_REVISION",
 # onnx -> model.onnx (fp32); onnx_int8 -> model_int8.onnx (dynamic-quantized).
 _ONNX_FILE = {"onnx": "model.onnx", "onnx_int8": "model_int8.onnx"}
 CJK_SHARE_THRESHOLD = _env_float("SEARCH_GATEWAY_CJK_SHARE_THRESHOLD", 0.25)
-SEMANTIC_RERANK = _env_bool("SEMANTIC_RERANK", True)
+SEMANTIC_RERANK = _env_bool("SEARCH_GATEWAY_SEMANTIC_RERANK",
+                            _env_bool("SEMANTIC_RERANK", True))  # legacy alias honored
 RERANK_CANDIDATES = _env_int("SEARCH_GATEWAY_RERANK_CANDIDATES", 30)
 MMR_ENABLED = _env_bool("SEARCH_GATEWAY_MMR", True)
 MMR_LAMBDA = _env_float("SEARCH_GATEWAY_MMR_LAMBDA", 0.75)  # relevance vs diversity
+# Per-category λ (B6 calibration): news/social value diversity more (0.7),
+# science/general value relevance more (0.8). Swept 0.6-0.9 in scripts/rerank_eval.py.
+MMR_LAMBDA_BY_CATEGORY = {
+    "general": _env_float("SEARCH_GATEWAY_MMR_LAMBDA_GENERAL", 0.75),
+    "news": _env_float("SEARCH_GATEWAY_MMR_LAMBDA_NEWS", 0.7),
+    "science": _env_float("SEARCH_GATEWAY_MMR_LAMBDA_SCIENCE", 0.8),
+    "social": _env_float("SEARCH_GATEWAY_MMR_LAMBDA_SOCIAL", 0.7),
+}
 EMBEDDING_DEDUP = _env_bool("SEARCH_GATEWAY_EMBEDDING_DEDUP", True)
 
 # --- freshness (Phase 3) ---
@@ -105,6 +113,9 @@ OPENCLI_PROFILES = _env_int("SEARCH_GATEWAY_OPENCLI_PROFILES", 1)  # N Chromium 
 # --- cache (Phase 1) ---
 CACHE_TTL = _env_int("SEARCH_GATEWAY_CACHE_TTL", 3600)  # final-result TTL (1h)
 SOURCE_CACHE_TTL = _env_int("SEARCH_GATEWAY_SOURCE_CACHE_TTL", 900)  # per-source TTL (15m)
+# Negative caching: how long a failed source is skipped for that query (bounded
+# so recovery stays fast).
+NEGATIVE_CACHE_TTL = _env_int("SEARCH_GATEWAY_NEGATIVE_CACHE_TTL", 60)
 
 # --- LLM / answer synthesis (Phase 5) ---
 DEEPSEEK_API_KEY = _env("DEEPSEEK_API_KEY", "")
@@ -113,6 +124,40 @@ LLM_MODEL = _env("SEARCH_GATEWAY_LLM_MODEL", "deepseek-v4-flash")
 LLM_ENABLED = _env_bool("SEARCH_GATEWAY_LLM", True)
 LLM_TIMEOUT = _env_int("SEARCH_GATEWAY_LLM_TIMEOUT", 60)
 QUERY_EXPANSION = _env_bool("SEARCH_GATEWAY_QUERY_EXPANSION", True)
+# Query-rewrite gating: expansion only runs when the base fan-out returns
+# fewer results than this (weak base → variants are worth the latency).
+EXPANSION_GATE_RESULTS = _env_int("SEARCH_GATEWAY_EXPANSION_GATE", 6)
+
+# --- fallback-chain matrix (B6 #8) ---
+# Per-source degradation semantics: when a channel fails (429/500/timeout/
+# empty/garbage), the fan-out records the failure in `sources` statuses and
+# the pipeline continues with the remaining sources. This matrix documents the
+# intended degrade order per channel class — enforced by the source adapters'
+# error semantics + the negative cache. "silent-throttle" = empty-but-200.
+FALLBACK_CHAINS: dict[str, list[str]] = {
+    # browser-backed channels (best-effort): fail → negative-cache skip
+    "twitter": ["twitter-cli", "opencli-twitter", "skip"],
+    "reddit": ["opencli-reddit", "skip"],
+    "facebook": ["opencli-facebook", "skip"],
+    "instagram": ["opencli-instagram", "skip"],
+    "xiaohongshu": ["opencli-xiaohongshu", "skip"],
+    "linkedin": ["mcporter-linkedin", "skip"],
+    # API channels: fail → the fan-out's remaining sources absorb the gap
+    "searxng": ["searxng-json", "exa"],
+    "exa": ["exa-mcporter", "searxng"],
+    "github": ["github-rest", "skip"],
+    "youtube": ["yt-dlp", "skip"],
+    "bilibili": ["bilibili-api", "skip"],
+    "v2ex": ["sov2ex-api", "skip"],
+    "stackoverflow": ["stackexchange-api", "skip"],
+    # academic: dedicated sources cross-cover each other
+    "arxiv": ["arxiv-atom", "openalex"],
+    "openalex": ["openalex-rest", "crossref"],
+    "crossref": ["crossref-rest", "openalex"],
+    "semantic_scholar": ["s2-rest", "openalex"],
+    # reader channel
+    "web": ["jina-reader", "skip"],
+}
 
 # --- auth ---
 TWITTER_ENV_FILE = _env("TWITTER_AUTH_FILE", os.path.expanduser("~/.agent-reach/twitter-auth.env"))
@@ -121,8 +166,33 @@ DEEPSEEK_ENV_FILE = _env("DEEPSEEK_AUTH_FILE", os.path.expanduser("~/.agent-reac
 # --- observability / serving (Phase D) ---
 LOG_FMT = _env("SEARCH_GATEWAY_LOG_FMT", "text")  # text | json (always stderr)
 LOG_LEVEL = _env("SEARCH_GATEWAY_LOG_LEVEL", "INFO")
+# Bounded per-source latency reservoir (last N successes) for p50/p95 — feeds
+# the adaptive-timeout budget and stats_report.
+STATS_RESERVOIR_SIZE = _env_int("SEARCH_GATEWAY_STATS_RESERVOIR", 60)
+# Adaptive per-source timeout: min(p95 x factor, cap) — stragglers die early,
+# healthy sources get headroom. Bounded by PER_SOURCE_TIMEOUT semantics.
+ADAPTIVE_TIMEOUT = _env_bool("SEARCH_GATEWAY_ADAPTIVE_TIMEOUT", True)
+ADAPTIVE_TIMEOUT_FACTOR = _env_float("SEARCH_GATEWAY_ADAPTIVE_TIMEOUT_FACTOR", 1.5)
+ADAPTIVE_TIMEOUT_MIN = _env_float("SEARCH_GATEWAY_ADAPTIVE_TIMEOUT_MIN", 3.0)
+ADAPTIVE_TIMEOUT_MAX = _env_float("SEARCH_GATEWAY_ADAPTIVE_TIMEOUT_MAX", 25.0)
 MCP_HOST = _env("SEARCH_GATEWAY_HOST", "127.0.0.1")  # bind host for http/sse serve
 MCP_PORT = _env_int("SEARCH_GATEWAY_PORT", 8765)     # bind port for http/sse serve
+# Required for the http/sse transports: an unauthenticated network endpoint
+# lets anyone spend the DeepSeek budget + trigger ban-rate queries against the
+# cookie-logged burner accounts. The stdio transport needs no token.
+HTTP_TOKEN = _env("SEARCH_GATEWAY_HTTP_TOKEN", "")
+# Per-source daily query budget (Redis-backed, 24h window) — the outer guard
+# against runaway/abusive fan-out on top of the per-query rate limit.
+DAILY_QUERY_LIMIT = _env_int("SEARCH_GATEWAY_DAILY_QUERY_LIMIT", 300)
+# Cap on `doctor` total probe wall time — the MCP client request timeout is
+# far smaller than the slowest probe (linkedin uvx first-run, opencli doctor),
+# so an unbounded report made the MCP `doctor` tool time out (-32001).
+DOCTOR_TIMEOUT = _env_int("SEARCH_GATEWAY_DOCTOR_TIMEOUT", 12)
+# Per-probe budget inside the doctor report (opencli doctor alone ≈ 9s).
+DOCTOR_PROBE_TIMEOUT = _env_int("SEARCH_GATEWAY_DOCTOR_PROBE_TIMEOUT", 6)
+# Probe results are cached so repeated doctor calls are instant (states don't
+# change every second — opencli doctor ≈ 9s, uvx cold start ≈ 2.5s).
+DOCTOR_CACHE_TTL = _env_int("SEARCH_GATEWAY_DOCTOR_CACHE_TTL", 120)
 
 # --- ledger health (Phase 4.6) ---
 # Where deep-research run directories (containing ledger.json) live. Used by
@@ -142,8 +212,7 @@ def load_env_file(path: str, keys: set[str]) -> dict[str, str]:
                 continue
             k, _, v = line.partition("=")
             k = k.strip()
-            if k.startswith("export "):
-                k = k[len("export "):]
+            k = k.removeprefix("export ")
             if k in keys:
                 out[k] = v.strip().strip('"').strip("'")
     return out

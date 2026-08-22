@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Bilibili source — B站 search API (no login required)."""
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ class BilibiliSource(Source):
                 resp.raise_for_status()
                 payload = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"bilibili request failed: {exc}")
+            raise SourceError(f"bilibili request failed: {exc}") from exc
 
         code = payload.get("code")
         if code != 0:
@@ -41,7 +40,8 @@ class BilibiliSource(Source):
             for it in items:
                 if not isinstance(it, dict):
                     continue
-                title = (it.get("title") or "").replace('<em class="keyword">', "").replace("</em>", "")
+                title = (it.get("title") or "").replace(
+                    '<em class="keyword">', "").replace("</em>", "")
                 if not title:
                     continue
                 url = it.get("arcurl") or it.get("url") or ""
@@ -66,7 +66,7 @@ class BilibiliSource(Source):
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
                 r = await client.get("https://api.bilibili.com/x/web-interface/search/all/v2",
-                                     params={"keyword": "test"}, headers={"User-Agent": "Mozilla/5.0"})
+                    params={"keyword": "test"}, headers={"User-Agent": "Mozilla/5.0"})
                 return r.status_code == 200, f"http {r.status_code}"
         except httpx.HTTPError as exc:
             return False, str(exc)

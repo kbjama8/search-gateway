@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """search-gateway benchmark harness.
 
 Measures the performance levers that matter, with one consistent methodology:
@@ -109,7 +108,9 @@ def _measure(fn, iterations: int, warmup: int = 1) -> list[float]:
 
 def _subprocess_script(script: str) -> str:
     """Run a snippet in a fresh interpreter and return its stdout."""
-    r = subprocess.run(
+    # Operator-run dev harness: the only snippets ever executed are the module
+    # constants below (plus a query string the operator types themselves).
+    r = subprocess.run(  # noqa: S603 — operator-authored snippets only
         [sys.executable, "-c", script],
         capture_output=True, text=True, timeout=600,
         cwd=str(Path(__file__).resolve().parent.parent),
@@ -165,14 +166,15 @@ def cmd_micro(args) -> dict:
 
         # dedup: title/URL-only path (no embeddings)
         try:
-            s = _measure(lambda: dedup(docs), args.iterations)
+            s = _measure(lambda docs=docs: dedup(docs), args.iterations)
             results[f"dedup_title_only_n{n}"] = _stats(s)
         except Exception as exc:  # noqa: BLE001
             results[f"dedup_title_only_n{n}"] = {"skip": str(exc)}
 
         # dedup: embedding path
         try:
-            s = _measure(lambda: dedup(docs, embeddings=emb), args.iterations)
+            s = _measure(lambda docs=docs, emb=emb: dedup(docs, embeddings=emb),
+                         args.iterations)
             results[f"dedup_embedding_n{n}"] = _stats(s)
         except Exception as exc:  # noqa: BLE001
             results[f"dedup_embedding_n{n}"] = {"skip": str(exc)}
@@ -180,9 +182,12 @@ def cmd_micro(args) -> dict:
         # mmr: greedy diversity over the same docs
         limit = min(10, n)
         for r in docs:
-            r.score = random.Random(r.title).uniform(0.5, 10.0)
+            # Seeded per-title pseudo-random scores: deterministic synthetic
+            # input for stable benchmark numbers, not a security boundary.
+            r.score = random.Random(r.title).uniform(0.5, 10.0)  # noqa: S311
         try:
-            s = _measure(lambda: mmr_select(docs, emb, limit), args.iterations)
+            s = _measure(lambda docs=docs, emb=emb, limit=limit:
+                         mmr_select(docs, emb, limit), args.iterations)
             results[f"mmr_n{n}_limit{limit}"] = _stats(s)
         except Exception as exc:  # noqa: BLE001
             results[f"mmr_n{n}_limit{limit}"] = {"skip": str(exc)}
@@ -304,8 +309,8 @@ _REAL_SNIPPET = (
 
 def cmd_search(args) -> dict:
     from search_gateway import orchestrator
-    from search_gateway.sources import ALL_SOURCES
     from search_gateway.config import DEFAULT_SOURCES
+    from search_gateway.sources import ALL_SOURCES
 
     out: dict = {"search": {}}
 
@@ -319,7 +324,7 @@ def cmd_search(args) -> dict:
     # Warm queries (unique query per run → real pipeline, not a cache hit).
     for q in args.queries:
         try:
-            def run():
+            def run(q=q):
                 asyncio.run(orchestrator.search(
                     _unique_query(q), list(DEFAULT_SOURCES), category="general",
                     limit=5, expand=False))
@@ -334,7 +339,7 @@ def cmd_search(args) -> dict:
         if src is None:
             continue
         try:
-            def run_src():
+            def run_src(src=src):
                 asyncio.run(src.search(_unique_query("benchmark"), limit=5))
             s = _measure(run_src, args.iterations)
             out["search"][f"source_{name}"] = _stats(s)

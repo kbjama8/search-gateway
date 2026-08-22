@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """SearXNG metasearch source (JSON API)."""
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ class SearXNGSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"searxng request failed: {exc}")
+            raise SourceError(f"searxng request failed: {exc}") from exc
 
         results: list[Result] = []
         for item in data.get("results", [])[:limit]:

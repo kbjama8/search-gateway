@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Twitter/X source — twitter-cli first, opencli fallback (query-time failover)."""
 
 from __future__ import annotations
@@ -7,7 +6,7 @@ import os
 
 from ..config import TWITTER_ENV_FILE
 from ..models import Result
-from .base import Source, run_cmd, run_opencli
+from .base import Source, guard_query, run_cmd, run_opencli
 
 
 def _load_twitter_env() -> dict[str, str]:
@@ -20,8 +19,7 @@ def _load_twitter_env() -> dict[str, str]:
                     continue
                 k, _, v = line.partition("=")
                 k = k.strip()
-                if k.startswith("export "):
-                    k = k[len("export "):]
+                k = k.removeprefix("export ")
                 v = v.strip().strip('"').strip("'")
                 if k in ("TWITTER_AUTH_TOKEN", "TWITTER_CT0") and v:
                     env[k] = v
@@ -34,6 +32,7 @@ class TwitterSource(Source):
     source_type = "post"
 
     async def search(self, query: str, limit: int = 10) -> list[Result]:
+        query = guard_query(query)
         errors: list[str] = []
 
         # backend 1: twitter-cli (needs explicit auth env)

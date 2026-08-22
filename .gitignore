@@ -11,3 +11,5 @@ assets/*.png
 *.pem
 *.key
 *.log
+
+.coverage

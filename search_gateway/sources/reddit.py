@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """Reddit source via OpenCLI (browser session)."""
 
 from __future__ import annotations
 
 from ..models import Result
-from .base import Source, SourceError, parse_json_or_yaml, run_opencli
+from .base import Source, SourceError, guard_query, parse_json_or_yaml, run_opencli
 
 
 class RedditSource(Source):
@@ -13,6 +12,7 @@ class RedditSource(Source):
     source_type = "forum"
 
     async def search(self, query: str, limit: int = 10) -> list[Result]:
+        query = guard_query(query)
         code, out = await run_opencli(
             ["opencli", "reddit", "search", query, "-f", "json"]
         )
@@ -20,10 +20,7 @@ class RedditSource(Source):
             raise SourceError(f"reddit failed: {out[:300]}")
         data = parse_json_or_yaml(out)
         if not isinstance(data, list):
-            if isinstance(data, dict):
-                data = data.get("data", data.get("results", []))
-            else:
-                data = []
+            data = data.get("data", data.get("results", [])) if isinstance(data, dict) else []
         results = []
         for p in data[:limit]:
             if not isinstance(p, dict):
@@ -46,6 +43,6 @@ class RedditSource(Source):
         return results
 
     async def available(self) -> tuple[bool, str]:
-        _code, out = await run_opencli(["opencli", "doctor"], timeout=15)
+        _code, out = await run_opencli(["opencli", "doctor"], timeout=15, retries=0)
         ok = "Extension: connected" in out or "connected" in out
         return ok, out.strip().split("\n")[0] if out else ""

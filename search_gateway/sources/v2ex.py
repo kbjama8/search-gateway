@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """V2EX source — sov2ex search API (V2EX's community search)."""
 
 from __future__ import annotations
@@ -6,7 +5,7 @@ from __future__ import annotations
 import httpx
 
 from ..models import Result
-from .base import Source, SourceError
+from .base import Source, SourceError, normalize_published
 
 
 class V2EXSource(Source):
@@ -23,7 +22,7 @@ class V2EXSource(Source):
                 resp.raise_for_status()
                 payload = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"v2ex request failed: {exc}")
+            raise SourceError(f"v2ex request failed: {exc}") from exc
 
         results: list[Result] = []
         for hit in payload.get("hits", []):
@@ -36,7 +35,7 @@ class V2EXSource(Source):
                 snippet=(src.get("content") or "")[:600],
                 source=self.name,
                 engine="sov2ex",
-                published=src.get("created"),
+                published=normalize_published(src.get("created")),
                 meta={
                     "member": src.get("member"),
                     "replies": src.get("replies"),
@@ -50,7 +49,8 @@ class V2EXSource(Source):
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
                 r = await client.get("https://www.sov2ex.com/api/search",
-                                     params={"q": "test", "size": 1}, headers={"User-Agent": "Mozilla/5.0"})
+                    params={"q": "test", "size": 1},
+                    headers={"User-Agent": "Mozilla/5.0"})
                 return r.status_code == 200, f"http {r.status_code}"
         except httpx.HTTPError as exc:
             return False, str(exc)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Stack Exchange / Stack Overflow source (free, no key — low-volume)."""
 
 from __future__ import annotations
@@ -6,7 +5,14 @@ from __future__ import annotations
 import httpx
 
 from ..models import Result
-from .base import Source, SourceError
+from .base import Source, SourceError, normalize_published
+
+
+def epoch_to_published(creation_date) -> str | None:
+    """Convert the Stack Exchange epoch-seconds timestamp to a parseable ISO
+    string (epoch strings defeat `_parse_date` → freshness duplication + no
+    year filtering). Backward-compat alias for the shared contract."""
+    return normalize_published(creation_date)
 
 
 class StackOverflowSource(Source):
@@ -27,7 +33,7 @@ class StackOverflowSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"stackoverflow request failed: {exc}")
+            raise SourceError(f"stackoverflow request failed: {exc}") from exc
 
         results = []
         for it in data.get("items", []):
@@ -37,7 +43,7 @@ class StackOverflowSource(Source):
                 snippet=self._strip_html(it.get("body", ""))[:800],
                 source=self.name,
                 engine="stackexchange",
-                published=str(it.get("creation_date")) if it.get("creation_date") else None,
+                published=epoch_to_published(it.get("creation_date")),
                 meta={
                     "question_id": it.get("question_id"),
                     "accepted": bool(it.get("accepted_answer_id")),

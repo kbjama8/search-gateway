@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """CLI exit-code / output tests (fast — no network, no model loads).
 
 `doctor` is intentionally not exercised here: it probes all 18 sources over

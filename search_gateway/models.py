@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """Normalized result schema shared by all sources."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Optional
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -14,7 +13,7 @@ class Result:
     snippet: str = ""
     source: str = ""      # searxng | exa | twitter | reddit | github | youtube | web
     engine: str = ""      # underlying engine/backend (bing, twitter-cli, opencli, ...)
-    published: Optional[str] = None
+    published: str | None = None
     score: float = 0.0    # final score (RRF and/or re-rank)
     meta: dict[str, Any] = field(default_factory=dict)
 

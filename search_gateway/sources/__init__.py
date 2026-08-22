@@ -1,25 +1,24 @@
-# -*- coding: utf-8 -*-
 """Source registry."""
 
-from .base import Source
-from .searxng import SearXNGSource
-from .exa import ExaSource
-from .twitter import TwitterSource
-from .reddit import RedditSource
-from .github import GitHubSource
-from .youtube import YouTubeSource
-from .facebook import FacebookSource
-from .instagram import InstagramSource
-from .bilibili import BilibiliSource
-from .linkedin import LinkedInSource
-from .v2ex import V2EXSource
-from .xiaohongshu import XiaohongshuSource
-from .web import WebSource
 from .arxiv import ArxivSource
-from .openalex import OpenAlexSource
+from .base import Source
+from .bilibili import BilibiliSource
 from .crossref import CrossrefSource
-from .stackoverflow import StackOverflowSource
+from .exa import ExaSource
+from .facebook import FacebookSource
+from .github import GitHubSource
+from .instagram import InstagramSource
+from .linkedin import LinkedInSource
+from .openalex import OpenAlexSource
+from .reddit import RedditSource
+from .searxng import SearXNGSource
 from .semantic_scholar import SemanticScholarSource
+from .stackoverflow import StackOverflowSource
+from .twitter import TwitterSource
+from .v2ex import V2EXSource
+from .web import WebSource
+from .xiaohongshu import XiaohongshuSource
+from .youtube import YouTubeSource
 
 ALL_SOURCES: dict[str, Source] = {
     s.name: s

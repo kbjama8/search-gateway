@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """XiaohongShu source via OpenCLI (browser session).
 
 NOTE: the Kaiser Chen persona has not yet authenticated XiaohongShu, so this
@@ -9,7 +8,7 @@ or an OpenCLI XHS browser session).
 from __future__ import annotations
 
 from ..models import Result
-from .base import Source, SourceError, parse_json_or_yaml, run_opencli
+from .base import Source, SourceError, guard_query, parse_json_or_yaml, run_opencli
 
 
 class XiaohongshuSource(Source):
@@ -18,6 +17,7 @@ class XiaohongshuSource(Source):
     source_type = "post"
 
     async def search(self, query: str, limit: int = 10) -> list[Result]:
+        query = guard_query(query)
         code, out = await run_opencli(
             ["opencli", "xiaohongshu", "search", query, "-f", "json"]
         )

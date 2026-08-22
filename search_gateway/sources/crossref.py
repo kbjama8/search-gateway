@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Crossref academic source — DOI metadata + full reference lists (free, no key)."""
 
 from __future__ import annotations
@@ -7,7 +6,7 @@ import httpx
 
 from ..config import MAILTO
 from ..models import Result
-from .base import Source, SourceError
+from .base import Source, SourceError, normalize_published
 
 
 class CrossrefSource(Source):
@@ -27,7 +26,7 @@ class CrossrefSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"crossref request failed: {exc}")
+            raise SourceError(f"crossref request failed: {exc}") from exc
 
         return [self._to_result(it) for it in data.get("message", {}).get("items", [])
                 if (it.get("title") or [""])[0]]
@@ -41,7 +40,7 @@ class CrossrefSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"crossref get failed: {exc}")
+            raise SourceError(f"crossref get failed: {exc}") from exc
         return self._to_result(data.get("message", {}))
 
     async def references(self, doi: str, limit: int = 20) -> list[Result]:
@@ -54,7 +53,7 @@ class CrossrefSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"crossref references failed: {exc}")
+            raise SourceError(f"crossref references failed: {exc}") from exc
 
         out: list[Result] = []
         for ref in data.get("message", {}).get("reference", [])[:limit]:
@@ -102,7 +101,7 @@ class CrossrefSource(Source):
             snippet=(it.get("abstract") or "")[:800],
             source="crossref",
             engine="crossref",
-            published=f"{year}" if year else None,
+            published=normalize_published(year),
             meta={
                 "doi": doi or None,
                 "authors": authors,

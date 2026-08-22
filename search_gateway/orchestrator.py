@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Search orchestrator — fan-out → fusion → dedup → re-rank → diversity → cache.
 
 Pipeline: per-source cache → (optional) LLM query expansion → concurrent fan-out
@@ -10,17 +9,35 @@ freshness filter → cache.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import datetime as dt
 import logging
 import re
 import time
-from typing import Any, Optional
+from typing import Any
 
 from . import cache, llm, ratelimit, stats
-from .config import (DEFAULT_LIMIT, DEFAULT_SOURCES, FRESHNESS_FILTER,
-                     GLOBAL_TIMEOUT, MMR_ENABLED, QUERY_EXPANSION,
-                     RATE_LIMITED_SOURCES, RATE_LIMIT_INTERVAL,
-                     RERANK_CANDIDATES, SEMANTIC_RERANK, EMBEDDING_DEDUP)
+from .config import (
+    ADAPTIVE_TIMEOUT,
+    ADAPTIVE_TIMEOUT_FACTOR,
+    ADAPTIVE_TIMEOUT_MAX,
+    ADAPTIVE_TIMEOUT_MIN,
+    DEFAULT_LIMIT,
+    DEFAULT_SOURCES,
+    EMBEDDING_DEDUP,
+    EXPANSION_GATE_RESULTS,
+    FRESHNESS_FILTER,
+    GLOBAL_TIMEOUT,
+    MMR_ENABLED,
+    MMR_LAMBDA,
+    MMR_LAMBDA_BY_CATEGORY,
+    PER_SOURCE_TIMEOUT,
+    QUERY_EXPANSION,
+    RATE_LIMIT_INTERVAL,
+    RATE_LIMITED_SOURCES,
+    RERANK_CANDIDATES,
+    SEMANTIC_RERANK,
+)
 from .dedup import dedup
 from .diversity import mmr_select
 from .embeddings import cjk_dominant, encode
@@ -32,6 +49,29 @@ from .sources.base import SourceError
 
 logger = logging.getLogger("search_gateway.orchestrator")
 
+# Singleflight: concurrent searches for the same (source, query) share one
+# in-flight task instead of hammering the backend N times.
+_inflight: dict[tuple[str, str], asyncio.Task] = {}
+
+
+async def _singleflight(source, query: str, limit: int, category: str,
+                        freshness: str | None, year_from: int | None,
+                        open_access_only: bool) -> tuple[str, Any]:
+    """Run `_run_one` under a per-(source, query) in-flight dedup."""
+    key = (source.name, query.lower().strip())
+    task = _inflight.get(key)
+    if task is not None and not task.done():
+        with contextlib.suppress(Exception):  # fall through to a fresh run
+            return await asyncio.shield(task)
+    task = asyncio.ensure_future(
+        _run_one(source, query, limit, category, freshness, year_from,
+                 open_access_only))
+    _inflight[key] = task
+    try:
+        return await task
+    finally:
+        _inflight.pop(key, None)
+
 _FRESHNESS_DAYS = {"day": 1, "week": 7, "month": 30, "year": 365}
 
 _DATE_PATTERNS = [
@@ -41,46 +81,46 @@ _DATE_PATTERNS = [
 ]
 
 
-def _parse_date(s: str) -> Optional[dt.datetime]:
+def _parse_date(s: str) -> dt.datetime | None:
     if not s:
         return None
     s = str(s).strip()
-    for _ in range(1):  # try direct ISO first
-        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-            try:
-                return dt.datetime.strptime(s[: len(fmt)], fmt)
-            except ValueError:
-                continue
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):  # ISO first
+        try:
+            return dt.datetime.strptime(s[: len(fmt)], fmt)  # noqa: DTZ007 — naive by design; callers normalize tz
+        except ValueError:
+            continue
     for pat, _ in _DATE_PATTERNS:
         m = pat.search(s)
         if m:
             groups = m.groups()
             try:
                 if len(groups) == 1:
-                    return dt.datetime(int(groups[0]), 1, 1)
-                return dt.datetime(*[int(g) for g in groups])
+                    return dt.datetime(int(groups[0]), 1, 1)  # noqa: DTZ001 — naive; callers normalize tz
+                return dt.datetime(*[int(g) for g in groups])  # noqa: DTZ001 — naive; callers normalize tz
             except (ValueError, TypeError):
                 return None
     return None
 
 
-def _filter_fresh(results: list[Result], freshness: Optional[str]) -> list[Result]:
+def _filter_fresh(results: list[Result], freshness: str | None) -> list[Result]:
     if not freshness or freshness not in _FRESHNESS_DAYS or not FRESHNESS_FILTER:
         return results
-    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=_FRESHNESS_DAYS[freshness])
+    cutoff = dt.datetime.now(dt.UTC) - dt.timedelta(days=_FRESHNESS_DAYS[freshness])
     out = []
     for r in results:
         d = _parse_date(r.published or "")
         if d is None:
-            out.append(r)  # unparseable → keep (don't drop)
-        elif d.tzinfo is None:
-            d = d.replace(tzinfo=dt.timezone.utc)
-        if d is None or d >= cutoff:
+            out.append(r)  # unparseable → keep exactly once (don't drop)
+            continue
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=dt.UTC)
+        if d >= cutoff:
             out.append(r)
     return out
 
 
-def _filter_year(results: list[Result], year_from: Optional[int]) -> list[Result]:
+def _filter_year(results: list[Result], year_from: int | None) -> list[Result]:
     if not year_from:
         return results
     return [r for r in results
@@ -92,7 +132,7 @@ def _filter_oa(results: list[Result]) -> list[Result]:
     return [r for r in results if r.meta.get("is_oa") is not False]
 
 
-def _filter_key(freshness: Optional[str], year_from: Optional[int],
+def _filter_key(freshness: str | None, year_from: int | None,
                 open_access_only: bool) -> str:
     parts = []
     if freshness:
@@ -132,31 +172,67 @@ async def _expand_query(query: str) -> list[str]:
         return []
 
 
+def _adaptive_timeout(name: str, fallback: float = PER_SOURCE_TIMEOUT) -> float:
+    """min(p95(source) x factor, cap) with a floor; fallback when unknown."""
+    if not ADAPTIVE_TIMEOUT:
+        return fallback
+    p95 = stats.latency_percentiles(name).get("p95_s", 0.0)
+    if p95 <= 0:
+        return fallback
+    return max(ADAPTIVE_TIMEOUT_MIN, min(p95 * ADAPTIVE_TIMEOUT_FACTOR,
+                                         ADAPTIVE_TIMEOUT_MAX))
+
+
+def _expansion_needed(base_total: int, gate: int = EXPANSION_GATE_RESULTS) -> bool:
+    return base_total < gate
+
+
+def _category_lambda(category: str) -> float:
+    return MMR_LAMBDA_BY_CATEGORY.get(category, MMR_LAMBDA)
+
+
 async def _run_one(source, query: str, limit: int, category: str,
-                   freshness: Optional[str], year_from: Optional[int] = None,
+                   freshness: str | None, year_from: int | None = None,
                    open_access_only: bool = False) -> tuple[str, Any]:
-    """Run a single source: rate-limit → per-source cache → search → stats."""
+    """Run a single source: rate-limit → per-source cache → search → stats.
+
+    The search call is wrapped in an ADAPTIVE per-source timeout:
+    `min(p95(source) * factor, cap)` — stragglers die early, healthy sources
+    get headroom. Unknown sources use the static PER_SOURCE_TIMEOUT.
+    """
     name = source.name
     fkey = _filter_key(freshness, year_from, open_access_only)
     try:
+        if cache.source_recently_failed(name, query, category):
+            return name, "skipped (recent failure)"
+
         if name in RATE_LIMITED_SOURCES:
             await ratelimit.wait_if_needed(name, RATE_LIMIT_INTERVAL)
+        await ratelimit.enforce_daily_budget(name)
 
-        cached = cache.get_source(name, query, category, filters=fkey)
+        cached = cache.get_source(name, query, category, limit=limit, filters=fkey)
         if cached is not None:
             return name, [Result(**d) for d in cached]
 
+        timeout = _adaptive_timeout(name)
+
         t0 = time.monotonic()
         if name == "searxng":
-            results = await source.search(query, limit=limit, category=category,
-                                          freshness=freshness)
+            coro = source.search(query, limit=limit, category=category,
+                                 freshness=freshness)
         elif name == "openalex":
-            results = await source.search(query, limit=limit, year_from=year_from,
-                                          open_access_only=open_access_only)
+            coro = source.search(query, limit=limit, year_from=year_from,
+                                 open_access_only=open_access_only)
         elif name == "crossref":
-            results = await source.search(query, limit=limit, year_from=year_from)
+            coro = source.search(query, limit=limit, year_from=year_from)
         else:
-            results = await source.search(query, limit=limit)
+            coro = source.search(query, limit=limit)
+        try:
+            results = await asyncio.wait_for(coro, timeout=timeout)
+        except TimeoutError as exc:
+            raise SourceError(
+                f"timeout ({timeout:.1f}s, adaptive): {name}"
+            ) from exc
         elapsed = time.monotonic() - t0
 
         if not isinstance(results, list):
@@ -172,20 +248,23 @@ async def _run_one(source, query: str, limit: int, category: str,
         if open_access_only and name != "openalex":
             results = _filter_oa(results)
 
-        cache.set_source(name, query, category, [r.to_dict() for r in results], filters=fkey)
+        cache.set_source(name, query, category, [r.to_dict() for r in results],
+                         limit=limit, filters=fkey)
         stats.record(name, True, elapsed)
         return name, results
     except SourceError as exc:
         stats.record_error(name)
+        cache.mark_source_failed(name, query, category)
         return name, f"error: {exc}"
     except Exception as exc:  # noqa: BLE001
         stats.record_error(name)
+        cache.mark_source_failed(name, query, category)
         return name, f"error: {type(exc).__name__}: {exc}"
 
 
-async def search(query: str, sources: Optional[list[str]], category: str = "general",
-                 limit: int = DEFAULT_LIMIT, freshness: Optional[str] = None,
-                 expand: bool = QUERY_EXPANSION, year_from: Optional[int] = None,
+async def search(query: str, sources: list[str] | None, category: str = "general",
+                 limit: int = DEFAULT_LIMIT, freshness: str | None = None,
+                 expand: bool = QUERY_EXPANSION, year_from: int | None = None,
                  open_access_only: bool = False) -> dict[str, Any]:
     start = time.monotonic()
     source_names = [s for s in (sources or DEFAULT_SOURCES)]
@@ -201,16 +280,12 @@ async def search(query: str, sources: Optional[list[str]], category: str = "gene
     statuses: dict[str, Any] = {}
     ranked_lists: list[list[Result]] = []
 
-    # Build all work items concurrently: the main fan-out (original query, all
-    # requested sources) + expansion fan-out (variants, fast web sources only).
-    work: list[tuple[Any, str, str]] = [(s, query, s.name) for s in objs]
-    if expand:
-        for variant in await _expand_query(query):
-            for src in get_sources(["searxng", "exa"]):
-                work.append((src, variant, ""))  # empty label → not in statuses
-
-    tasks = {asyncio.ensure_future(_run_one(s, q, limit, category, freshness, year_from, open_access_only)): (label, s.name)
-             for (s, q, label) in work}
+    # Phase 1: base fan-out (original query on all requested sources).
+    tasks = {asyncio.ensure_future(
+        _singleflight(s, query, limit, category, freshness, year_from,
+                      open_access_only)
+    ): (s.name, s.name)
+             for s in objs}
     done, pending = await asyncio.wait(tasks, timeout=GLOBAL_TIMEOUT)
 
     for fut in done:
@@ -236,7 +311,27 @@ async def search(query: str, sources: Optional[list[str]], category: str = "gene
             statuses[name] = "pending (timeout)"
         fut.cancel()
 
+    # Phase 2: expansion fan-out ONLY when the base results are weak
+    # (gated rewrite — variants are worth the latency when the base is thin).
+    base_total = sum(len(rl) for rl in ranked_lists)
+    if expand and _expansion_needed(base_total):
+        variants = await _expand_query(query)
+        if variants:
+            tasks2 = {asyncio.ensure_future(
+                _singleflight(s, v, limit, category, freshness, year_from,
+                              open_access_only)
+            ): ("", s.name)
+                      for v in variants for s in get_sources(["searxng", "exa"])}
+            done2, pending2 = await asyncio.wait(tasks2, timeout=GLOBAL_TIMEOUT)
+            for fut in done2:
+                _, outcome = fut.result()
+                if isinstance(outcome, list) and outcome:
+                    ranked_lists.append(outcome)
+            for fut in pending2:
+                fut.cancel()
+
     # fusion (weighted RRF + exact dedup) → near-dup dedup (embedding)
+    t_fusion = time.monotonic()
     fused = rrf_fuse(ranked_lists)
     dedup_docs = [(r.title + " " + r.snippet[:200]) for r in fused]
     multilingual = cjk_dominant(dedup_docs)
@@ -244,6 +339,7 @@ async def search(query: str, sources: Optional[list[str]], category: str = "gene
     if EMBEDDING_DEDUP and len(fused) > 1:
         emb_for_dedup = encode(dedup_docs, multilingual=multilingual)
     fused = dedup(fused, embeddings=emb_for_dedup)
+    t_dedup = time.monotonic()
 
     # semantic re-rank the top candidates (full re-ranked list, no truncation)
     reranked = None
@@ -251,14 +347,17 @@ async def search(query: str, sources: Optional[list[str]], category: str = "gene
         reranked = rerank(query, fused[:RERANK_CANDIDATES])
     else:
         reranked = fused
+    t_rerank = time.monotonic()
 
-    # MMR diversity on the re-ranked candidates
+    # MMR diversity on the re-ranked candidates (per-category λ)
     if MMR_ENABLED and len(reranked) > limit:
         emb_for_mmr = encode([(r.title + " " + r.snippet[:200]) for r in reranked],
                              multilingual=multilingual)
-        final = mmr_select(reranked, emb_for_mmr, limit)
+        final = mmr_select(reranked, emb_for_mmr, limit,
+                          lam=_category_lambda(category))
     else:
         final = reranked[:limit]
+    t_mmr = time.monotonic()
 
     result_dicts = [r.to_dict() for r in final]
     cache.set(query, source_names, category, limit, result_dicts, filters=fkey)
@@ -273,4 +372,11 @@ async def search(query: str, sources: Optional[list[str]], category: str = "gene
         "partial": bool(pending_names),
         "pending": pending_names,
         "elapsed_ms": int((time.monotonic() - start) * 1000),
+        "stage_ms": {
+            "fanout": int((t_fusion - start) * 1000),
+            "fusion_dedup": int((t_dedup - t_fusion) * 1000),
+            "rerank": int((t_rerank - t_dedup) * 1000),
+            "mmr": int((t_mmr - t_rerank) * 1000),
+            "total": int((time.monotonic() - start) * 1000),
+        },
     }

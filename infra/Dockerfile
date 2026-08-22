@@ -6,7 +6,7 @@
 # docs/deployment.md. Full deployments run the gateway as a host process.
 #
 #   docker build -t search-gateway .
-#   docker run --rm -p 8765:8765 search-gateway
+#   docker run --rm -p 127.0.0.1:8765:8765 -e SEARCH_GATEWAY_HTTP_TOKEN=<token> search-gateway
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -21,4 +21,6 @@ ENV PYTHONUNBUFFERED=1 \
 EXPOSE 8765
 
 ENTRYPOINT ["search-gateway"]
-CMD ["serve", "--transport", "http", "--host", "0.0.0.0", "--port", "8765"]
+# Loopback-only + token-gated: the HTTP transport refuses to serve without
+# SEARCH_GATEWAY_HTTP_TOKEN (see server.main).
+CMD ["serve", "--transport", "http", "--host", "127.0.0.1", "--port", "8765"]

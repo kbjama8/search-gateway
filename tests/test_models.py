@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Model-path tests — @pytest.mark.slow, skipped when the HF cache is cold.
 
 CI runs `-m "not slow"`; these are for a machine with the models downloaded.

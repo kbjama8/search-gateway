@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Web page reader via Jina Reader (read_url, not part of search fan-out)."""
 
 from __future__ import annotations
@@ -23,5 +22,5 @@ class WebSource(Source):
                 resp.raise_for_status()
                 text = resp.text
         except httpx.HTTPError as exc:
-            raise SourceError(f"jina read failed: {exc}")
+            raise SourceError(f"jina read failed: {exc}") from exc
         return text[:20000]

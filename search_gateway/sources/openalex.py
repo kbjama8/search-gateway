@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """OpenAlex academic source — the primary rich scholarly source (free, no key)."""
 
 from __future__ import annotations
@@ -45,9 +44,9 @@ class OpenAlexSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"openalex request failed: {exc}")
+            raise SourceError(f"openalex request failed: {exc}") from exc
 
-        return [self._to_result(w) for w in data.get("results", []) if self._to_result(w).title]
+        return [r for r in map(self._to_result, data.get("results", [])) if r.title]
 
     async def get(self, identifier: str) -> Result:
         """Resolve a DOI, arXiv DOI, or OpenAlex ID to a full Result."""
@@ -62,7 +61,7 @@ class OpenAlexSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"openalex get failed: {exc}")
+            raise SourceError(f"openalex get failed: {exc}") from exc
         return self._to_result(data)
 
     async def citations(self, identifier: str, limit: int = 20) -> list[Result]:
@@ -76,7 +75,7 @@ class OpenAlexSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"openalex citations failed: {exc}")
+            raise SourceError(f"openalex citations failed: {exc}") from exc
         return [self._to_result(w) for w in data.get("results", [])]
 
     async def references(self, identifier: str, limit: int = 20) -> list[Result]:
@@ -89,7 +88,7 @@ class OpenAlexSource(Source):
                 resp.raise_for_status()
                 ref_ids = (resp.json().get("referenced_works") or [])[:limit]
         except httpx.HTTPError as exc:
-            raise SourceError(f"openalex references failed: {exc}")
+            raise SourceError(f"openalex references failed: {exc}") from exc
         if not ref_ids:
             return []
         short = [rid.rsplit("/", 1)[-1] for rid in ref_ids]
@@ -101,7 +100,7 @@ class OpenAlexSource(Source):
                 resp.raise_for_status()
                 data = resp.json()
         except httpx.HTTPError as exc:
-            raise SourceError(f"openalex references batch failed: {exc}")
+            raise SourceError(f"openalex references batch failed: {exc}") from exc
         return [self._to_result(w) for w in data.get("results", [])]
 
     async def _resolve_work_id(self, identifier: str) -> str:
@@ -121,7 +120,7 @@ class OpenAlexSource(Source):
                 resp.raise_for_status()
                 return (resp.json().get("id") or "").rsplit("/", 1)[-1]
         except httpx.HTTPError as exc:
-            raise SourceError(f"openalex id resolve failed: {exc}")
+            raise SourceError(f"openalex id resolve failed: {exc}") from exc
 
     @staticmethod
     def _to_result(w: dict) -> Result:

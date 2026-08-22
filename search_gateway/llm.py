@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """DeepSeek LLM client (OpenAI-compatible REST, via httpx).
 
 Used by answer synthesis and query expansion. deepseek-v4-flash is a reasoning
@@ -11,27 +10,35 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
 
 import httpx
 
-from .config import (DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_ENV_FILE,
-                     LLM_MODEL, LLM_TIMEOUT, load_env_file)
+from .config import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_ENV_FILE,
+    LLM_ENABLED,
+    LLM_MODEL,
+    LLM_TIMEOUT,
+    load_env_file,
+)
 
 logger = logging.getLogger("search_gateway.llm")
 
-_api_key: Optional[str] = None
+_api_key: str | None = None
 
 
 def get_api_key() -> str:
     global _api_key
     if _api_key is None:
-        _api_key = DEEPSEEK_API_KEY or load_env_file(DEEPSEEK_ENV_FILE, {"DEEPSEEK_API_KEY"}).get("DEEPSEEK_API_KEY", "")
+        _api_key = DEEPSEEK_API_KEY or load_env_file(
+            DEEPSEEK_ENV_FILE, {"DEEPSEEK_API_KEY"}).get("DEEPSEEK_API_KEY", "")
     return _api_key
 
 
 def available() -> bool:
-    return bool(get_api_key())
+    """LLM is usable only when enabled AND a key is present."""
+    return bool(LLM_ENABLED and get_api_key())
 
 
 async def complete(messages: list[dict], max_tokens: int = 2048,
@@ -71,7 +78,7 @@ async def complete(messages: list[dict], max_tokens: int = 2048,
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPError as exc:
-        raise RuntimeError(f"deepseek request failed: {exc}")
+        raise RuntimeError(f"deepseek request failed: {exc}") from exc
 
     if "error" in data:
         raise RuntimeError(f"deepseek API error: {data['error']}")

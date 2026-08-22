@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Regression guard for the search-gateway.
 
 Asserts the package imports, all 18 sources register, and a smoke search
@@ -19,10 +18,10 @@ os.environ.setdefault("SEARCH_GATEWAY_MMR", "0")
 os.environ.setdefault("SEARCH_GATEWAY_QUERY_EXPANSION", "0")
 os.environ.setdefault("SEARCH_GATEWAY_EMBEDDING_DEDUP", "0")
 
-import asyncio  # noqa: E402
+import asyncio
 
-from search_gateway import orchestrator  # noqa: E402
-from search_gateway.sources import ALL_SOURCES  # noqa: E402
+from search_gateway import orchestrator
+from search_gateway.sources import ALL_SOURCES
 
 EXPECTED_SOURCES = {
     "arxiv", "bilibili", "crossref", "exa", "facebook", "github",
@@ -33,12 +32,12 @@ EXPECTED_SOURCES = {
 
 
 def test_package_imports():
-    import search_gateway.server  # noqa: F401
-    import search_gateway.cache  # noqa: F401
+    import search_gateway.cache
+    import search_gateway.embeddings
+    import search_gateway.llm
+    import search_gateway.rerank
+    import search_gateway.server
     import search_gateway.stats  # noqa: F401
-    import search_gateway.llm  # noqa: F401
-    import search_gateway.embeddings  # noqa: F401
-    import search_gateway.rerank  # noqa: F401
 
 
 def test_all_18_sources_registered():

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """arXiv academic source (free, no key; Atom XML over HTTPS)."""
 
 from __future__ import annotations
@@ -26,11 +25,12 @@ class ArxivSource(Source):
         params = {"search_query": f"all:{query}", "start": 0, "max_results": limit}
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params=params, headers={"User-Agent": "search-gateway/0.1"})
+                resp = await client.get(
+                    url, params=params, headers={"User-Agent": "search-gateway/0.1"})
                 resp.raise_for_status()
-                root = ET.fromstring(resp.text)
+                root = ET.fromstring(resp.text)  # noqa: S314 — ET does not resolve external entities; arxiv.org is a fixed trusted host
         except (httpx.HTTPError, ET.ParseError) as exc:
-            raise SourceError(f"arxiv request failed: {exc}")
+            raise SourceError(f"arxiv request failed: {exc}") from exc
 
         return self._parse_entries(root, limit)
 
@@ -42,9 +42,9 @@ class ArxivSource(Source):
                 resp = await client.get(url, params={"id_list": arxiv_id},
                                         headers={"User-Agent": "search-gateway/0.1"})
                 resp.raise_for_status()
-                root = ET.fromstring(resp.text)
+                root = ET.fromstring(resp.text)  # noqa: S314 — ET does not resolve external entities; arxiv.org is a fixed trusted host
         except (httpx.HTTPError, ET.ParseError) as exc:
-            raise SourceError(f"arxiv get failed: {exc}")
+            raise SourceError(f"arxiv get failed: {exc}") from exc
         results = self._parse_entries(root, 1)
         if not results:
             raise SourceError(f"arxiv: no paper found for {arxiv_id}")

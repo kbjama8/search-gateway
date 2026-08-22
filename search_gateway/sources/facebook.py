@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """Facebook source via OpenCLI (browser session)."""
 
 from __future__ import annotations
 
 from ..models import Result
-from .base import Source, SourceError, parse_json_or_yaml, run_opencli
+from .base import Source, SourceError, guard_query, parse_json_or_yaml, run_opencli
 
 
 class FacebookSource(Source):
@@ -13,6 +12,7 @@ class FacebookSource(Source):
     source_type = "post"
 
     async def search(self, query: str, limit: int = 10) -> list[Result]:
+        query = guard_query(query)
         code, out = await run_opencli(
             ["opencli", "facebook", "search", query, "-f", "json"]
         )

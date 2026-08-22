@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Exa neural web-search source (via mcporter MCP)."""
 
 from __future__ import annotations
@@ -6,10 +5,10 @@ from __future__ import annotations
 import re
 
 from ..models import Result
-from .base import Source, SourceError, run_cmd
+from .base import Source, SourceError, guard_query, run_cmd
 
 _BLOCK_SPLIT = re.compile(r"\n---+\n")
-_FIELD = re.compile(r"^(Title|URL|Published|Author|Highlights)\s*:\s*(.*)$", re.M)
+_FIELD = re.compile(r"^(Title|URL|Published|Author|Highlights)\s*:\s*(.*)$", re.MULTILINE)
 
 
 class ExaSource(Source):
@@ -17,6 +16,7 @@ class ExaSource(Source):
     description = "Exa neural (semantic) web search via mcporter."
 
     async def search(self, query: str, limit: int = 10) -> list[Result]:
+        query = guard_query(query)
         code, out = await run_cmd([
             "mcporter", "call", "exa.web_search_exa",
             f"query={query}", f"numResults={limit}",
@@ -57,5 +57,5 @@ class ExaSource(Source):
         return results
 
     async def available(self) -> tuple[bool, str]:
-        code, out = await run_cmd(["mcporter", "--version"], timeout=10)
+        code, out = await run_cmd(["mcporter", "--version"], timeout=10, retries=0)
         return code == 0, out.strip()

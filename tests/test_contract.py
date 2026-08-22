@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Golden contract: 18 sources + 14 tools + Result surface unchanged.
 
 Any change to a tool name, the source registry, or the `Result` shape is a

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Saved / recurring query store (Redis) + delta reporting.
 
 The gateway owns Redis (cache/stats/rate-limit), so saved queries live here too.
@@ -12,12 +11,11 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Optional
 
 import redis
 
-from .config import DEFAULT_SOURCES, REDIS_URL
 from . import orchestrator
+from .config import DEFAULT_SOURCES, REDIS_URL
 
 logger = logging.getLogger("search_gateway.saved_queries")
 
@@ -35,7 +33,7 @@ def _key(name: str) -> str:
     return f"sg:sq:{name}"
 
 
-def _get(name: str) -> Optional[dict]:
+def _get(name: str) -> dict | None:
     try:
         raw = _get_client().get(_key(name))
     except redis.RedisError as exc:
@@ -64,11 +62,11 @@ def _snapshot(results: list[dict]) -> list[dict]:
 
 def _identity(r: dict) -> str:
     url = (r.get("url") or "").strip().rstrip("/")
-    return url if url else (r.get("title") or "").strip().lower()
+    return url or (r.get("title") or "").strip().lower()
 
 
-def save(name: str, query: str, sources: Optional[list[str]] = None,
-         freshness: Optional[str] = None, category: str = "general") -> dict:
+def save(name: str, query: str, sources: list[str] | None = None,
+         freshness: str | None = None, category: str = "general") -> dict:
     if not name or not query:
         return {"error": "name and query are required"}
     rec = {
@@ -133,13 +131,33 @@ async def run(name: str, limit: int = 10) -> dict:
 
 
 async def diff(name: str, limit: int = 10) -> dict:
+    """Delta report in a stable shape: {name, new, removed, unchanged, count}.
+
+    First run has no baseline: it establishes one and reports everything as
+    `new` (marked `baseline_established`), so callers never have to branch on
+    the response shape.
+    """
     rec = _get(name)
     if not rec:
         return {"error": f"unknown saved query: {name}"}
     old = rec.get("last_results") or []
     if not old:
-        # no baseline yet — run once to establish it
-        return await run(name, limit=limit)
+        res = await _run(rec, limit)
+        new_snap = _snapshot(res.get("results", []))
+        rec["last_run"] = time.time()
+        rec["last_results"] = new_snap
+        try:
+            _get_client().set(_key(name), json.dumps(rec, ensure_ascii=False))
+        except redis.RedisError as exc:
+            return {"error": f"redis error: {exc}"}
+        return {
+            "name": name,
+            "new": new_snap,
+            "removed": [],
+            "unchanged": 0,
+            "count": res.get("count"),
+            "baseline_established": True,
+        }
     res = await _run(rec, limit)
     new_snap = _snapshot(res.get("results", []))
     old_ids = {_identity(r) for r in old}

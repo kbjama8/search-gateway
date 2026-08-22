@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """stdio JSON-RPC handshake + tool-call tests.
 
 Covers both the bare `search-gateway` invocation (what OpenCode's MCP config
@@ -19,11 +18,11 @@ def _handshake(args: list[str]) -> list[str]:
         params = StdioServerParameters(
             command=sys.executable, args=["-m", "search_gateway.cli", *args],
         )
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                tools = await session.list_tools()
-                return [t.name for t in tools.tools]
+        async with (stdio_client(params) as (read, write),
+                     ClientSession(read, write) as session):
+            await session.initialize()
+            tools = await session.list_tools()
+            return [t.name for t in tools.tools]
 
     return asyncio.run(_run())
 
@@ -33,14 +32,14 @@ def _call_tool(args: list[str], tool: str, arguments: dict) -> dict:
         params = StdioServerParameters(
             command=sys.executable, args=["-m", "search_gateway.cli", *args],
         )
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                res = await session.call_tool(tool, arguments)
-                for c in res.content:
-                    if c.type == "text":
-                        return json.loads(c.text)
-                return {}
+        async with (stdio_client(params) as (read, write),
+                     ClientSession(read, write) as session):
+            await session.initialize()
+            res = await session.call_tool(tool, arguments)
+            for c in res.content:
+                if c.type == "text":
+                    return json.loads(c.text)
+            return {}
 
     return asyncio.run(_run())
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Semantic Scholar academic source (free; optional fallback, rate-limited)."""
 
 from __future__ import annotations
@@ -8,7 +7,7 @@ import asyncio
 import httpx
 
 from ..models import Result
-from .base import Source, SourceError
+from .base import Source, SourceError, normalize_published
 
 _FIELDS = ("title,abstract,year,venue,externalIds,authors,citationCount,"
            "openAccessPdf,publicationTypes")
@@ -64,7 +63,7 @@ class SemanticScholarSource(Source):
             except httpx.HTTPError as exc:
                 last = exc
                 await asyncio.sleep(1 + attempt)
-        raise SourceError(f"semantic scholar failed: {last}")
+        raise SourceError(f"semantic scholar failed: {last}") from last
 
     @staticmethod
     def _to_result(p: dict) -> Result:
@@ -77,7 +76,7 @@ class SemanticScholarSource(Source):
             snippet=(p.get("abstract") or "")[:800],
             source="semantic_scholar",
             engine="semantic-scholar",
-            published=f"{p.get('year')}" if p.get("year") else None,
+            published=normalize_published(p.get("year")),
             meta={
                 "doi": ext.get("DOI"),
                 "arxiv_id": ext.get("ArXiv"),

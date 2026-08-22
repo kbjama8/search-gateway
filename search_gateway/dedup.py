@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Cross-source de-duplication.
 
 Three layers, cheap → expensive:
@@ -67,6 +66,10 @@ def dedup(results: list[Result], embeddings=None,
     emb_doc: dict[str, str] = {}
 
     use_emb = EMBEDDING_DEDUP and embeddings is not None and len(embeddings) == len(results)
+    # precompute docs + ascii flags once (the old inner loop rebuilt the doc
+    # string for every (result, existing) pair — O(n²) string builds)
+    docs = [r.title + " " + r.snippet[:200] for r in results]
+    ascii_flags = [_is_ascii_dominant(d) for d in docs]
 
     for idx, r in enumerate(results):
         ckey = canonical_url(r.identity())
@@ -85,10 +88,10 @@ def dedup(results: list[Result], embeddings=None,
                 _merge(seen[existing_key], r)
                 dup = True
                 break
-            if use_emb and existing_key in emb_vec:
-                doc = r.title + " " + r.snippet[:200]
-                if _is_ascii_dominant(doc) and _is_ascii_dominant(emb_doc[existing_key]):
-                    sim = float(np.dot(np.asarray(emb_vec[existing_key]), np.asarray(embeddings[idx])))
+            if (use_emb and existing_key in emb_vec and ascii_flags[idx]
+                    and _is_ascii_dominant(emb_doc[existing_key])):
+                    sim = float(np.dot(
+                        np.asarray(emb_vec[existing_key]), np.asarray(embeddings[idx])))
                     if sim >= _EMBED_THRESHOLD:
                         _merge(seen[existing_key], r)
                         dup = True
@@ -100,7 +103,7 @@ def dedup(results: list[Result], embeddings=None,
         norm_titles[ckey] = nt
         if use_emb:
             emb_vec[ckey] = embeddings[idx]
-            emb_doc[ckey] = r.title + " " + r.snippet[:200]
+            emb_doc[ckey] = docs[idx]
         order.append(ckey)
 
     return [seen[k] for k in order]

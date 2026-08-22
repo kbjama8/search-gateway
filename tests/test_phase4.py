@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Regression tests for the Phase 4 hardening features.
 
 Pure + Redis-only checks (no network, no model loads) so they stay fast and

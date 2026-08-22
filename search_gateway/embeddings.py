@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Document embeddings (bi-encoder) for MMR diversity + embedding dedup.
 
 Lazy-loads sentence-transformers/all-MiniLM-L6-v2 (already cached) for the fast
@@ -13,22 +12,27 @@ cross-encoder and can't produce standalone vectors.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 
-from .config import (CJK_SHARE_THRESHOLD, EMBED_CJK, EMBED_CJK_REVISION,
-                     EMBED_MODEL, EMBED_MODEL_CJK, EMBED_REVISION)
+from .config import (
+    CJK_SHARE_THRESHOLD,
+    EMBED_CJK,
+    EMBED_CJK_REVISION,
+    EMBED_MODEL,
+    EMBED_MODEL_CJK,
+    EMBED_REVISION,
+)
 
 logger = logging.getLogger("search_gateway.embeddings")
 
-_model: Optional[object] = None
-_model_error: Optional[str] = None
-_cjk_model: Optional[object] = None
-_cjk_model_error: Optional[str] = None
+_model: object | None = None
+_model_error: str | None = None
+_cjk_model: object | None = None
+_cjk_model_error: str | None = None
 
 
-def _load(model_name: str, revision: str = "") -> tuple[Optional[object], Optional[str]]:
+def _load(model_name: str, revision: str = "") -> tuple[object | None, str | None]:
     try:
         from sentence_transformers import SentenceTransformer
         logger.info("loading embed model %s ...", model_name)
@@ -89,7 +93,7 @@ def cjk_dominant(texts: list[str]) -> bool:
     return (cjk / total) >= CJK_SHARE_THRESHOLD
 
 
-def encode(texts: list[str], multilingual: bool = False) -> Optional[np.ndarray]:
+def encode(texts: list[str], multilingual: bool = False) -> np.ndarray | None:
     """Return normalized document vectors (or None if the model is unavailable).
 
     `multilingual=True` selects the CJK model (bge-m3); leave False for the fast

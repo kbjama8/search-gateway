@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """YouTube source via yt-dlp (newline-delimited JSON)."""
 
 from __future__ import annotations
@@ -6,7 +5,7 @@ from __future__ import annotations
 import json
 
 from ..models import Result
-from .base import Source, SourceError, run_cmd
+from .base import Source, SourceError, guard_query, run_cmd
 
 
 class YouTubeSource(Source):
@@ -15,6 +14,7 @@ class YouTubeSource(Source):
     source_type = "video"
 
     async def search(self, query: str, limit: int = 10) -> list[Result]:
+        query = guard_query(query)
         code, out = await run_cmd([
             "yt-dlp", f"ytsearch{limit}:{query}",
             "--dump-json", "--skip-download", "--no-warnings",
@@ -51,5 +51,5 @@ class YouTubeSource(Source):
         return results
 
     async def available(self) -> tuple[bool, str]:
-        code, out = await run_cmd(["yt-dlp", "--version"], timeout=15)
+        code, out = await run_cmd(["yt-dlp", "--version"], timeout=15, retries=0)
         return code == 0, out.strip()

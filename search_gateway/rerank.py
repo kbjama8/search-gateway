@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Semantic re-ranking with a local cross-encoder (CPU).
 
 Lazily loads BAAI/bge-reranker-v2-m3 (multilingual, EN+ZH) — the best
@@ -10,17 +9,22 @@ candidates (never the full result set) to bound CPU latency.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-from .config import (INFERENCE_BACKEND, RERANK_MODEL, RERANK_ONNX_MODEL,
-                     RERANK_ONNX_REVISION, RERANK_REVISION, SEMANTIC_RERANK,
-                     _ONNX_FILE)
+from .config import (
+    _ONNX_FILE,
+    INFERENCE_BACKEND,
+    RERANK_MODEL,
+    RERANK_ONNX_MODEL,
+    RERANK_ONNX_REVISION,
+    RERANK_REVISION,
+    SEMANTIC_RERANK,
+)
 from .models import Result
 
 logger = logging.getLogger("search_gateway.rerank")
 
-_model: Optional[object] = None
-_model_error: Optional[str] = None
+_model: object | None = None
+_model_error: str | None = None
 _effective_model: str = (RERANK_ONNX_MODEL if INFERENCE_BACKEND in _ONNX_FILE
                          else RERANK_MODEL)
 
@@ -69,7 +73,7 @@ def _get_model():
     return _model
 
 
-def rerank(query: str, candidates: list[Result], top_k: Optional[int] = None) -> list[Result]:
+def rerank(query: str, candidates: list[Result], top_k: int | None = None) -> list[Result]:
     """Re-rank candidates by query-document relevance. Falls back to input
     order (RRF) if the model is unavailable or disabled. `top_k` optionally
     truncates (else returns the full re-ranked list, so MMR can diversify)."""
@@ -85,7 +89,7 @@ def rerank(query: str, candidates: list[Result], top_k: Optional[int] = None) ->
     try:
         pairs = [(query, (r.snippet or r.title)[:512]) for r in candidates]
         scores = model.predict(pairs)
-        for r, s in zip(candidates, scores):
+        for r, s in zip(candidates, scores, strict=False):
             r.score = float(s)
         ranked = sorted(candidates, key=lambda r: r.score, reverse=True)
         return ranked[:top_k] if top_k else ranked

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Console entry point: `search-gateway serve|doctor|check|version|warm`."""
 
 from __future__ import annotations
@@ -8,7 +7,7 @@ import asyncio
 import json
 import signal
 import sys
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from . import __version__, health
 from .config import MCP_HOST, MCP_PORT
@@ -89,7 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     configure_logging()
     args = build_parser().parse_args(argv)
     handlers = {

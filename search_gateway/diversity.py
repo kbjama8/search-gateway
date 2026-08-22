@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Maximal Marginal Relevance (MMR) diversity.
 
 After semantic re-rank, greedily select results balancing relevance vs

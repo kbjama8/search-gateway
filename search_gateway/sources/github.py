@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """GitHub source — direct REST API (bypasses the broken local `gh` script)."""
 
 from __future__ import annotations
@@ -22,13 +21,14 @@ class GitHubSource(Source):
             headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(url, params={"q": query, "per_page": limit}, headers=headers)
+                resp = await client.get(
+                    url, params={"q": query, "per_page": limit}, headers=headers)
                 if resp.status_code == 403:
                     raise SourceError("github rate-limited (set GITHUB_TOKEN to raise limit)")
                 resp.raise_for_status()
                 items = resp.json().get("items", [])
         except httpx.HTTPError as exc:
-            raise SourceError(f"github request failed: {exc}")
+            raise SourceError(f"github request failed: {exc}") from exc
 
         results = []
         for it in items:
@@ -43,7 +43,8 @@ class GitHubSource(Source):
                     "stars": it.get("stargazers_count"),
                     "language": it.get("language"),
                     "forks": it.get("forks_count"),
-                    "engagement": {"stars": it.get("stargazers_count"), "forks": it.get("forks_count")},
+                    "engagement": {"stars": it.get("stargazers_count"),
+                                      "forks": it.get("forks_count")},
                 },
             ))
         return results

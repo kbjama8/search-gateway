@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Structured logging setup.
 
 Logs always go to **stderr**, never stdout — stdout is the MCP stdio protocol

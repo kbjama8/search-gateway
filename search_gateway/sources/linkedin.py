@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """LinkedIn source via mcp-server-linkedin (mcporter).
 
 NOTE: the Kaiser Chen LinkedIn account is currently blocked on QR
@@ -13,7 +12,7 @@ import re
 from ..models import Result
 from .base import Source, SourceError, run_cmd
 
-_FIELD = re.compile(r"^(Name|Headline|Current Position|URL|Profile URL)\s*:\s*(.*)$", re.M)
+_FIELD = re.compile(r"^(Name|Headline|Current Position|URL|Profile URL)\s*:\s*(.*)$", re.MULTILINE)
 
 
 class LinkedInSource(Source):
@@ -39,7 +38,7 @@ class LinkedInSource(Source):
             if m:
                 key = m.group(1)
                 val = m.group(2).strip()
-                if key in ("Name",):
+                if key == "Name":
                     if cur and (cur.get("name") or cur.get("url")):
                         results.append(LinkedInSource._make(cur))
                     cur = {"name": val}
@@ -64,6 +63,10 @@ class LinkedInSource(Source):
         )
 
     async def available(self) -> tuple[bool, str]:
-        _code, out = await run_cmd(["uvx", "mcp-server-linkedin@latest", "--status"], timeout=60)
+        # Probe must be fast + non-retrying: `uvx @latest` can trigger a
+        # first-run download, and retrying a failed probe burns the doctor
+        # budget (bounded by DOCTOR_TIMEOUT in health.report).
+        _code, out = await run_cmd(["uvx", "mcp-server-linkedin@latest", "--status"],
+                                   timeout=10, retries=0)
         ok = "Session is valid" in out
         return ok, out.strip().split("\n")[-1] if out else ""
