@@ -377,6 +377,7 @@ history, not rewritten here.
 
 | Doc | Covers |
 |-----|--------|
+| `docs/project-map.md` | whole-repo navigational map — vision & goals, layout, module map, sources, tools, reliability, tests, skills, ADRs |
 | `docs/architecture.md` | pipeline, request lifecycle, reliability model, source-adapter contract, decoupling boundary, design decisions, versioning |
 | `docs/api/tools.md` | canonical 14-tool surface — args, returns, worked examples, error semantics |
 | `docs/meta-schema.md` | `Result.meta` contract + one example per `source_type` |
