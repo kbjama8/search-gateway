@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import logging
 
-from ..config import STEALTH_ENABLED, STEALTH_PROFILE
-from .egress import assert_egress
+from ..config import EGRESS_PROXY, STEALTH_ENABLED, STEALTH_PROFILE
+from . import harden
+from .egress import assert_egress, get_proxy
 from .proxies import context_proxy
 
 logger = logging.getLogger("search_gateway.extract.camoufox")
@@ -36,10 +37,23 @@ async def launch(profile: str, *, headless: str = "virtual"):
     """Launch a Camoufox browser bound to the profile's proxy + fingerprint.
 
     Returns (browser, reason); browser is None on any failure — never raise.
+
+    Containment (0.4.2): L3 enforcement requires the kernel filter AND the
+    gateway process itself to sit inside the scoped cgroup (Camoufox spawns
+    its own children — unlike opencli, we cannot wrap them, so coverage is
+    mandatory; run the gateway under `systemd-run --user --scope --unit
+    sg-egress` or the hardened systemd unit). L2: when
+    `SEARCH_GATEWAY_EGRESS_PROXY=1` (default), the browser is pointed at the
+    loopback egress proxy with forced-proxy flags so every socket it opens
+    passes the floor.
     """
     ok, reason = available()
     if not ok:
         return None, reason
+    try:
+        harden.enforce(require_coverage=True)
+    except harden.EgressUnhardened as exc:
+        return None, str(exc)
     try:
         from camoufox import AsyncCamoufox
     except ImportError:
@@ -49,6 +63,17 @@ async def launch(profile: str, *, headless: str = "virtual"):
     if STEALTH_PROFILE:
         kwargs["fingerprint_preset"] = STEALTH_PROFILE
     proxy = context_proxy(profile)
+    if EGRESS_PROXY:
+        egress = await get_proxy()
+        if egress is not None:
+            # forced-proxy egress (LESSONS.md §1.5): everything + remote DNS
+            # through the loopback floor proxy; localhost exempt so the proxy
+            # itself still works
+            kwargs["args"] = [
+                f"--proxy-server=http://127.0.0.1:{egress.port}",
+                "--host-resolver-rules=MAP * 0.0.0.0, EXCLUDE 127.0.0.1",
+            ]
+            proxy = None  # the egress proxy chains upstream itself
     if proxy:
         kwargs["proxy"] = proxy
 

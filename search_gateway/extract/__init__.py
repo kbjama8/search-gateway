@@ -10,6 +10,9 @@ Sub-modules:
   proxies.py      env-gated proxy gateway (sticky sessions, geo grammar)
   http.py         HTTP facade with optional TLS/JA3 impersonation
   camoufox.py     Camoufox anonymous-tier adapter (experimental, lazy)
+  egress.py       L1 egress floor + L2 forced-proxy (Phase 7 containment)
+  vault.py        per-persona secrets vault (Phase 7, D7.3)
+  harden.py       L3 kernel egress filter — nftables cgroupv2 (Phase 7, D7.1)
 
 Everything here fails toward its input: a disabled capability is a no-op, an
 unavailable dependency degrades the stage rather than raising.

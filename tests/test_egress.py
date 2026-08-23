@@ -117,13 +117,18 @@ class TestCheckAndRaise:
 
 class TestStatusSection:
     def test_status_shape(self, monkeypatch, rds):
+        from search_gateway.extract import harden
         monkeypatch.setattr(egress, "EGRESS_FLOOR", True)
+        monkeypatch.setattr(harden, "table_installed", lambda: False)
+        monkeypatch.setattr(harden, "_nft", lambda: None)
         st = egress.status()
         assert st["floor"]["enabled"] is True
         assert set(st) == {"floor", "proxy", "kernel", "denied_count",
                            "last_denial"}
-        assert st["proxy"]["enabled"] is False
-        assert st["kernel"]["installed"] is None
+        # 0.4.2: L2 default ON for the anonymous tier; kernel section live
+        assert st["proxy"]["enabled"] is True
+        assert st["kernel"]["mode"] == "required"
+        assert st["kernel"]["installed"] is False
 
 
 class TestHooks:

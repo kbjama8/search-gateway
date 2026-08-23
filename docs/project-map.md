@@ -124,7 +124,7 @@ search-gateway/
 │   ├── sources/               # 22 adapters + base.py (Source, run_cmd, run_opencli)
 │   └── extract/               # v0.4: parse, detectors, router, scheduler,
 │                              # profiles, fingerprints, proxies, http, camoufox,
-│                              # egress (L1 floor), vault (per-persona secrets)
+│                              # egress (L1 floor + L2 proxy), vault, harden (L3 kernel)
 ├── skills/                    # 5 orchestration skills, symlinked by install.sh
 │   ├── deep-research/         # research_ledger.py CLI (760 LOC, stdlib-only)
 │   ├── master-router/         # request classification → tools/sources/effort plan
@@ -188,7 +188,7 @@ partial, pending[], elapsed_ms, stage_ms{fanout, fusion_dedup, rerank, mmr}}`
 | `ratelimit.py` | per-source min-interval gate (Redis, in-memory fallback) + daily budget (300) | `wait_if_needed`, `enforce_daily_budget` |
 | `saved_queries.py` | Redis `sg:sq:*` store; identity-based diff; first run establishes baseline | `save`, `list_all`, `run`, `diff` |
 | `log.py` | text/json formatter → stderr; stdout is reserved for the MCP wire | `configure_logging` |
-| `extract/` | the v0.4+ extraction layer — tier routing (api=1/cli=3/browser=10), block/challenge detectors, browser budget + jittered pacing, profile farm + health machine, fingerprint bundles + coherence lint, env-gated proxy gateway, curl_cffi impersonation seam, multi-shape parsing, Camoufox adapter, L1 egress floor (SSRF/metadata, pre-nav + post-redirect), per-persona secrets vault (v0.4.1) | `router`, `detectors`, `profiles`, `proxies`, `parse`, `egress`, `vault` |
+| `extract/` | the v0.4+ extraction layer — tier routing (api=1/cli=3/browser=10), block/challenge detectors, browser budget + jittered pacing, profile farm + health machine, fingerprint bundles + coherence lint, env-gated proxy gateway, curl_cffi impersonation seam, multi-shape parsing, Camoufox adapter, L1 egress floor (SSRF/metadata, pre-nav + post-redirect), L2 forced-proxy (anonymous tier), L3 kernel filter (nftables cgroupv2, mandatory D7.1), per-persona secrets vault (D7.3) | `router`, `detectors`, `profiles`, `proxies`, `parse`, `egress`, `vault`, `harden` |
 | `sources/base.py` | `Source` ABC, `SourceError`, `run_cmd` (retry on exit codes 1/8/52/56), `run_opencli` (serialized via browser budget), `guard_query` (flag-injection), `_subprocess_env` allowlist, `normalize_published`, block-event telemetry at the raise site (0.4.1) | — |
 
 ## Source adapters

@@ -340,7 +340,9 @@ multi-stage `read_url` — see `docs/extraction/PLAN.md`. Since 0.4.1 it also
 carries the containment floor: an L1 egress filter (private/link-local/
 metadata ranges, checked pre-nav and post-redirect), a per-persona secrets
 vault (`search-gateway vault migrate|status`), and block-event telemetry in
-`doctor`/`stats_report`.
+`doctor`/`stats_report`. Since 0.4.2: an L2 forced-proxy for the anonymous
+browser tier and a mandatory L3 kernel egress filter (`search-gateway harden
+--install --sudo` — browser ops refuse to launch without it, D7.1).
 
 ## CLI
 
@@ -353,10 +355,11 @@ vault (`search-gateway vault migrate|status`), and block-event telemetry in
 | `search-gateway warm` | preload rerank + embed models |
 | `search-gateway vault migrate [--dry-run]` | move legacy flat secrets into the per-persona vault |
 | `search-gateway vault status` | vault layout + hygiene findings |
+| `search-gateway harden --install\|--status\|--uninstall\|--check [--sudo]` | L3 kernel egress filter (nftables cgroupv2, mandatory D7.1) |
 
 ## Configuration
 
-Everything is an environment variable with a default — all 79 of them,
+Everything is an environment variable with a default — all 82 of them,
 grouped by concern and mapped to capability tiers in
 `docs/config-reference.md`, with the override precedence (env var > env file >
 default) spelled out once so it doesn't need re-deriving per variable. Secrets

@@ -423,7 +423,11 @@ class TestCamoufox:
     @pytest.mark.asyncio
     async def test_launch_failure_degrades(self, monkeypatch):
         import search_gateway.extract.camoufox as cf
+        from search_gateway.extract import harden
         monkeypatch.setattr(cf, "STEALTH_ENABLED", True)
+        # 0.4.2: enforcement gates the launch — simulate a hardened env so the
+        # test exercises the launch path itself
+        monkeypatch.setattr(harden, "HARDEN", "permissive")
 
         class Boom:
             def __init__(self, **kw):

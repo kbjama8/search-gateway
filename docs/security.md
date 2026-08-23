@@ -34,7 +34,7 @@ specifics.
 | Untrusted fetched content → DeepSeek (prompt injection) | `research_answer` prompt is scoped "use ONLY the numbered sources"; synthesis refuses out-of-scope. Best-effort, **not** a sandbox. |
 | Social auth tokens in subprocess env (`TWITTER_AUTH_TOKEN` / `CT0`) | child-process env only, never logged; `.gitignore` blocks `*.env`; `doctor`/`check` never echo secrets. |
 | Model download supply chain | pinned `*_REVISION` (empty = unpinned) fixes commit-churn re-downloads and pins provenance. |
-| `read_url` fetching arbitrary URLs (SSRF) | **L1 egress floor (0.4.1)** blocks private/link-local/metadata egress pre-nav AND post-redirect (the whole `169.254.0.0/16`, RFC1918, CGNAT, cloud IMDS ranges — LESSONS.md §1.5: the hermes-agent IAM-credential incident class). Denials surface as `blocked (egress-floor/…)` with telemetry. L2 forced-proxy + L3 kernel filter (0.4.2) close the rest. |
+| `read_url` fetching arbitrary URLs (SSRF) | **L1 egress floor (0.4.1)** blocks private/link-local/metadata egress pre-nav AND post-redirect (the whole `169.254.0.0/16`, RFC1918, CGNAT, cloud IMDS ranges — LESSONS.md §1.5: the hermes-agent IAM-credential incident class). Denials surface as `blocked (egress-floor/…)` with telemetry. **L2 (0.4.2)**: the anonymous browser tier is forced through a loopback CONNECT proxy that re-checks every target; **L3 (0.4.2)**: an nftables per-cgroup DROP table covers browser children at the kernel — browser ops refuse to launch until it is installed (D7.1). |
 | Secret leakage via logs | logs go to stderr with `SEARCH_GATEWAY_LOG_FMT`; JSON formatter never serializes env/tokens. |
 | Saved-query loss on Redis reset | Redis AOF enabled in `infra/docker-compose.yml`; backup documented in `docs/deployment.md`. |
 | Secrets on disk (mode/symlink/stale) | per-persona vault `~/.agent-reach/profiles/<persona>/` (0600/0700, decision D7.3); `search-gateway vault status` hygiene checks (modes, symlink escapes, stale files, out-of-vault config) with doctor red findings. |
@@ -79,6 +79,12 @@ echoed back into a tool's return value.
   host-process deployment (`docs/deployment.md`'s HTTP/systemd path) — one
   JSON object per line is what makes `journalctl`/log-aggregation queries
   possible; the `text` default is for interactive/local use only.
+- **Kernel egress floor (0.4.2).** Browser-tier operations refuse to launch
+  without the L3 nftables filter (D7.1): `search-gateway harden --install
+  --sudo`, and for systemd deployments the shipped unit's `ExecStartPre`
+  installs it for the unit's cgroup. `permissive` (`SEARCH_GATEWAY_HARDEN`)
+  is the explicit opt-out for sandboxed CI only — an operator who disables it
+  outside CI is disabling the containment envelope's last layer on purpose.
 - **Review `research_answer` output before acting on it.** Given the prompt
   injection surface above, treat its `answer` field as a summary to verify
   against `results[]`, not as a pre-validated fact — the tool's own

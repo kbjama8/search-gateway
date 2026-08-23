@@ -279,7 +279,7 @@ AUTH_GATED_SOURCES = frozenset({"zhihu", "weibo", "twitter", "reddit",
 YOUTUBE_PO_PLUGIN = _env("SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN", "")
 YOUTUBE_PO_SERVER = _env("SEARCH_GATEWAY_YOUTUBE_PO_SERVER", "http://127.0.0.1:4416")
 
-# --- containment & observability (v0.4.1, Phase 7) ---
+# --- containment & observability (v0.4.1+, Phase 7) ---
 # L1 egress floor: always-blocked private/link-local/metadata ranges, checked
 # pre-nav AND post-redirect. Default ON by design (it is the containment
 # floor, not a risky capability). Local-infra exemption = the gateway's own
@@ -288,6 +288,22 @@ EGRESS_FLOOR = _env_bool("SEARCH_GATEWAY_EGRESS_FLOOR", True)
 FLOOR_EXEMPT = _env("SEARCH_GATEWAY_FLOOR_EXEMPT", "")
 # Block-event telemetry reservoir (bounded, 24h TTL) — feeds doctor `blocks`.
 BLOCK_RESERVOIR = _env_int("SEARCH_GATEWAY_BLOCK_RESERVOIR", 120)
+
+# --- L2 forced-proxy (v0.4.2, D7.2) ---
+# Loopback CONNECT proxy in front of the anonymous browser tier. Every target
+# passes the floor (deny 403 + telemetry); allowed targets chain through the
+# residential tier when it is enabled. Anonymous engines only — the
+# authenticated OpenCLI tier keeps L1+L3 (a bench live-test gate must pass
+# before that policy ever changes).
+EGRESS_PROXY = _env_bool("SEARCH_GATEWAY_EGRESS_PROXY", True)
+
+# --- L3 kernel filter (v0.4.2, D7.1) ---
+# nftables per-cgroup egress DROP rules (no suid binary, no kernel module).
+# Browser-tier ops REFUSE to launch without it: `required` (default) makes
+# run_opencli/Camoufox fail with the explicit "egress-unhardened" message;
+# `permissive` is the explicit opt-out for sandboxed CI that cannot run nft.
+HARDEN = _env("SEARCH_GATEWAY_HARDEN", "required")  # required | permissive
+HARDEN_SUDO = _env_bool("SEARCH_GATEWAY_HARDEN_SUDO", False)
 
 
 def load_env_file(path: str, keys: set[str]) -> dict[str, str]:

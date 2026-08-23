@@ -200,8 +200,28 @@ async def run_opencli(cmd: list[str], timeout: int = PER_SOURCE_TIMEOUT,
                       retries: int = RETRY_COUNT,
                       source: str | None = None) -> tuple[int, str]:
     """Run an opencli command under the browser budget (default 2 concurrent
-    browser ops) instead of the old single-slot lock."""
+    browser ops) instead of the old single-slot lock.
+
+    L3 enforcement (D7.1): browser-tier ops REFUSE to launch without the
+    kernel egress filter installed (EgressUnhardened → the explicit
+    `blocked (egress-unhardened)` SourceError the envelope names). When the
+    filter is live but the gateway itself is not inside the scoped cgroup,
+    the child is wrapped in a `systemd-run --user --scope` transient scope
+    (pam_authnft pattern) so the kernel rules see its sockets; the fixed
+    unit name implies a serialized browser budget for ad-hoc scoped mode.
+    """
+    from ..extract import harden
+    try:
+        harden.enforce()
+    except harden.EgressUnhardened as exc:
+        raise SourceError(str(exc)) from None
     async with browser_lease(cmd[0] if cmd else "opencli"):
+        st = harden.status()
+        if st["installed"] and not st["covered"]:
+            scoped = ["systemd-run", "--user", "--scope", "--collect",
+                      "--unit", "sg-egress", *cmd]
+            return await run_cmd(scoped, timeout=timeout, env=env,
+                                 retries=retries, source=source)
         return await run_cmd(cmd, timeout=timeout, env=env, retries=retries,
                              source=source)
 

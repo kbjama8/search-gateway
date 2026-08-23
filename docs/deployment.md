@@ -105,10 +105,15 @@ systemctl --user daemon-reload
 systemctl --user enable --now search-gateway@8765.service
 ```
 
-The unit runs `search-gateway check` before start (`ExecStartPre`), restarts on
-failure, logs JSON to the journal, and keeps models warm across client
-disconnects. `%i` is the HTTP port. Verified: `systemd-analyze verify` exits 0
-on the shipped unit; the HTTP transport answers `tools/list` with 14 tools.
+The unit runs `search-gateway check` before start (`ExecStartPre`), installs
+and reports the L3 egress filter for its own cgroup, restarts on failure, logs
+JSON to the journal, and keeps models warm across client disconnects. `%i` is
+the HTTP port. Hardening (0.4.2): `LoadCredential=` for vault secrets,
+`NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict` (+ `ReadWritePaths`
+for the vault/profile dirs and the HF cache), `RestrictAddressFamilies`,
+`IPAddressDeny` for the service-level floor. Verified: `systemd-analyze
+verify` exits 0 on the shipped unit; the HTTP transport answers `tools/list`
+with 14 tools.
 
 ## 3.1 Secrets vault (0.4.1+)
 
@@ -134,6 +139,50 @@ For a host-process deployment under systemd, prefer `LoadCredential=` over
 own doctrine — see `docs/security.md`). The hardened unit in 0.4.2 ships this;
 manual setups can pass `SEARCH_GATEWAY_CREDENTIALS_DIR` in the unit pointing
 at the credential mount directory.
+
+## 3.2 Kernel egress filter (0.4.2, decision D7.1)
+
+Browser-tier operations **refuse to launch** until the L3 nftables egress
+filter is installed (the explicit `blocked (egress-unhardened)` message names
+it). The filter is an nftables `socket cgroupv2` rule set: sockets opened by
+browser children in a scoped cgroup are dropped when they target any
+private/link-local/metadata range — no suid binary, no kernel module
+(LESSONS.md §1.5, pam_authnft pattern).
+
+**Ad-hoc gateway** (browser children wrapped in a transient scope):
+
+```bash
+# one-time install, from INSIDE the scope that will wrap browser children:
+systemd-run --user --scope --unit=sg-egress -- \
+  search-gateway harden --install --sudo
+search-gateway harden --status       # installed + covered
+search-gateway harden --check        # browser-tier enforceability report
+```
+
+With the filter live, `run_opencli` automatically wraps each browser child in
+`systemd-run --user --scope --unit=sg-egress` (serialized — keep
+`SEARCH_GATEWAY_BROWSER_BUDGET=1` in ad-hoc scoped mode). For the Camoufox
+anonymous tier the *gateway itself* must run inside the scope (Camoufox
+spawns its own children):
+
+```bash
+systemd-run --user --scope --unit=sg-egress -- search-gateway serve
+```
+
+**systemd deployment**: the hardened unit's `ExecStartPre` installs the
+ruleset for the unit's own cgroup (browser children inherit it) and reports
+state. Without `--sudo` the ruleset is written to
+`~/.config/search-gateway/sg-egress.nft` — load it once:
+
+```bash
+sudo nft -f ~/.config/search-gateway/sg-egress.nft
+# or, for fully automated loads: enable passwordless `sudo nft` and uncomment
+# the sudo ExecStartPre line in infra/systemd/search-gateway@.service
+```
+
+`nft` rules survive service restarts (they are kernel state). Uninstall:
+`search-gateway harden --uninstall`. Sandboxed CI that cannot run nft sets
+`SEARCH_GATEWAY_HARDEN=permissive` — the explicit opt-out, not the default.
 
 ## 4. Headless tier-1 image (CI / academic-only)
 

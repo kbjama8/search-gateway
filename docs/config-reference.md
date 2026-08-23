@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All 79 settings are environment variables with defaults — `config.py` is the
+All 82 settings are environment variables with defaults — `config.py` is the
 source of truth, and `.env.example` mirrors it (verified: the three cross-check
 clean against each other). Copy `.env.example`, override what you need, and
 never commit a secret (`.gitignore` blocks `*.env`).
@@ -58,7 +58,7 @@ matter starting at a specific tier, not from `minimal` onward.
 | Stealth / impersonation (v0.4) | Camoufox anonymous tier + curl_cffi TLS impersonation | experimental, opt-in |
 | Read_url stages (v0.4) | Jina → Trafilatura → readability extraction pipeline | **minimal** |
 | CN tier (v0.4) | zhihu/weibo/baidu/toutiao + bilibili wbi signing | opt-in (`SEARCH_GATEWAY_CN_SOURCES=1`) |
-| Containment (v0.4.1) | L1 egress floor (SSRF/metadata), per-persona secrets vault, block telemetry | **any tier** (floor), **social/vertical** (vault/telemetry) |
+| Containment (v0.4.1+) | L1 egress floor (SSRF/metadata), L2 forced-proxy, L3 kernel filter, per-persona secrets vault, block telemetry | **any tier** (floor), **social/vertical** (L2/L3/vault/telemetry) |
 
 ## Infrastructure
 
@@ -325,13 +325,17 @@ defaults. Full rationale: `docs/extraction/PLAN.md`.*
 | `SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN` | `""` | yt-dlp PO-token provider plugin (e.g. `bgutil-ytdlp-pot-provider`) |
 | `SEARCH_GATEWAY_YOUTUBE_PO_SERVER` | `http://127.0.0.1:4416` | PO-token HTTP server URL when a provider plugin needs one |
 
-### Containment & observability (v0.4.1, Phase 7)
+### Containment & observability (v0.4.1+, Phase 7)
 
-*The always-blocked network floor, the secrets vault, and block telemetry.
-Full rationale: `docs/extraction/PHASE7-HANDOFF.md` + `docs/security.md`.*
+*The always-blocked network floor, the L2/L3 egress layers, the secrets
+vault, and block telemetry. Full rationale: `docs/extraction/PHASE7-HANDOFF.md`
++ `docs/security.md`.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SEARCH_GATEWAY_EGRESS_FLOOR` | `1` | L1 egress floor: private/link-local/metadata egress blocked pre-nav AND post-redirect (default ON by design) |
 | `SEARCH_GATEWAY_FLOOR_EXEMPT` | `""` | operator allowlist for the floor (comma-separated hostnames/IPs); the gateway's own loopback deps are always exempt |
 | `SEARCH_GATEWAY_BLOCK_RESERVOIR` | `120` | block-event reservoir size (recent denials kept, 24h TTL) |
+| `SEARCH_GATEWAY_EGRESS_PROXY` | `1` | L2 forced-proxy for the anonymous browser tier (loopback CONNECT; every target through the floor; chains the residential tier when enabled). Anonymous engines only (D7.2) |
+| `SEARCH_GATEWAY_HARDEN` | `required` | L3 kernel-filter enforcement: `required` (browser ops refuse with the explicit `egress-unhardened` message until `search-gateway harden --install --sudo`) \| `permissive` (explicit opt-out for sandboxed CI) (D7.1) |
+| `SEARCH_GATEWAY_HARDEN_SUDO` | `0` | auto-use `sudo` when loading the nft ruleset (root already: auto) |

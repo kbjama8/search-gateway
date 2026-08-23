@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-08-23
+
+Phase 7 (containment & observability), release 2 of 2 — the sharp end:
+L2 forced-proxy for the anonymous tier, the **mandatory** L3 kernel egress
+filter, bench browser tier, and the hardened systemd unit
+(`docs/extraction/PHASE7-HANDOFF.md`, decisions D7.1/D7.2).
+
+### Added
+- **L3 kernel egress filter** (`extract/harden.py`, decision D7.1):
+  nftables `socket cgroupv2` per-cgroup DROP rules for private/link-local/
+  metadata ranges (pam_authnft pattern — no suid binary, no kernel module,
+  LESSONS.md §1.5). `search-gateway harden --install|--status|--uninstall|
+  --check [--sudo]`; `build_rules()` is a pure function with a golden
+  ruleset test; all kernel probes mocked in CI.
+- **Mandatory enforcement (D7.1)**: browser-tier ops (`run_opencli` +
+  Camoufox launch) refuse to run until the filter is installed — the
+  explicit `blocked (egress-unhardened): run 'search-gateway harden
+  --install --sudo'` message reaches the envelope and negative cache.
+  `SEARCH_GATEWAY_HARDEN=required` (default) | `permissive` (sandboxed-CI
+  opt-out). OpenCLI children are wrapped in a `systemd-run --user --scope
+  --unit=sg-egress` transient scope when the gateway itself is not inside
+  the scoped cgroup; Camoufox requires the gateway to be scoped (its
+  children cannot be wrapped).
+- **L2 forced-proxy** (`egress.EgressProxy`, decision D7.2): loopback
+  CONNECT/absolute-URI HTTP proxy fronting the anonymous tier; every target
+  re-passes the floor (403 + telemetry), chains through the residential
+  tier when enabled, origin-form rewriting, lazy singleton.
+  `SEARCH_GATEWAY_EGRESS_PROXY=1` (default ON for the anonymous tier).
+  Camoufox launches with `--proxy-server` + `--host-resolver-rules="MAP *
+  0.0.0.0, EXCLUDE 127.0.0.1"` (remote DNS through the proxy too).
+- **bench browser tier** (`scripts/bench.py browser`, slow): egress-floor
+  overhead, L2 proxy roundtrip vs direct, Camoufox cold/warm launch,
+  navigate→extract→teardown, profile rotation, RSS delta — each measurement
+  SKIPs with a reason when its dependency is absent.
+- **Hardened systemd unit** (`infra/systemd/search-gateway@.service`):
+  `LoadCredential=` for the vault (`$CREDENTIALS_DIRECTORY` bridge),
+  `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict` + `ReadWritePaths`
+  for vault/HF-cache, `RestrictAddressFamilies`, service-level `IPAddressDeny`
+  (loopback stays open for Redis/SearXNG), `ExecStartPre` installs + reports
+  the L3 filter for the unit's cgroup. `systemd-analyze verify` exits 0.
+
+### Changed
+- `doctor`'s `egress` section is now fully populated: floor + proxy + kernel
+  state (`mode`/`installed`/`covered`) + denial counters.
+- `.env.example` / `docs/config-reference.md`: 3 new variables
+  (`SEARCH_GATEWAY_EGRESS_PROXY`, `SEARCH_GATEWAY_HARDEN`,
+  `SEARCH_GATEWAY_HARDEN_SUDO`) → 82 documented.
+- Deployment docs: §3.2 kernel-filter walkthrough (ad-hoc scope, systemd
+  unit, `sudo nft -f` one-time load).
+
 ## [0.4.1] - 2026-08-23
 
 Phase 7 (containment & observability), release 1 of 2 — the zero-risk floor:

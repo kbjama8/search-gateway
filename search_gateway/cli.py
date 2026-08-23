@@ -70,6 +70,29 @@ def _cmd_vault(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_harden(args: argparse.Namespace) -> int:
+    from .extract import harden
+
+    if args.harden_action == "install":
+        out = harden.install(sudo=args.sudo, dry_run=args.dry_run)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("ok") else 1
+    if args.harden_action == "uninstall":
+        out = harden.uninstall()
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("ok") else 1
+    st = harden.status()
+    print(json.dumps(st, ensure_ascii=False, indent=2))
+    if args.harden_action == "check":
+        # `check` reports enforceability (exit 0 even when not enforced —
+        # the unit logs the report; in-process enforce() is the real gate)
+        enforceable = st["installed"] and st["systemd_run"]
+        print(f"browser-tier enforceability: "
+              f"{'yes' if enforceable else 'no — ' + '; '.join(st['problems']) or 'permissive'}")
+        return 0
+    return 0 if st["installed"] else 1
+
+
 def _cmd_warm(_args: argparse.Namespace) -> int:
     from . import embeddings, rerank
 
@@ -105,6 +128,23 @@ def build_parser() -> argparse.ArgumentParser:
     vmigrate.add_argument("--dry-run", action="store_true",
                           help="report what would move without touching files")
     vsub.add_parser("status", help="vault layout + hygiene findings")
+    harden = sub.add_parser("harden", help="L3 kernel egress filter (nftables cgroupv2)")
+    harden.add_argument("--install", dest="harden_action", action="store_const",
+                        const="install", help="install the egress filter (derive "
+                        "the cgroup from the current process; run inside the "
+                        "scope or the unit — see docs/deployment.md)")
+    harden.add_argument("--dry-run", action="store_true",
+                        help="print the ruleset without touching the kernel")
+    harden.add_argument("--status", dest="harden_action", action="store_const",
+                        const="status", help="report install/coverage state")
+    harden.add_argument("--uninstall", dest="harden_action", action="store_const",
+                        const="uninstall", help="delete the sg_egress table")
+    harden.add_argument("--check", dest="harden_action", action="store_const",
+                        const="check", help="report browser-tier enforceability")
+    harden.add_argument("--sudo", action="store_true",
+                        help="load the ruleset with elevation (root already: "
+                        "auto); without it, rules are written for manual load")
+    harden.set_defaults(harden_action="status")
     return parser
 
 
@@ -118,6 +158,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "version": _cmd_version,
         "warm": _cmd_warm,
         "vault": _cmd_vault,
+        "harden": _cmd_harden,
     }
     return handlers[args.command or "serve"](args)
 

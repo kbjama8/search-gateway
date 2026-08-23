@@ -1,4 +1,4 @@
-# Search Gateway MCP server — long-running HTTP host process.
+# Search Gateway MCP server — long-running HTTP host process (hardened, v0.4.2).
 #
 # User-level template unit. The instance name is the HTTP port:
 #
@@ -6,6 +6,20 @@
 #   chmod 600 ~/.config/search-gateway/gateway.env
 #   systemctl --user enable --now search-gateway@8765.service
 #   search-gateway doctor   # or: curl http://127.0.0.1:8765/mcp/
+#
+# Containment (Phase 7 / decisions D7.1-D7.4):
+#   * Secrets arrive as FILES via LoadCredential= (never env vars — systemd's
+#     own doctrine; $CREDENTIALS_DIRECTORY is exposed to the process as
+#     SEARCH_GATEWAY_CREDENTIALS_DIR).
+#   * Service-level egress floor via IPAddressDeny= (loopback stays open for
+#     Redis/SearXNG; 169.254.0.0/16 covers IMDS).
+#   * L3 kernel filter for the browser children: ExecStartPre installs the
+#     ruleset for THIS unit's cgroup (browser children inherit it) and reports
+#     state. `harden --install` without --sudo writes the ruleset and marks it
+#     pending; load it once with:  sudo nft -f %h/.config/search-gateway/sg-egress.nft
+#     (or enable passwordless `sudo nft` and uncomment the sudo line below).
+#     Browser-tier ops refuse with the explicit "egress-unhardened" message
+#     until the table is live (SEARCH_GATEWAY_HARDEN=required, default).
 #
 # Assumes the console script is installed at ~/.local/bin (pip install . /
 # pip install --user .). Clients register the URL in mcp.json (see
@@ -16,16 +30,46 @@ After=network.target
 
 [Service]
 Type=simple
-# Secrets (DEEPSEEK_API_KEY, TWITTER_AUTH_FILE, ...) — keep this file 0600.
+# Non-secret runtime config; keep 0600 (it may reference paths).
 EnvironmentFile=%h/.config/search-gateway/gateway.env
 Environment=SEARCH_GATEWAY_LOG_FMT=json
+# Vault secrets as systemd credentials — files in $CREDENTIALS_DIRECTORY,
+# never env vars (LESSONS.md §1.5). Names match the vault files so the
+# credentials-dir-aware loader finds them (<kind>.env).
+LoadCredential=twitter.env:%h/.agent-reach/profiles/kaiser/twitter.env
+LoadCredential=deepseek.env:%h/.agent-reach/profiles/kaiser/deepseek.env
+LoadCredential=proxy.env:%h/.agent-reach/profiles/kaiser/proxy.env
+Environment=SEARCH_GATEWAY_CREDENTIALS_DIR=%d
+# Pre-flight gates
 ExecStartPre=%h/.local/bin/search-gateway check
+ExecStartPre=%h/.local/bin/search-gateway harden --install
+ExecStartPre=%h/.local/bin/search-gateway harden --status
+# Optional fully-automated load (needs passwordless sudo for nft):
+# ExecStartPre=/usr/bin/sudo /usr/bin/nft -f %h/.config/search-gateway/sg-egress.nft
 ExecStart=%h/.local/bin/search-gateway serve --transport http --host 127.0.0.1 --port %i
 Restart=on-failure
 RestartSec=3
-# Models stay warm across client disconnects; there is no local state to flush,
-# so a short stop window is safe.
 TimeoutStopSec=30
+
+# --- containment (v0.4.2) ---
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+# The gateway's writable state: the vault (secrets + profile farm) and the HF
+# model cache (model loads write here on first use).
+ReadWritePaths=%h/.agent-reach/profiles %h/.cache/huggingface
+# Service-level egress floor: loopback stays open (Redis/SearXNG); browser
+# children get the strict per-cgroup nft rules instead.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+IPAddressDeny=169.254.0.0/16 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10
+# The gateway is a host process that shells out (opencli/Chromium, yt-dlp,
+# mcporter/uvx) and binds a local port for the HTTP transport.
+MemoryDenyWriteExecute=no
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
 
 [Install]
 WantedBy=default.target
