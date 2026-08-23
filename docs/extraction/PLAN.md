@@ -262,16 +262,22 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
       test_sources_parsers)
 - [x] Phase 6 — CN expansion: **bilibili wbi** (canonical-example-verified),
       **zhihu**, **weibo**, **baidu**, **toutiao**; registry 22 sources
-- [ ] Phase 7 — containment & observability — **in progress: 0.4.1 SHIPPED
-      (`3f79e15`), 0.4.2 next; see [PHASE7-HANDOFF.md](PHASE7-HANDOFF.md)**
+- [x] Phase 7 — containment & observability — **COMPLETE (0.4.1 `3f79e15` +
+      `0.4.2` `8d1601e`); see [PHASE7-HANDOFF.md](PHASE7-HANDOFF.md)**
 - [x] Phase 7.1 (0.4.1) — **L1 egress floor** (`extract/egress.py`, pre-nav +
       post-redirect, IMDS/RFC1918/CGNAT, local-infra exemption, default ON) +
       **secrets vault** (`extract/vault.py`, D7.3 full migration run on this
       machine, `vault migrate|status`, hygiene) + **block telemetry**
       (`stats.record_block`, doctor sections egress/vault/blocks/profiles);
       config 79 vars; 250 fast tests green, ruff clean, coverage 85.6%
-- [ ] Phase 7.2 (0.4.2) — L2 forced-proxy for anonymous engines (D7.2) +
-      mandatory L3 kernel filter (D7.1) + bench browser tier + hardened unit
+- [x] Phase 7.2 (0.4.2) — **L2 forced-proxy** for the anonymous tier
+      (`egress.EgressProxy`, loopback CONNECT, floor-composed, residential
+      chaining, Camoufox flags, D7.2) + **mandatory L3 kernel filter**
+      (`extract/harden.py` + `harden` CLI, nftables cgroupv2 per-scope DROP,
+      golden ruleset test, `blocked (egress-unhardened)` enforcement, D7.1) +
+      **bench browser tier** (slow-marked) + **hardened systemd unit**
+      (LoadCredential, NoNewPrivileges, ProtectSystem=strict, IPAddressDeny);
+      config 82 vars; 296 fast tests green, ruff clean, coverage 86.8%
 - [x] Phase 8 (partial) — contract tests 22 sources, envelope 0.4 fields,
       config-reference/api-tools/README/architecture/project-map/faq/
       deployment/security updated, CHANGELOG 0.4.0, version bumped

@@ -473,3 +473,28 @@ Source: github.com/lexiforest/curl_cffi.
   firejail rejected, nftables-cgroupv2 chosen for L3, IMDS floor lesson
   (pre-nav + post-redirect), systemd credentials bridge, forced-proxy flags.
   Parking-lot R8/R13–R16 closed.
+- **2026-08-23 (0.4.1 build)** — floor + vault + telemetry shipped (`3f79e15`):
+  egress floor live on every extraction path; secrets migrated on this machine
+  (legacy paths honored one release, removed 0.4.3); block telemetry at the
+  raise site vs the envelope chokepoint split so events never double-count;
+  test suite must bind `rds` on any fixture that can trigger a floor denial
+  (the hook tests polluted real Redis once before that discipline was added).
+- **2026-08-23 (0.4.2 build)** — L2 + L3 + bench + unit shipped (`8d1601e`):
+  - **Empirical scoping fact**: `systemd-run --user --scope` places the scope
+    under `app.slice/sg-egress-<unit>.scope` (sibling of the caller's unit
+    path, NOT nested) — so `install()` must derive the rule path from
+    `/proc/self/cgroup` at install time (run install inside the scope, or
+    let the unit's `ExecStartPre` do it in the unit cgroup), and the
+    `run_opencli` wrapper must reuse the FIXED unit name `sg-egress` so the
+    paths agree. Serialized browser budget implied for ad-hoc scoped mode.
+  - **CONNECT header hygiene**: a proxy must consume-and-discard the
+    CONNECT request's remaining headers before replying 200 — leaking them
+    into the tunnel makes the target read `Host:…` as its first bytes
+    (caught by a real loopback echo test).
+  - **Event-loop discipline**: asyncio servers started in a sync fixture's
+    `asyncio.run` live in a *different* loop than the test — loopback tests
+    must run the server loop in a background thread (`run_coroutine_threadsafe`).
+  - **L2/L3 default posture**: egress proxy default ON for the anonymous tier
+    only (D7.2); kernel filter `required` by default with an explicit
+    `permissive` escape for sandboxed CI (D7.1); `nft` rules are kernel state
+    and survive service restarts.
