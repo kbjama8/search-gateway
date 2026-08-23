@@ -110,6 +110,31 @@ failure, logs JSON to the journal, and keeps models warm across client
 disconnects. `%i` is the HTTP port. Verified: `systemd-analyze verify` exits 0
 on the shipped unit; the HTTP transport answers `tools/list` with 14 tools.
 
+## 3.1 Secrets vault (0.4.1+)
+
+Since 0.4.1, secrets live in the per-persona vault
+`~/.agent-reach/profiles/<persona>/` (0600 files, 0700 dirs — decision D7.3).
+One-time migration from the legacy flat files:
+
+```bash
+search-gateway vault migrate --dry-run   # what would move (shows paths + status)
+search-gateway vault migrate             # moves twitter.env / deepseek.env / proxy.env
+search-gateway vault status              # layout + hygiene (modes, symlinks, staleness)
+search-gateway doctor                    # `vault` section: hygiene ok + no legacy_in_use
+```
+
+Legacy flat paths are still honored for one release with a doctor deprecation
+warning (removed in 0.4.3). `gateway.env` for tests (`~/.agent-reach/gateway.env`)
+is the *test* environment, not a profile secret — the migration leaves it in
+place by design.
+
+For a host-process deployment under systemd, prefer `LoadCredential=` over
+`EnvironmentFile=` for the vault secrets: secrets arrive as files in
+`$CREDENTIALS_DIRECTORY` and never touch the process environment (systemd's
+own doctrine — see `docs/security.md`). The hardened unit in 0.4.2 ships this;
+manual setups can pass `SEARCH_GATEWAY_CREDENTIALS_DIR` in the unit pointing
+at the credential mount directory.
+
 ## 4. Headless tier-1 image (CI / academic-only)
 
 ```bash
@@ -153,10 +178,14 @@ flowchart TD
 
 **Reading `doctor`.** Run `search-gateway doctor` and read top-down: `redis`
 and `sources` are the two fields `search-gateway check`'s exit code depends
-on (`health.check()` fails if `len(ALL_SOURCES) != 18` or `redis.ok` is
+on (`health.check()` fails if `len(ALL_SOURCES) != 22` or `redis.ok` is
 false); `rerank`/`embed`/`llm` are soft signals that degrade the pipeline
-without failing it. `stats_report` adds the rolling reliability/latency
-numbers `doctor` doesn't carry.
+without failing it. Since 0.4.1 the report also carries the containment
+sections — `egress` (floor state + denial counters), `vault` (hygiene),
+`blocks` (block-event reservoir), `profiles` (browser profile farm) — read
+`vault.hygiene.ok` and `egress.floor.enabled` when auditing a host.
+`stats_report` adds the rolling reliability/latency numbers `doctor` doesn't
+carry, plus the same `blocks` reservoir.
 
 **Redis down.** `cache.ping()` catches `redis.RedisError` and returns
 `{"ok": false, "error": "<message>"}` — `doctor` surfaces this directly, and

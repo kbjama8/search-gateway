@@ -20,7 +20,6 @@ import redis
 from ..config import (
     PROXY_COUNTRY,
     PROXY_ENABLED,
-    PROXY_ENV_FILE,
     PROXY_GATEWAY,
     PROXY_GEO_ALIGN,
     PROXY_PASSWORD,
@@ -28,9 +27,9 @@ from ..config import (
     PROXY_STICKY_TTL,
     PROXY_USERNAME,
     REDIS_URL,
-    load_env_file,
 )
 from .fingerprints import GEO_LOCALE, derive_for_geo, lint
+from .vault import load_secrets
 
 logger = logging.getLogger("search_gateway.extract.proxies")
 
@@ -52,9 +51,9 @@ def _credentials() -> tuple[str, str]:
     username = PROXY_USERNAME
     password = PROXY_PASSWORD
     if not username:
-        loaded = load_env_file(PROXY_ENV_FILE,
-                               {"SEARCH_GATEWAY_PROXY_USERNAME",
-                                "SEARCH_GATEWAY_PROXY_PASSWORD"})
+        loaded = load_secrets("proxy",
+                              {"SEARCH_GATEWAY_PROXY_USERNAME",
+                               "SEARCH_GATEWAY_PROXY_PASSWORD"})
         username = loaded.get("SEARCH_GATEWAY_PROXY_USERNAME", "")
         password = loaded.get("SEARCH_GATEWAY_PROXY_PASSWORD", password)
     return username, password

@@ -57,6 +57,19 @@ def _cmd_version(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_vault(args: argparse.Namespace) -> int:
+    from .extract import vault
+
+    if args.vault_command == "migrate":
+        rows = vault.migrate(dry_run=args.dry_run)
+        print(json.dumps(rows, ensure_ascii=False, indent=2))
+        return 0 if all(r["status"] in ("noop", "migrated", "empty")
+                        for r in rows) else 1
+    # status
+    print(json.dumps(vault.status(), ensure_ascii=False, indent=2))
+    return 0
+
+
 def _cmd_warm(_args: argparse.Namespace) -> int:
     from . import embeddings, rerank
 
@@ -85,6 +98,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("check", help="gate: 18 sources + Redis reachable (non-zero on failure)")
     sub.add_parser("version", help="print the package version")
     sub.add_parser("warm", help="preload the rerank + embed models")
+    vault = sub.add_parser("vault", help="per-persona secrets vault management")
+    vsub = vault.add_subparsers(dest="vault_command")
+    vmigrate = vsub.add_parser("migrate",
+                               help="move legacy flat env files into the persona vault (D7.3)")
+    vmigrate.add_argument("--dry-run", action="store_true",
+                          help="report what would move without touching files")
+    vsub.add_parser("status", help="vault layout + hygiene findings")
     return parser
 
 
@@ -97,6 +117,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "check": _cmd_check,
         "version": _cmd_version,
         "warm": _cmd_warm,
+        "vault": _cmd_vault,
     }
     return handlers[args.command or "serve"](args)
 

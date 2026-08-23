@@ -10,10 +10,11 @@ bounded. Latency is tracked as a running mean.
 from __future__ import annotations
 
 import logging
+import time
 
 import redis
 
-from .config import LEDGER_DIR, REDIS_URL, STATS_RESERVOIR_SIZE
+from .config import BLOCK_RESERVOIR, LEDGER_DIR, REDIS_URL, STATS_RESERVOIR_SIZE
 
 logger = logging.getLogger("search_gateway.stats")
 
@@ -55,6 +56,55 @@ def record(source: str, ok: bool, elapsed_s: float) -> None:
         pipe.execute()
     except redis.RedisError as exc:
         logger.debug("stats record error: %s", exc)
+
+
+def record_block(source: str, vendor: str, level: str) -> None:
+    """Record a block event: bounded reservoir + counter (24h TTL).
+
+    Keyed `sg:bl:<source>:<vendor>` so the doctor `blocks` section can break
+    down denials by source and vendor (e.g. `egress:floor`, `reddit:cf`).
+    `level` rides along in the recent-events list only.
+    """
+    try:
+        c = _get_client()
+        key = f"sg:bl:{source}:{vendor}"
+        pipe = c.pipeline()
+        pipe.incr(key)
+        pipe.rpush("sg:bl:recent", f"{source}|{vendor}|{level}|{int(time.time())}")
+        pipe.ltrim("sg:bl:recent", -BLOCK_RESERVOIR, -1)
+        pipe.expire(key, _WINDOW)
+        pipe.expire("sg:bl:recent", _WINDOW)
+        pipe.execute()
+    except redis.RedisError as exc:
+        logger.debug("stats record_block error: %s", exc)
+
+
+def blocks_snapshot() -> dict:
+    """Block counters + the recent-event reservoir (bounded, newest last)."""
+    out = {"counters": {}, "total": 0, "recent": []}
+    try:
+        c = _get_client()
+        for key in c.scan_iter("sg:bl:*"):
+            name = key.removeprefix("sg:bl:")
+            if "|" in name or ":" not in name:
+                continue  # the recent list key, not a counter
+            n = int(c.get(key) or 0)
+            out["counters"][name] = n
+            out["total"] += n
+        for item in c.lrange("sg:bl:recent", 0, -1):
+            parts = item.split("|")
+            if len(parts) == 4:
+                src, vendor, level, ts = parts
+                try:
+                    ts = int(ts)
+                except ValueError:
+                    continue
+                out["recent"].append({"source": src, "vendor": vendor,
+                                      "level": level, "ts": ts})
+        return out
+    except redis.RedisError as exc:
+        logger.debug("stats blocks snapshot error: %s", exc)
+        return out
 
 
 def _percentiles(values: list[float], *ps: float) -> list[float]:

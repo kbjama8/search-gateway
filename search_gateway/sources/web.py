@@ -21,6 +21,7 @@ import logging
 import httpx
 
 from ..config import READ_URL_STAGES
+from ..extract.egress import assert_egress
 from ..extract.proxies import jina_header
 from .base import Source, SourceError
 
@@ -39,6 +40,10 @@ class WebSource(Source):
         return []
 
     async def read(self, url: str) -> str:
+        # L1 floor, pre-nav: the target of every stage is checked once here;
+        # each stage additionally re-checks where it can see a redirect
+        # (readability below — the direct-fetch stages).
+        assert_egress(url, "web")
         errors: list[str] = []
         for stage in [s.strip() for s in READ_URL_STAGES.split(",") if s.strip()]:
             handler = getattr(self, f"_read_{stage}", None)
@@ -58,6 +63,7 @@ class WebSource(Source):
         raise SourceError("all read stages failed: " + "; ".join(errors))
 
     async def _read_jina(self, url: str) -> str:
+        assert_egress(url, "web")
         headers = {}
         proxy = jina_header()
         if proxy:
@@ -69,6 +75,10 @@ class WebSource(Source):
             return resp.text
 
     async def _read_trafilatura(self, url: str) -> str:
+        # pre-nav only: trafilatura's own fetcher exposes no final URL —
+        # the kernel layer catches redirect targets the floor can't see.
+        assert_egress(url, "web")
+
         def _sync() -> str:
             import trafilatura
             downloaded = trafilatura.fetch_url(url)
@@ -79,12 +89,19 @@ class WebSource(Source):
         return await asyncio.to_thread(_sync)
 
     async def _read_readability(self, url: str) -> str:
+        assert_egress(url, "web")
+
         def _sync() -> str:
             import httpx as _httpx
             from lxml import html as lxml_html
             from readability import Document
             resp = _httpx.get(url, timeout=30.0, follow_redirects=True)
             resp.raise_for_status()
+            # L1 floor, post-redirect: a redirect can jump to a private host
+            # (LESSONS.md §1.5 — hermes lesson). httpx exposes the final URL.
+            final = str(resp.url)
+            if final != url:
+                assert_egress(final, "web")
             doc = Document(resp.text)
             summary = doc.summary()
             if not summary:

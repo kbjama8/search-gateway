@@ -78,6 +78,57 @@ Source: proxycove.com comparison of anti-bots 2026.
 
 Source: developers.cloudflare.com/cloudflare-challenges/challenge-types/challenge-pages/detect-response/.
 
+### 1.5 Containment field state (Phase 7 research, all verified read-only)
+**2026-08-22 · verified (primary sources) · actionable — decisions D7.1–D7.4**
+
+- **firejail is rejected as the sandbox mechanism**: it is a suid binary with
+  a root-escalation CVE history; its `netfilter`/`dns`/`hosts-file` primitives
+  have no systemd equivalent, but systemd eBPF (`IPAddressDeny=`,
+  `IPAddressAllow=`, `SocketBindDeny=`, `RestrictAddressFamilies=`) covers the
+  service-level floor. **Implication:** service-level denials via the unit;
+  per-process egress via nftables (below). (Sources: netblue30/firejail wiki
+  "Comparison of firejail and systemd hardening options";
+  fedoraproject discussion #121109.)
+- **nftables supports per-process egress filtering** via
+  `socket cgroupv2 level 2 "<path>"` — proven pattern from the pam_authnft
+  project: systemd transient scope pins PIDs to a cgroup → nftables chain
+  dispatches per-cgroup. No suid binary, no kernel module, works for ad-hoc
+  processes (the browser children outlive our process; a kernel-level floor
+  is the only thing that still sees them). **Implication:** L3 kernel filter
+  = nft table `inet sg_egress` + cgroupv2 scope. (Sources: identd-ng/
+  pam_authnft ARCHITECTURE.txt; spinics.net nftables thread.)
+- **IMDS SSRF is a real incident class**: hermes-agent's browser hybrid
+  routing bypassed its pre-nav guard for the whole `169.254.0.0/16` (link-
+  local qualifies as "private") → IAM credential theft; their fix is an
+  **always-blocked floor as an independent gate, checked pre-nav AND
+  post-redirect**. **Implication:** L1 floor checks literal IPs both before
+  navigation and after redirect, and blocks the *whole* link-local range, not
+  just the well-known 169.254.169.254. (Source: NousResearch/hermes-agent
+  PR #21228, issue #16234.)
+- **Chrome 136+**: `--remote-debugging-port`/`--remote-debugging-pipe`
+  require a **non-default `--user-data-dir`** (App-Bound Encryption); prefer
+  `--remote-debugging-pipe` over an open port; "Chrome for Testing" is the
+  automation build. **Implication:** the anonymous tier's Camoufox launches
+  always carry an explicit profile dir; forced-proxy flags (below) keep the
+  browser's egress inside the floor. (Source: developer.chrome.com blog,
+  2025-03.)
+- **systemd credentials**: `LoadCredential=`/`LoadCredentialEncrypted=` +
+  `$CREDENTIALS_DIRECTORY`; systemd's own doctrine is that **env vars are NOT
+  suitable for secrets** (world-readable via D-Bus, propagate across setuid
+  boundaries); Issue #40333 documents the `EnvironmentFile=%d/app-secrets`
+  bridge. **Implication:** the hardened unit passes the vault through
+  `LoadCredential=`, and the config loader honors
+  `SEARCH_GATEWAY_CREDENTIALS_DIR` so files arrive via
+  `$CREDENTIALS_DIRECTORY` without ever touching the process env.
+  (Sources: systemd.io/CREDENTIALS/; systemd/systemd#40333.)
+- **Chromium forced-proxy egress is fully supported**:
+  `--proxy-server="http://127.0.0.1:PORT"` routes everything;
+  `--host-resolver-rules="MAP * 0.0.0.0, EXCLUDE 127.0.0.1"` pushes remote
+  DNS through the proxy (a browser whose resolver still talks to the host DNS
+  would leak the target domain). **Implication:** L2 = loopback CONNECT proxy
+  in front of Camoufox; localhost is exempted so the proxy itself still
+  works. (Sources: chromium net/docs/proxy.md; superuser #1812598.)
+
 ---
 
 ## 2. Proxy economics & provider landscape
@@ -378,11 +429,15 @@ Source: github.com/lexiforest/curl_cffi.
 | R5 | ~~yt-dlp PO-token plugins~~ → **DONE**: bgutil-provider + getpot-wpc (§3.9) | Phase 4/6 |
 | R6 | ~~Jina headers~~ → **DONE**: X-Target/Wait-Selector, X-With-Links-Summary, X-Proxy-Url (§4.2) | Phase 5 |
 | R7 | ~~curl_cffi~~ → **DONE**: impersonation + async + proxy rotation (§5.5) | Phase 3 |
-| R8 | firejail vs systemd sandboxing for browser tier (egress rules to block Redis/SSH-agent) | Phase 7 |
+| R8 | ~~firejail vs systemd sandboxing for browser tier~~ → **DONE**: firejail REJECTED (suid + CVE history); systemd eBPF for the service + **nftables cgroupv2** for per-process egress (L3, §1.5) | Phase 7 |
 | R9 | ~~Cloudflare challenge markers~~ → **DONE**: `cf-mitigated: challenge` official header (§1.4); remaining: DataDome/Kasada/Akamai marker catalog — DR-1 fixture task | Phase 4 |
 | R10 | IPRoyal/SOXA API specifics: geo grammar, sticky TTL caps, dashboard/API provisioning | Phase 3.5 |
 | R11 | Zhihu hot-list JSON endpoint (public?) | Phase 6 |
 | R12 | Baidu `top.baidu.com/api/board` + Toutiao hot-board live verification | Phase 6 |
+| R13 | ~~IMDS/SSRF incident class: always-blocked floor~~ → **DONE**: link-local `169.254.0.0/16` bypass → IAM theft; floor checked pre-nav AND post-redirect (hermes-agent PR #21228) (§1.5) | Phase 7 |
+| R14 | ~~systemd credentials for secrets~~ → **DONE**: `LoadCredential=`/`$CREDENTIALS_DIRECTORY`; env vars rejected for secrets (systemd.io/CREDENTIALS, #40333) (§1.5) | Phase 7 |
+| R15 | ~~Chrome 136+ automation constraints~~ → **DONE**: non-default user-data-dir required for remote debugging; CfT recommended (§1.5) | Phase 7 |
+| R16 | ~~Forced-proxy egress for Chromium~~ → **DONE**: `--proxy-server` + `--host-resolver-rules="MAP * 0.0.0.0, EXCLUDE 127.0.0.1"` (chromium proxy.md) (§1.5) | Phase 7 |
 
 ---
 
@@ -414,3 +469,7 @@ Source: github.com/lexiforest/curl_cffi.
     (noqa'd with reason); sha1 for sticky ids upgraded to sha256.
   - **Phase 7 pending**: browser sandboxing (firejail/systemd egress rules),
     per-profile secret vault, bench.py browser tier — not yet implemented.
+- **2026-08-23 (Phase 7 execution)** — containment research folded in (§1.5):
+  firejail rejected, nftables-cgroupv2 chosen for L3, IMDS floor lesson
+  (pre-nav + post-redirect), systemd credentials bridge, forced-proxy flags.
+  Parking-lot R8/R13–R16 closed.

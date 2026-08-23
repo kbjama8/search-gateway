@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-08-23
+
+Phase 7 (containment & observability), release 1 of 2 — the zero-risk floor:
+L1 egress floor, per-persona secrets vault with full migration, and block
+telemetry. L2/L3 land in 0.4.2 (`docs/extraction/PHASE7-HANDOFF.md`, decisions
+D7.1–D7.4).
+
+### Added
+- **L1 egress floor** (`extract/egress.py`): always-blocked private/link-local/
+  metadata ranges (RFC1918, CGNAT, IMDS across AWS/GCP/Azure/Alibaba, loopback
+  v4+v6) checked **pre-nav and post-redirect** on every extraction path — API
+  tier (`extract/http.py`), all `read_url` stages (`sources/web.py`), the
+  Camoufox adapter, and the `read_url` server tool. Pure IP/hostname matching,
+  no DNS in the floor; the L3 kernel filter catches what the floor can't see.
+  Local-infra exemption only (`SEARXNG_BASE`/`REDIS_URL` hosts +
+  `SEARCH_GATEWAY_FLOOR_EXEMPT`). Default **ON** by design.
+- **Per-persona secrets vault** (`extract/vault.py`): secrets move to
+  `~/.agent-reach/profiles/<persona>/{twitter,deepseek,proxy}.env` (0600,
+  decision D7.3). `search-gateway vault migrate [--dry-run]` / `vault status`;
+  hygiene checks (mode enforcement, symlink traps, stale files, out-of-vault
+  config) warn-not-fail but color doctor red. Legacy flat paths honored one
+  release with a doctor deprecation warning (removed 0.4.3).
+- **systemd credentials bridge**: `SEARCH_GATEWAY_CREDENTIALS_DIR`
+  (`$CREDENTIALS_DIRECTORY`) — secrets arrive as files, never env vars
+  (LESSONS.md §1.5).
+- **Block-event telemetry** (`stats.record_block` / `blocks_snapshot`): bounded
+  24h reservoir `sg:bl:<source>:<vendor>` recorded from the subprocess raise
+  site, the envelope chokepoint (non-raising blocked strings only — no double
+  counting), and egress denials.
+- **Doctor sections**: `egress{floor,proxy,kernel,denied_count,last_denial}`,
+  `vault{profiles,hygiene,findings}`, `blocks`, `profiles` (Phase 2 profile
+  farm status). `stats_report` gains `blocks`.
+
+### Changed
+- `TWITTER_AUTH_FILE` / `DEEPSEEK_AUTH_FILE` / `SEARCH_GATEWAY_PROXY_AUTH_FILE`
+  defaults now point into the vault; consumers resolve via the vault chain
+  (credentials bridge → vault → legacy).
+- `.env.example` / `docs/config-reference.md`: 6 new variables (containment +
+  vault + telemetry).
+
+### Security
+- SSRF floor: the whole link-local range is blocked, not just the well-known
+  IMDS address — a post-redirect jump to any private/metadata host now fails
+  with an explicit `blocked (egress-floor/…)` envelope signal.
+
 ## [0.4.0] - 2026-08-22
 
 Project Gatekeeper — the extraction-architecture overhaul

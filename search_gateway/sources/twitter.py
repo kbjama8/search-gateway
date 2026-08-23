@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import os
 
-from ..config import TWITTER_ENV_FILE
+from ..extract.vault import env_file_for
 from ..models import Result
 from .base import Source, guard_query, run_cmd, run_opencli
 
 
 def _load_twitter_env() -> dict[str, str]:
     env: dict[str, str] = {}
-    if os.path.exists(TWITTER_ENV_FILE):
-        with open(TWITTER_ENV_FILE, encoding="utf-8") as fh:
+    path = env_file_for("twitter")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:

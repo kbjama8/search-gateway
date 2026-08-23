@@ -418,9 +418,11 @@ TWITTER_CLI_JSON = json.dumps({"ok": True, "data": [
 
 def test_twitter_backend1_success(monkeypatch, tmp_path):
     import search_gateway.sources.twitter as mod
+    from search_gateway.extract import vault as vault_mod
     envfile = tmp_path / "twitter.env"
     envfile.write_text('TWITTER_AUTH_TOKEN="t"\nTWITTER_CT0="c"\n')
-    monkeypatch.setattr(mod, "TWITTER_ENV_FILE", str(envfile))
+    monkeypatch.setitem(vault_mod._CONFIG_PATHS, "twitter", str(envfile))
+    monkeypatch.setitem(vault_mod.LEGACY_PATHS, "twitter", str(tmp_path / "nope.env"))
 
     async def fake_run_cmd(cmd, **kwargs):
         return 0, TWITTER_CLI_JSON
@@ -438,7 +440,9 @@ def test_twitter_backend1_success(monkeypatch, tmp_path):
 
 def test_twitter_backend2_opencli_fallback(monkeypatch):
     import search_gateway.sources.twitter as mod
-    monkeypatch.setattr(mod, "TWITTER_ENV_FILE", "/nonexistent.env")  # no backend1 auth
+    from search_gateway.extract import vault as vault_mod
+    monkeypatch.setitem(vault_mod._CONFIG_PATHS, "twitter", "/nonexistent.env")
+    monkeypatch.setitem(vault_mod.LEGACY_PATHS, "twitter", "/nonexistent.env")  # no auth
 
     async def fake_run_cmd(cmd, **kwargs):
         return 0, "{}"  # backend1 empty
@@ -459,7 +463,9 @@ def test_twitter_backend2_opencli_fallback(monkeypatch):
 
 def test_twitter_both_backends_fail(monkeypatch):
     import search_gateway.sources.twitter as mod
-    monkeypatch.setattr(mod, "TWITTER_ENV_FILE", "/nonexistent.env")
+    from search_gateway.extract import vault as vault_mod
+    monkeypatch.setitem(vault_mod._CONFIG_PATHS, "twitter", "/nonexistent.env")
+    monkeypatch.setitem(vault_mod.LEGACY_PATHS, "twitter", "/nonexistent.env")
 
     async def fake_run_cmd(cmd, **kwargs):
         return 1, "fail"

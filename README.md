@@ -336,7 +336,11 @@ binaries and env vars it needs. Adding source #23 is a bounded, four-step
 change documented in `docs/architecture.md`'s source-adapter contract.
 The v0.4 extraction layer (`search_gateway/extract/`) adds tiered routing,
 block detection, a browser profile farm, an env-gated proxy subsystem, and
-multi-stage `read_url` — see `docs/extraction/PLAN.md`.
+multi-stage `read_url` — see `docs/extraction/PLAN.md`. Since 0.4.1 it also
+carries the containment floor: an L1 egress filter (private/link-local/
+metadata ranges, checked pre-nav and post-redirect), a per-persona secrets
+vault (`search-gateway vault migrate|status`), and block-event telemetry in
+`doctor`/`stats_report`.
 
 ## CLI
 
@@ -347,10 +351,12 @@ multi-stage `read_url` — see `docs/extraction/PLAN.md`.
 | `search-gateway check` | strict gate (22 sources + Redis), for `ExecStartPre`/CI |
 | `search-gateway version` | print `__version__` |
 | `search-gateway warm` | preload rerank + embed models |
+| `search-gateway vault migrate [--dry-run]` | move legacy flat secrets into the per-persona vault |
+| `search-gateway vault status` | vault layout + hygiene findings |
 
 ## Configuration
 
-Everything is an environment variable with a default — all 41 of them,
+Everything is an environment variable with a default — all 79 of them,
 grouped by concern and mapped to capability tiers in
 `docs/config-reference.md`, with the override precedence (env var > env file >
 default) spelled out once so it doesn't need re-deriving per variable. Secrets

@@ -164,9 +164,18 @@ FALLBACK_CHAINS: dict[str, list[str]] = {
     "toutiao": ["toutiao-board", "skip"],
 }
 
-# --- auth ---
-TWITTER_ENV_FILE = _env("TWITTER_AUTH_FILE", os.path.expanduser("~/.agent-reach/twitter-auth.env"))
-DEEPSEEK_ENV_FILE = _env("DEEPSEEK_AUTH_FILE", os.path.expanduser("~/.agent-reach/deepseek.env"))
+# --- auth (v0.4.1: secrets vault, per-persona, 0600) ---
+# Persona + vault root drive the env-file defaults. `vault.resolve_env_file`
+# honors the legacy flat paths (deprecated, removed 0.4.3) and the systemd
+# `$CREDENTIALS_DIRECTORY` bridge (SEARCH_GATEWAY_CREDENTIALS_DIR).
+PERSONA = _env("SEARCH_GATEWAY_PERSONA", "kaiser")
+VAULT_DIR = _env("SEARCH_GATEWAY_VAULT_DIR",
+                 os.path.expanduser("~/.agent-reach/profiles"))
+CREDENTIALS_DIR = _env("SEARCH_GATEWAY_CREDENTIALS_DIR", "")
+TWITTER_ENV_FILE = _env("TWITTER_AUTH_FILE",
+                        os.path.expanduser(f"{VAULT_DIR}/{PERSONA}/twitter.env"))
+DEEPSEEK_ENV_FILE = _env("DEEPSEEK_AUTH_FILE",
+                         os.path.expanduser(f"{VAULT_DIR}/{PERSONA}/deepseek.env"))
 
 # --- observability / serving (Phase D) ---
 LOG_FMT = _env("SEARCH_GATEWAY_LOG_FMT", "text")  # text | json (always stderr)
@@ -237,7 +246,7 @@ PROXY_GATEWAY = _env("SEARCH_GATEWAY_PROXY_GATEWAY", "")       # host:port
 PROXY_USERNAME = _env("SEARCH_GATEWAY_PROXY_USERNAME", "")     # carries geo grammar
 PROXY_PASSWORD = _env("SEARCH_GATEWAY_PROXY_PASSWORD", "")
 PROXY_ENV_FILE = _env("SEARCH_GATEWAY_PROXY_AUTH_FILE",
-                      os.path.expanduser("~/.agent-reach/proxy.env"))
+                      os.path.expanduser(f"{VAULT_DIR}/{PERSONA}/proxy.env"))
 PROXY_COUNTRY = _env("SEARCH_GATEWAY_PROXY_COUNTRY", "")       # "" = provider default
 PROXY_STICKY_TTL = _env("SEARCH_GATEWAY_PROXY_STICKY_TTL", "30m")
 # Geo-consistency (Phase 3.5): derive TZ/locale bundle from egress geo.
@@ -270,6 +279,16 @@ AUTH_GATED_SOURCES = frozenset({"zhihu", "weibo", "twitter", "reddit",
 YOUTUBE_PO_PLUGIN = _env("SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN", "")
 YOUTUBE_PO_SERVER = _env("SEARCH_GATEWAY_YOUTUBE_PO_SERVER", "http://127.0.0.1:4416")
 
+# --- containment & observability (v0.4.1, Phase 7) ---
+# L1 egress floor: always-blocked private/link-local/metadata ranges, checked
+# pre-nav AND post-redirect. Default ON by design (it is the containment
+# floor, not a risky capability). Local-infra exemption = the gateway's own
+# loopback deps (SEARXNG_BASE/REDIS_URL) + the operator allowlist below.
+EGRESS_FLOOR = _env_bool("SEARCH_GATEWAY_EGRESS_FLOOR", True)
+FLOOR_EXEMPT = _env("SEARCH_GATEWAY_FLOOR_EXEMPT", "")
+# Block-event telemetry reservoir (bounded, 24h TTL) — feeds doctor `blocks`.
+BLOCK_RESERVOIR = _env_int("SEARCH_GATEWAY_BLOCK_RESERVOIR", 120)
+
 
 def load_env_file(path: str, keys: set[str]) -> dict[str, str]:
     """Load `KEY=VALUE` lines from a file (export-aware, quote-stripped)."""
@@ -287,3 +306,22 @@ def load_env_file(path: str, keys: set[str]) -> dict[str, str]:
             if k in keys:
                 out[k] = v.strip().strip('"').strip("'")
     return out
+
+
+def load_env_file_credential(name: str, keys: set[str],
+                             fallback_path: str = "") -> dict[str, str]:
+    """Credentials-dir-aware env loader (systemd $CREDENTIALS_DIRECTORY bridge).
+
+    When `SEARCH_GATEWAY_CREDENTIALS_DIR` is set (systemd `LoadCredential=`
+    puts files there as `<name>`), read `<dir>/<name>` first — the systemd
+    way: secrets arrive as files, never as env vars (LESSONS.md §1.5).
+    Both `<name>` and `<name>.env` are tried (the vault files carry the
+    suffix; a unit may bind either name). Falls back to `fallback_path`
+    (the vault file) when the bridge is off.
+    """
+    if CREDENTIALS_DIR:
+        for candidate in (name, f"{name}.env"):
+            path = os.path.join(CREDENTIALS_DIR, candidate)
+            if os.path.exists(path):
+                return load_env_file(path, keys)
+    return load_env_file(fallback_path, keys)

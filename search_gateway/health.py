@@ -18,6 +18,9 @@ from .config import (
     DOCTOR_PROBE_TIMEOUT,
     DOCTOR_TIMEOUT,
 )
+from .extract import profiles
+from .extract.egress import status as egress_status
+from .extract.vault import status as vault_status
 from .sources import ALL_SOURCES
 
 # probe results are cached in-process: `opencli doctor` ≈ 9s and `uvx` cold
@@ -54,6 +57,11 @@ async def report() -> dict:
         "sources": {},
         "academic": {},
         "ledger": stats.ledger_health(),
+        # Phase 7 sections (v0.4.1+): containment + block telemetry + profiles
+        "egress": egress_status(),
+        "vault": vault_status(),
+        "blocks": stats.blocks_snapshot(),
+        "profiles": profiles.store.status(),
     }
     tasks = {name: asyncio.ensure_future(_probe(name, src))
              for name, src in ALL_SOURCES.items()}

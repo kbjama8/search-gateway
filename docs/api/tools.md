@@ -341,6 +341,10 @@ sequenceDiagram
 ### `read_url(url)`
 Read a web page as Markdown (Jina Reader). Returns `{url, content, length}`.
 
+Since 0.4.1 the L1 egress floor checks the target before navigation and
+post-redirect inside the direct-fetch stages; a denied URL returns an explicit
+error instead of fetching:
+
 ```json
 { "url": "https://example.com/blog/post" }
 ```
@@ -351,13 +355,17 @@ Read a web page as Markdown (Jina Reader). Returns `{url, content, length}`.
   "length": 4821
 }
 ```
+```json
+{ "url": "http://169.254.169.254/latest/meta-data", "error": "blocked (egress-floor/169.254.0.0/16): http://169.254.169.254/latest/meta-data" }
+```
 <!-- capture: real read_url output -->
 
 ### `doctor()`
 Health report: Redis, models, every source, academic latency/rate-limit status,
-and ledger health. 18 sources + `redis`/`rerank`/`embed`/`llm`/`ledger` keys.
-Shared with the CLI via `health.report()` — `search-gateway doctor` prints the
-same JSON.
+ledger health, and (0.4.1+) the containment sections `egress`/`vault`/`blocks`/
+`profiles`. 22 sources + `redis`/`rerank`/`embed`/`llm`/`ledger` keys. Shared
+with the CLI via `health.report()` — `search-gateway doctor` prints the same
+JSON.
 
 ```json
 {
@@ -366,6 +374,13 @@ same JSON.
   "embed": { "model": "sentence-transformers/all-MiniLM-L6-v2", "loaded": true, "error": null,
              "cjk_model": "BAAI/bge-m3", "cjk_loaded": false, "cjk_error": null, "cjk_enabled": true },
   "llm": { "available": true },
+  "egress": { "floor": { "enabled": true, "denied": 0 }, "proxy": { "enabled": false, "note": "…" },
+              "kernel": { "installed": null, "note": "…" }, "denied_count": 0, "last_denial": null },
+  "vault": { "persona": "kaiser", "vault_dir": "~/.agent-reach/profiles", "credentials_dir": null,
+             "profiles": [ { "persona": "kaiser", "files": ["deepseek.env", "twitter.env"] } ],
+             "legacy_in_use": {}, "hygiene": { "ok": true, "findings": [] } },
+  "blocks": { "counters": { "egress:floor": 0 }, "total": 0, "recent": [] },
+  "profiles": {},
   "sources": { "searxng": "ok", "exa": "ok", "github": "ok", "youtube": "ok", "bilibili": "ok",
                "v2ex": "ok", "twitter": "down — auth expired", "reddit": "ok", "facebook": "down — login wall",
                "instagram": "ok", "xiaohongshu": "ok", "linkedin": "ok", "web": "ok", "arxiv": "ok",
@@ -383,12 +398,15 @@ same JSON.
 <!-- capture: real doctor output -->
 
 ### `stats_report()`
-Per-source reliability & latency (rolling 24h) + ledger health.
+Per-source reliability & latency (rolling 24h) + block-event reservoir
+(0.4.1+) + ledger health.
 
 ```json
 {
   "searxng": { "queries": 214, "errors": 3, "reliability": 0.986, "avg_latency_s": 0.87 },
   "twitter": { "queries": 40, "errors": 12, "reliability": 0.7, "avg_latency_s": 3.42 },
+  "blocks": { "counters": { "egress:floor": 1, "twitter:cloudflare": 2 }, "total": 3,
+              "recent": [ { "source": "egress", "vendor": "floor", "level": "169.254.0.0/16", "ts": 1787504705 } ] },
   "_ledger": { "ledger_dir": "/home/user/research_runs", "configured": true, "run_count": 4, "claim_count": 61,
                "evidence_count": 58, "open_claims": 3, "runs_with_open_claims": 1, "errors": 0 }
 }

@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 
 from ..config import STEALTH_ENABLED, STEALTH_PROFILE
+from .egress import assert_egress
 from .proxies import context_proxy
 
 logger = logging.getLogger("search_gateway.extract.camoufox")
@@ -67,9 +68,15 @@ async def html(browser, url: str, *, timeout_ms: int = 30000) -> str | None:
     if browser is None:
         return None
     try:
+        # L1 floor, pre-nav AND post-nav (hermes lesson, LESSONS.md §1.5):
+        # the browser follows redirects, so the *final* URL must be re-checked.
+        assert_egress(url, "stealth")
         page = await browser.new_page()
         await page.goto(url, wait_until="domcontentloaded",
                         timeout=timeout_ms)
+        final = str(page.url)
+        if final != url:
+            assert_egress(final, "stealth")
         return await page.content()
     except Exception as exc:  # noqa: BLE001
         logger.debug("camoufox html fetch failed: %s", exc)

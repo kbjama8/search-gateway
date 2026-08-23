@@ -198,6 +198,11 @@ def _extract_signals(statuses: dict[str, Any]) -> tuple[dict, dict]:
     Source outcomes already carry the machine-readable facts: `blocked
     (vendor/level)` and `auth: reason`. This turns them into structured
     envelope fields — the envelope names the state, never guesses it.
+
+    Block telemetry: raising sources record the event in
+    `sources.base._blocked_error` (the raise site). Outcomes here that are
+    blocked strings but NOT error-prefixed came from a non-raising path, so
+    they are recorded here — the two sites never record the same event twice.
     """
     blocked: list[dict] = []
     auth: dict[str, str] = {}
@@ -212,6 +217,8 @@ def _extract_signals(statuses: dict[str, Any]) -> tuple[dict, dict]:
         if m:
             blocked.append({"source": name, "vendor": m.group(1),
                             "level": m.group(2)})
+            if not outcome.startswith("error:"):
+                stats.record_block(name, m.group(1), m.group(2))
         if outcome.startswith("auth:"):
             auth[name] = "missing"
         elif name in AUTH_GATED_SOURCES:

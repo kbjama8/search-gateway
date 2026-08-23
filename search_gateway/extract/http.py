@@ -16,6 +16,7 @@ from types import SimpleNamespace  # noqa: F401 — convenience for callers
 from typing import Any
 
 from ..config import IMPERSONATE, IMPERSONATE_SOURCES
+from .egress import assert_egress
 
 logger = logging.getLogger("search_gateway.extract.http")
 
@@ -62,7 +63,12 @@ async def request(method: str, url: str, *, source: str | None = None,
 
     curl_cffi failure degrades to httpx rather than raising — the extraction
     layer never lets a transport enhancement sink a request.
+
+    The L1 egress floor is checked before every call (pre-nav; the API tier
+    does not follow redirects, so there is no post-redirect surface here —
+    see web.py for the reader stages).
     """
+    assert_egress(url, source)
     if _should_impersonate(source):
         try:
             return await _curl_cffi_request(method, url, headers=headers,

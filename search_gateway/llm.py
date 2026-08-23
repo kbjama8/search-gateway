@@ -16,12 +16,11 @@ import httpx
 from .config import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
-    DEEPSEEK_ENV_FILE,
     LLM_ENABLED,
     LLM_MODEL,
     LLM_TIMEOUT,
-    load_env_file,
 )
+from .extract.vault import load_secrets
 
 logger = logging.getLogger("search_gateway.llm")
 
@@ -31,8 +30,8 @@ _api_key: str | None = None
 def get_api_key() -> str:
     global _api_key
     if _api_key is None:
-        _api_key = DEEPSEEK_API_KEY or load_env_file(
-            DEEPSEEK_ENV_FILE, {"DEEPSEEK_API_KEY"}).get("DEEPSEEK_API_KEY", "")
+        _api_key = DEEPSEEK_API_KEY or load_secrets(
+            "deepseek", {"DEEPSEEK_API_KEY"}).get("DEEPSEEK_API_KEY", "")
     return _api_key
 
 

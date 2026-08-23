@@ -262,8 +262,9 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
       test_sources_parsers)
 - [x] Phase 6 — CN expansion: **bilibili wbi** (canonical-example-verified),
       **zhihu**, **weibo**, **baidu**, **toutiao**; registry 22 sources
-- [ ] Phase 7 — containment & observability (sandboxing + per-profile
-      secret vault + bench browser tier) — next
+- [ ] Phase 7 — containment & observability — **planned, decisions locked,
+      not executed; see [PHASE7-HANDOFF.md](PHASE7-HANDOFF.md)** (splits into
+      0.4.1: floor+vault+telemetry; 0.4.2: L2+L3+bench+hardened unit)
 - [x] Phase 8 (partial) — contract tests 22 sources, envelope 0.4 fields,
       config-reference/api-tools/README/architecture/project-map/faq/
       deployment/security updated, CHANGELOG 0.4.0, version bumped

@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All 70 settings are environment variables with defaults — `config.py` is the
+All 79 settings are environment variables with defaults — `config.py` is the
 source of truth, and `.env.example` mirrors it (verified: the three cross-check
 clean against each other). Copy `.env.example`, override what you need, and
 never commit a secret (`.gitignore` blocks `*.env`).
@@ -58,6 +58,7 @@ matter starting at a specific tier, not from `minimal` onward.
 | Stealth / impersonation (v0.4) | Camoufox anonymous tier + curl_cffi TLS impersonation | experimental, opt-in |
 | Read_url stages (v0.4) | Jina → Trafilatura → readability extraction pipeline | **minimal** |
 | CN tier (v0.4) | zhihu/weibo/baidu/toutiao + bilibili wbi signing | opt-in (`SEARCH_GATEWAY_CN_SOURCES=1`) |
+| Containment (v0.4.1) | L1 egress floor (SSRF/metadata), per-persona secrets vault, block telemetry | **any tier** (floor), **social/vertical** (vault/telemetry) |
 
 ## Infrastructure
 
@@ -217,12 +218,21 @@ do (`docs/faq.md`).
 
 | Variable | Default |
 |----------|---------|
-| `TWITTER_AUTH_FILE` | `~/.agent-reach/twitter-auth.env` |
-| `DEEPSEEK_AUTH_FILE` | `~/.agent-reach/deepseek.env` |
+| `SEARCH_GATEWAY_PERSONA` | `kaiser` |
+| `SEARCH_GATEWAY_VAULT_DIR` | `~/.agent-reach/profiles` |
+| `SEARCH_GATEWAY_CREDENTIALS_DIR` | `""` |
+| `TWITTER_AUTH_FILE` | `~/.agent-reach/profiles/kaiser/twitter.env` |
+| `DEEPSEEK_AUTH_FILE` | `~/.agent-reach/profiles/kaiser/deepseek.env` |
+| `SEARCH_GATEWAY_PROXY_AUTH_FILE` | `~/.agent-reach/profiles/kaiser/proxy.env` |
 
 These are *paths* to files containing `KEY=VALUE` secrets, parsed by
 `load_env_file()` (export-aware, quote-stripped) — not secrets themselves.
-Env var still wins if both are set (see override precedence above).
+Since 0.4.1 the defaults live in the **per-persona vault** (0600, decision
+D7.3). Resolution chain per secret kind: `SEARCH_GATEWAY_CREDENTIALS_DIR`
+(systemd `$CREDENTIALS_DIRECTORY` bridge — files arrive via `LoadCredential=`,
+never env vars) → the configured path → the legacy flat path (`~/.agent-reach/
+<name>.env`, honored one release with a doctor deprecation warning, removed
+0.4.3). Migrate with `search-gateway vault migrate`; inspect with `vault status`.
 
 ## Observability / serving
 
@@ -291,7 +301,6 @@ defaults. Full rationale: `docs/extraction/PLAN.md`.*
 | `SEARCH_GATEWAY_PROXY_GATEWAY` | `""` | provider gateway `host:port` |
 | `SEARCH_GATEWAY_PROXY_USERNAME` | `""` | targeting-grammar username (verbatim wins; else auto-built `country-sid-ttl`) |
 | `SEARCH_GATEWAY_PROXY_PASSWORD` | `""` | provider password |
-| `SEARCH_GATEWAY_PROXY_AUTH_FILE` | `~/.agent-reach/proxy.env` | 0600 file for the three credentials above |
 | `SEARCH_GATEWAY_PROXY_COUNTRY` | `""` | persona egress country (ISO) |
 | `SEARCH_GATEWAY_PROXY_STICKY_TTL` | `30m` | sticky-session lifetime per profile |
 | `SEARCH_GATEWAY_PROXY_GEO_ALIGN` | `1` | derive TZ/locale/languages from egress geo into the fingerprint bundle |
@@ -315,3 +324,14 @@ defaults. Full rationale: `docs/extraction/PLAN.md`.*
 | `SEARCH_GATEWAY_BILIBILI_WBI_KEY_TTL` | `82800` | wbi key cache TTL (23h — keys rotate daily) |
 | `SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN` | `""` | yt-dlp PO-token provider plugin (e.g. `bgutil-ytdlp-pot-provider`) |
 | `SEARCH_GATEWAY_YOUTUBE_PO_SERVER` | `http://127.0.0.1:4416` | PO-token HTTP server URL when a provider plugin needs one |
+
+### Containment & observability (v0.4.1, Phase 7)
+
+*The always-blocked network floor, the secrets vault, and block telemetry.
+Full rationale: `docs/extraction/PHASE7-HANDOFF.md` + `docs/security.md`.*
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_EGRESS_FLOOR` | `1` | L1 egress floor: private/link-local/metadata egress blocked pre-nav AND post-redirect (default ON by design) |
+| `SEARCH_GATEWAY_FLOOR_EXEMPT` | `""` | operator allowlist for the floor (comma-separated hostnames/IPs); the gateway's own loopback deps are always exempt |
+| `SEARCH_GATEWAY_BLOCK_RESERVOIR` | `120` | block-event reservoir size (recent denials kept, 24h TTL) |

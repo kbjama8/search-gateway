@@ -109,18 +109,23 @@ class SourceError(Exception):
     """Raised when a source cannot fulfil a query."""
 
 
-def _blocked_error(code: int, text: str) -> SourceError | None:
+def _blocked_error(code: int, text: str, source: str | None = None) -> SourceError | None:
     """Classify a response for challenge markers; None when clean.
 
     A challenge is the one failure retry logic must NOT touch — retrying a
     wall is the wrong move, so a detected block raises immediately (before
     the retryable-exit-code check) and the orchestrator's ladder decides.
+    Block events are recorded for telemetry here (the raise site); the
+    envelope layer only records non-raising blocked strings — never the same
+    event twice (see orchestrator._extract_signals).
     """
     if not BLOCK_DETECTION:
         return None
     sig = classify(code, None, text)
     if sig is None:
         return None
+    from ..stats import record_block
+    record_block(source or "cli", sig.vendor, sig.level)
     return SourceError(f"blocked ({sig.vendor}/{sig.level}): {sig.evidence}")
 
 
@@ -129,6 +134,7 @@ async def run_cmd(
     timeout: int = PER_SOURCE_TIMEOUT,
     env: dict | None = None,
     retries: int = RETRY_COUNT,
+    source: str | None = None,
 ) -> tuple[int, str]:
     """Run a command, returning (returncode, combined_stdout).
 
@@ -137,6 +143,7 @@ async def run_cmd(
     fail immediately — retrying them wastes the fan-out budget. `command not
     found` is not retried. Detected challenge walls also fail immediately
     (a `blocked (vendor/level)` SourceError) — retries never touch them.
+    `source` names the gateway source for block telemetry.
     """
     full_env = _subprocess_env(env)
     last_err: SourceError | None = None
@@ -155,7 +162,7 @@ async def run_cmd(
             text = out.decode("utf-8", "replace")
             if code == 0:
                 return code, text
-            blocked = _blocked_error(code, text)
+            blocked = _blocked_error(code, text, source)
             if blocked is not None:
                 raise blocked
             detail = _sanitize_text(text, 200)
@@ -190,11 +197,13 @@ def parse_json_or_yaml(text: str):
 
 async def run_opencli(cmd: list[str], timeout: int = PER_SOURCE_TIMEOUT,
                       env: dict | None = None,
-                      retries: int = RETRY_COUNT) -> tuple[int, str]:
+                      retries: int = RETRY_COUNT,
+                      source: str | None = None) -> tuple[int, str]:
     """Run an opencli command under the browser budget (default 2 concurrent
     browser ops) instead of the old single-slot lock."""
     async with browser_lease(cmd[0] if cmd else "opencli"):
-        return await run_cmd(cmd, timeout=timeout, env=env, retries=retries)
+        return await run_cmd(cmd, timeout=timeout, env=env, retries=retries,
+                             source=source)
 
 
 class Source(ABC):
