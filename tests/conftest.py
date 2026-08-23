@@ -157,4 +157,7 @@ def rds(monkeypatch):
     bind(stats)
     from search_gateway import saved_queries
     bind(saved_queries)
+    from search_gateway.extract import profiles, proxies
+    bind(profiles)
+    bind(proxies)
     return stub

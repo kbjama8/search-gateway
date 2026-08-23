@@ -157,6 +157,11 @@ FALLBACK_CHAINS: dict[str, list[str]] = {
     "semantic_scholar": ["s2-rest", "openalex"],
     # reader channel
     "web": ["jina-reader", "skip"],
+    # CN tier (v0.4): API first, browser as the last-resort tier
+    "zhihu": ["zhihu-v4", "browser", "skip"],
+    "weibo": ["weibo-ajax", "weibo-hot", "browser", "skip"],
+    "baidu": ["baidu-board", "skip"],
+    "toutiao": ["toutiao-board", "skip"],
 }
 
 # --- auth ---
@@ -198,6 +203,72 @@ DOCTOR_CACHE_TTL = _env_int("SEARCH_GATEWAY_DOCTOR_CACHE_TTL", 120)
 # Where deep-research run directories (containing ledger.json) live. Used by
 # `doctor` / `stats_report` to report run/claim/open-claim health. Read-only.
 LEDGER_DIR = _env("SEARCH_GATEWAY_LEDGER_DIR", os.path.expanduser("~/research_runs"))
+
+# --- extraction layer (v0.4 / Project Gatekeeper) ---
+# The extraction overhaul's knobs. Risky capabilities ship disabled; the
+# existing behavior is preserved when every flag below stays at its default.
+# Doctrine: public-content research, consistency-first stealth, pacing as the
+# cheapest anti-detection. See docs/extraction/PLAN.md.
+
+# Profile farm (Phase 2): per-(platform, persona) browser sessions with a
+# health state machine. Reuses the Phase-4 OPENCLI_PROFILES knob for count.
+PROFILE_DIR = _env("SEARCH_GATEWAY_PROFILE_DIR",
+                   os.path.expanduser("~/.agent-reach/profiles"))
+PROFILE_HEALTH_TTL = _env_int("SEARCH_GATEWAY_PROFILE_HEALTH_TTL", 3600)
+
+# Browser scheduler (Phase 1): global budget replaces the single OPENCLI_LOCK.
+# Default 1 preserves the old single-bridge behavior; the profile farm raises
+# it once parallel browser profiles exist (SEARCH_GATEWAY_OPENCLI_PROFILES).
+BROWSER_BUDGET = _env_int("SEARCH_GATEWAY_BROWSER_BUDGET", 1)
+RATE_LIMIT_JITTER = _env_float("SEARCH_GATEWAY_RATE_LIMIT_JITTER", 0.3)  # ± fraction
+
+# Stealth tier (Phase 3): Camoufox anonymous extraction, experimental.
+STEALTH_ENABLED = _env_bool("SEARCH_GATEWAY_STEALTH", False)
+STEALTH_PROFILE = _env("SEARCH_GATEWAY_STEALTH_PROFILE", "")  # fingerprint preset name
+
+# HTTP impersonation (Phase 3): curl_cffi TLS/JA3/HTTP2 for fingerprinted APIs.
+IMPERSONATE = _env_bool("SEARCH_GATEWAY_IMPERSONATE", False)
+IMPERSONATE_SOURCES = {"bilibili", "zhihu", "weibo"}  # allowlist; searxng etc. never
+
+# Proxy subsystem (Phase 3.5): env-gated, default OFF (zero-cost doctrine).
+PROXY_ENABLED = _env_bool("SEARCH_GATEWAY_PROXY_ENABLED", False)
+PROXY_PROTOCOL = _env("SEARCH_GATEWAY_PROXY_PROTOCOL", "http")  # http|socks5
+PROXY_GATEWAY = _env("SEARCH_GATEWAY_PROXY_GATEWAY", "")       # host:port
+PROXY_USERNAME = _env("SEARCH_GATEWAY_PROXY_USERNAME", "")     # carries geo grammar
+PROXY_PASSWORD = _env("SEARCH_GATEWAY_PROXY_PASSWORD", "")
+PROXY_ENV_FILE = _env("SEARCH_GATEWAY_PROXY_AUTH_FILE",
+                      os.path.expanduser("~/.agent-reach/proxy.env"))
+PROXY_COUNTRY = _env("SEARCH_GATEWAY_PROXY_COUNTRY", "")       # "" = provider default
+PROXY_STICKY_TTL = _env("SEARCH_GATEWAY_PROXY_STICKY_TTL", "30m")
+# Geo-consistency (Phase 3.5): derive TZ/locale bundle from egress geo.
+PROXY_GEO_ALIGN = _env_bool("SEARCH_GATEWAY_PROXY_GEO_ALIGN", True)
+
+# Block & challenge intelligence (Phase 4).
+BLOCK_DETECTION = _env_bool("SEARCH_GATEWAY_BLOCK_DETECTION", True)
+PLATFORM_BLOCK_LIMIT = _env_int("SEARCH_GATEWAY_PLATFORM_BLOCK_LIMIT", 3)
+PLATFORM_COOLDOWN_TTL = _env_int("SEARCH_GATEWAY_PLATFORM_COOLDOWN_TTL", 900)
+
+# Parser intelligence (Phase 5): LLM-assisted extraction for degenerate shapes.
+LLM_PARSE = _env_bool("SEARCH_GATEWAY_LLM_PARSE", False)  # gated, validated
+READ_URL_STAGES = _env("SEARCH_GATEWAY_READ_URL_STAGES", "jina,trafilatura,readability")
+TRAFILATURA_MIN_LEN = _env_int("SEARCH_GATEWAY_TRAFILATURA_MIN_LEN", 300)
+
+# CN sources (Phase 6): opt-in per D3 — bilibili wbi upgrade is always on.
+BILIBILI_WBI = _env_bool("SEARCH_GATEWAY_BILIBILI_WBI", True)
+BILIBILI_WBI_KEY_TTL = _env_int("SEARCH_GATEWAY_BILIBILI_WBI_KEY_TTL", 82800)  # 23h
+CN_SOURCES = _env_bool("SEARCH_GATEWAY_CN_SOURCES", False)  # zhihu/weibo/baidu/toutiao
+ZHIHU_COOKIE = _env("ZHIHU_COOKIE", "")   # d_c0 + z_c0 (required; 401 without)
+WEIBO_SUB = _env("WEIBO_SUB", "")         # logged-in SUB cookie (keyword search only)
+
+# Cookie-gated sources: the envelope reports their auth state on every search
+# (auth: missing|ok|unknown) so callers never wonder why a source is silent.
+AUTH_GATED_SOURCES = frozenset({"zhihu", "weibo", "twitter", "reddit",
+                                "facebook", "instagram", "xiaohongshu",
+                                "linkedin"})
+
+# YouTube PO tokens (Phase 4/6): externally provisioned; default off.
+YOUTUBE_PO_PLUGIN = _env("SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN", "")
+YOUTUBE_PO_SERVER = _env("SEARCH_GATEWAY_YOUTUBE_PO_SERVER", "http://127.0.0.1:4416")
 
 
 def load_env_file(path: str, keys: set[str]) -> dict[str, str]:

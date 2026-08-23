@@ -1,6 +1,7 @@
 """Source registry."""
 
 from .arxiv import ArxivSource
+from .baidu import BaiduSource
 from .base import Source
 from .bilibili import BilibiliSource
 from .crossref import CrossrefSource
@@ -14,11 +15,14 @@ from .reddit import RedditSource
 from .searxng import SearXNGSource
 from .semantic_scholar import SemanticScholarSource
 from .stackoverflow import StackOverflowSource
+from .toutiao import ToutiaoSource
 from .twitter import TwitterSource
 from .v2ex import V2EXSource
 from .web import WebSource
+from .weibo import WeiboSource
 from .xiaohongshu import XiaohongshuSource
 from .youtube import YouTubeSource
+from .zhihu import ZhihuSource
 
 ALL_SOURCES: dict[str, Source] = {
     s.name: s
@@ -41,6 +45,11 @@ ALL_SOURCES: dict[str, Source] = {
         CrossrefSource(),
         StackOverflowSource(),
         SemanticScholarSource(),
+        # Chinese-ecosystem tier (v0.4, gated by SEARCH_GATEWAY_CN_SOURCES)
+        ZhihuSource(),
+        WeiboSource(),
+        BaiduSource(),
+        ToutiaoSource(),
     )
 }
 

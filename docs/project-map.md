@@ -77,7 +77,7 @@ that produced it is gone.
 |---------|------|----------------|
 | short | a stable, verifiable retrieval backbone for the research skills | 135-test fast suite, golden contract (`tests/test_contract.py`) |
 | short | deterministic behaviour on this machine: pinned revisions, adaptive timeouts, negative caching | `config.py`, ADR 0005 |
-| medium | a bounded extension path — source #19 is a four-step change, nothing else moves | `docs/architecture.md#source-adapter-contract` |
+| medium | a bounded extension path — source #23 is a four-step change, nothing else moves | `docs/architecture.md#source-adapter-contract` |
 | medium | long-running host deployments: HTTP/SSE transports, systemd, headless image | `server.py`, `infra/` |
 | long | a client-agnostic research substrate that outlives any single tool — evidence memory across runs, recurring monitors, docs written for future readers | `skills/deep-research` memory-*, `skills/monitor`, `docs/voice.md` |
 
@@ -121,7 +121,9 @@ search-gateway/
 │   ├── ratelimit.py           # cross-process rate gate + daily budget
 │   ├── saved_queries.py       # recurring queries + {new, removed, unchanged} diff
 │   ├── log.py                 # text|json → stderr ONLY (stdout is the MCP wire)
-│   └── sources/               # 18 adapters + base.py (Source, run_cmd, run_opencli)
+│   ├── sources/               # 22 adapters + base.py (Source, run_cmd, run_opencli)
+│   └── extract/               # v0.4: parse, detectors, router, scheduler,
+│                              # profiles, fingerprints, proxies, http, camoufox
 ├── skills/                    # 5 orchestration skills, symlinked by install.sh
 │   ├── deep-research/         # research_ledger.py CLI (760 LOC, stdlib-only)
 │   ├── master-router/         # request classification → tools/sources/effort plan
@@ -171,7 +173,7 @@ partial, pending[], elapsed_ms, stage_ms{fanout, fusion_dedup, rerank, mmr}}`
 | `server.py` | the MCP surface; 14 `@mcp.tool()` handlers; `_clamp_limit` (1..30), `_resolve_sources` (unknown names fail loudly); `BearerAuthMiddleware` for http/sse; `_scrub` control-char stripping; `main(transport)` | `search`, `research_answer`, `get_paper`, `read_url`, `doctor`, `saved_queries` |
 | `orchestrator.py` | pipeline orchestration; singleflight `_inflight` map; adaptive timeout; expansion gating | `search` (382-LOC module, the hub — 63 edges in the code graph) |
 | `cli.py` | console commands; SIGTERM→SIGINT mapping for graceful shutdown | `serve` (default), `doctor`, `check`, `version`, `warm` |
-| `health.py` | `report()` (cached probes, `DOCTOR_TIMEOUT=12s` budget) + `check()` (strict: 18 sources + Redis) | shared by the `doctor` tool and the CLI |
+| `health.py` | `report()` (cached probes, `DOCTOR_TIMEOUT=12s` budget) + `check()` (strict: 22 sources + Redis) | shared by the `doctor` tool and the CLI |
 | `models.py` | `Result{title,url,snippet,source,engine,published,score,meta}` + `identity()` (canonical dedup key) | — |
 | `config.py` | all 41 env settings + `load_env_file` + `FALLBACK_CHAINS` (per-source degrade-order matrix) | — |
 | `fusion.py` | weighted RRF, `score_raw` preserved in `meta` | `rrf_fuse` |
@@ -185,11 +187,12 @@ partial, pending[], elapsed_ms, stage_ms{fanout, fusion_dedup, rerank, mmr}}`
 | `ratelimit.py` | per-source min-interval gate (Redis, in-memory fallback) + daily budget (300) | `wait_if_needed`, `enforce_daily_budget` |
 | `saved_queries.py` | Redis `sg:sq:*` store; identity-based diff; first run establishes baseline | `save`, `list_all`, `run`, `diff` |
 | `log.py` | text/json formatter → stderr; stdout is reserved for the MCP wire | `configure_logging` |
+| `extract/` | the v0.4 extraction layer — tier routing (api=1/cli=3/browser=10), block/challenge detectors, browser budget + jittered pacing, profile farm + health machine, fingerprint bundles + coherence lint, env-gated proxy gateway, curl_cffi impersonation seam, multi-shape parsing, Camoufox adapter | `router`, `detectors`, `profiles`, `proxies`, `parse` |
 | `sources/base.py` | `Source` ABC, `SourceError`, `run_cmd` (retry on exit codes 1/8/52/56), `run_opencli` (serialized via `OPENCLI_LOCK`), `guard_query` (flag-injection), `_subprocess_env` allowlist, `normalize_published` | — |
 
 ## Source adapters
 
-18 adapters in `search_gateway/sources/`, all registered in `ALL_SOURCES`
+22 adapters in `search_gateway/sources/`, all registered in `ALL_SOURCES`
 (`sources/__init__.py:23`) — the single registry the orchestrator, `doctor`,
 and `search-gateway check` read from. Three implementation patterns:
 
@@ -197,7 +200,8 @@ and `search-gateway check` read from. Three implementation patterns:
 |---------|-----------|---------|
 | HTTP API | `httpx` direct, `SourceError` on failure | searxng (SearXNG JSON), arxiv (Atom), openalex (REST), crossref (REST), semantic_scholar (Graph API), github (REST; token raises rate limit), bilibili (B站 API), v2ex (sov2ex), stackoverflow (Stack Exchange), web (Jina Reader) |
 | Subprocess CLI | `run_cmd` with env allowlist + retry | exa (mcporter), youtube (yt-dlp NDJSON) |
-| Browser / OpenCLI | `run_opencli` (serialized through one Chromium bridge), opt-in via `sources=`, rate-limited 2.5s | twitter (twitter-cli → opencli failover), reddit, facebook, instagram, xiaohongshu (not yet authenticated — errors gracefully), linkedin (mcporter; account blocked on QR verification — errors gracefully) |
+| Browser / OpenCLI | `run_opencli` (browser budget via `extract/scheduler`, default 1), opt-in via `sources=`, rate-limited 2.5s | twitter (twitter-cli → opencli failover), reddit, facebook, instagram, xiaohongshu (not yet authenticated — errors gracefully), linkedin (mcporter; account blocked on QR verification — errors gracefully) |
+| CN tier (v0.4, gated by `SEARCH_GATEWAY_CN_SOURCES`) | zhihu (v4 API, cookie-gated), weibo (hot list + SUB-gated keyword search), baidu + toutiao hot boards (public JSON); bilibili upgraded with wbi signing (always on) |
 
 Contract: subclass `Source`, implement `search()` (+ `available()` for doctor),
 emit `Result` with `meta` keys per `docs/meta-schema.md`. Adding source #19 is
@@ -262,9 +266,9 @@ Secrets live in `~/.agent-reach/*.env` (or a 0600 `EnvironmentFile`); `.env.exam
 
 ## Tests & CI
 
-- **Fast suite: 135 tests, all green** (verified 2026-08-22: `pytest -m "not slow"` exit 0). Slow tests (model downloads) excluded.
+- **Fast suite: 191 tests, all green** (verified 2026-08-22: `pytest -m "not slow"` exit 0). Slow tests (model downloads) excluded.
 - Test tiers: unit (models, parsers — `test_sources_parsers.py` has the largest parser surface), pipeline (in-memory `RedisStub` fixture in `tests/conftest.py` binds every module's `_get_client`), integration (smoke + stdio handshake — `test_smoke.py`, `test_mcp_handshake.py`).
-- **Golden contract** (`tests/test_contract.py`): live registry = 18 sources, live `tools/list` = 14 tools, `Result` shape + standardized meta keys.
+- **Golden contract** (`tests/test_contract.py`): live registry = 22 sources, live `tools/list` = 14 tools, `Result` shape + standardized meta keys.
 - CI (`.github/workflows/ci.yml`): ruff (F-clean, select E/W/I/B/UP/SIM/RUF/FURB/S/DTZ/BLE) + pytest on 3.12/3.13 against real Redis + SearXNG services + coverage gate ≥85% + headless Docker build.
 
 ## Infra
@@ -307,10 +311,10 @@ Six standing decisions in `docs/adrs/` (each linked from
 
 Verified on 2026-08-22:
 
-- Fast test suite passes: 135 tests, exit 0.
+- Fast test suite passes: 191 tests, exit 0.
 - Code graph current: 619 nodes / 4,395 edges / 59 files, built at
   `bea991b` (matches HEAD).
-- Version: `0.3.0` (`search_gateway/__init__.py`).
+- Version: `0.4.0` (`search_gateway/__init__.py`).
 
 Not re-verified in this pass (live dependencies, expected to vary per machine):
 per-source `available()` probes, model loads, Redis credentials, DeepSeek key.

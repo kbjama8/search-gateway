@@ -34,8 +34,8 @@ flowchart LR
     T0["minimal<br/>pip install + network"] --> T1["web+neural<br/>+ mcporter"]
     T1 --> T2["social/vertical<br/>+ opencli/Chromium, twitter, yt-dlp, uvx"]
     T2 --> T3["answer synthesis<br/>+ DEEPSEEK_API_KEY"]
-    T0 -.->|"doctor reports ok"| D0(("18 sources<br/>partially available"))
-    T3 -.->|"doctor reports ok"| D3(("18 sources<br/>fully available"))
+    T0 -.->|"doctor reports ok"| D0(("22 sources<br/>partially available"))
+    T3 -.->|"doctor reports ok"| D3(("22 sources<br/>fully available"))
 ```
 
 Each tier is additive — nothing in a lower tier stops working when you add a
@@ -54,7 +54,7 @@ higher one, and nothing in a higher tier is required to use a lower one.
 git clone <this-repo> && cd search-gateway
 pip install .                  # or: pip install -e . for development
 search-gateway --help
-search-gateway check           # gate: 18 sources + Redis reachable
+search-gateway check           # gate: 22 sources + Redis reachable
 ```
 
 Optional report-tooling extras:
@@ -169,7 +169,7 @@ degrades to `1.0` for everyone (no history to read).
 **SearXNG down.** Appears as `sources.searxng = "down — <reason>"` in
 `doctor`. `search`, `search_web`, `search_news`, and `search_science` all
 lose SearXNG's contribution to fusion but still return results from every
-other fanned-out source — SearXNG is one of 18 sources, not a dependency of
+other fanned-out source — SearXNG is one of 22 sources, not a dependency of
 the pipeline itself.
 
 **Model re-download.** If `rerank.error` or `embed.error` mentions a network
@@ -203,7 +203,7 @@ and an AOF backup is the only way to recover saved queries after it.
 ```bash
 pip install -U .                    # or: pip install -U search-gateway (if published)
 search-gateway version              # confirm the bump
-search-gateway check                # re-verify 18 sources + Redis after upgrade
+search-gateway check                # re-verify 22 sources + Redis after upgrade
 ```
 
 A minor bump (e.g. `0.2.0` → `0.3.0`) may add a tool — re-read

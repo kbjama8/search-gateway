@@ -10,18 +10,22 @@ import os
 from abc import ABC, abstractmethod
 
 from ..config import (
+    BLOCK_DETECTION,
     PER_SOURCE_TIMEOUT,
     RETRY_BACKOFF,
     RETRY_COUNT,
     RETRYABLE_EXIT_CODES,
 )
+from ..extract.detectors import classify
+from ..extract.scheduler import browser_lease
 from ..models import Result
 
 logger = logging.getLogger("search_gateway.sources")
 
-# opencli sources share a single browser bridge (one tab lease at a time),
-# so their commands must be serialized to avoid contention timeouts.
-OPENCLI_LOCK = asyncio.Semaphore(1)
+# opencli sources share a single browser bridge (one tab lease at a time), so
+# their commands are serialized — now through the extraction layer's browser
+# budget (SEARCH_GATEWAY_BROWSER_BUDGET, default 2) instead of a hardcoded
+# single-slot semaphore. `browser_lease` is re-exported below for callers.
 
 # Subprocess env allowlist: CLI backends get the runtime essentials only.
 # Secrets (DEEPSEEK_API_KEY, GITHUB_TOKEN, …) must NOT reach subprocesses —
@@ -105,6 +109,21 @@ class SourceError(Exception):
     """Raised when a source cannot fulfil a query."""
 
 
+def _blocked_error(code: int, text: str) -> SourceError | None:
+    """Classify a response for challenge markers; None when clean.
+
+    A challenge is the one failure retry logic must NOT touch — retrying a
+    wall is the wrong move, so a detected block raises immediately (before
+    the retryable-exit-code check) and the orchestrator's ladder decides.
+    """
+    if not BLOCK_DETECTION:
+        return None
+    sig = classify(code, None, text)
+    if sig is None:
+        return None
+    return SourceError(f"blocked ({sig.vendor}/{sig.level}): {sig.evidence}")
+
+
 async def run_cmd(
     cmd: list[str],
     timeout: int = PER_SOURCE_TIMEOUT,
@@ -116,7 +135,8 @@ async def run_cmd(
     Retries transient failures (timeouts and `RETRYABLE_EXIT_CODES`) with
     exponential backoff. Non-transient exit codes (auth failures, 404s, …)
     fail immediately — retrying them wastes the fan-out budget. `command not
-    found` is not retried.
+    found` is not retried. Detected challenge walls also fail immediately
+    (a `blocked (vendor/level)` SourceError) — retries never touch them.
     """
     full_env = _subprocess_env(env)
     last_err: SourceError | None = None
@@ -135,6 +155,9 @@ async def run_cmd(
             text = out.decode("utf-8", "replace")
             if code == 0:
                 return code, text
+            blocked = _blocked_error(code, text)
+            if blocked is not None:
+                raise blocked
             detail = _sanitize_text(text, 200)
             if RETRYABLE_EXIT_CODES and code not in RETRYABLE_EXIT_CODES:
                 # non-transient (auth/404/usage): fail now, don't burn retries
@@ -168,8 +191,9 @@ def parse_json_or_yaml(text: str):
 async def run_opencli(cmd: list[str], timeout: int = PER_SOURCE_TIMEOUT,
                       env: dict | None = None,
                       retries: int = RETRY_COUNT) -> tuple[int, str]:
-    """Run an opencli command serialized against other opencli commands."""
-    async with OPENCLI_LOCK:
+    """Run an opencli command under the browser budget (default 2 concurrent
+    browser ops) instead of the old single-slot lock."""
+    async with browser_lease(cmd[0] if cmd else "opencli"):
         return await run_cmd(cmd, timeout=timeout, env=env, retries=retries)
 
 

@@ -1,6 +1,6 @@
 # Result.meta — Standardized Schema
 
-`Result` is the universal contract across all 18 sources: it is what sources
+`Result` is the universal contract across all 22 sources: it is what sources
 emit, what fusion/re-rank/dedup consume, and what the report skills read. Its
 `meta` field is a free-form `dict[str, Any]`; this document defines the
 **standardized keys** that sources populate. Every key is **optional and

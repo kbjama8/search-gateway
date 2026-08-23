@@ -7,7 +7,7 @@ git clone <this-repo> && cd search-gateway
 pip install -e .                 # editable install
 cd infra && docker compose up -d # redis (AOF) + searxng (JSON, :8888)
 cd ..
-search-gateway check             # confirm 18 sources + Redis before you start
+search-gateway check             # confirm 22 sources + Redis before you start
 ```
 
 ## Running tests

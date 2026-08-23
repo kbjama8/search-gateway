@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All 41 settings are environment variables with defaults — `config.py` is the
+All 70 settings are environment variables with defaults — `config.py` is the
 source of truth, and `.env.example` mirrors it (verified: the three cross-check
 clean against each other). Copy `.env.example`, override what you need, and
 never commit a secret (`.gitignore` blocks `*.env`).
@@ -52,6 +52,12 @@ matter starting at a specific tier, not from `minimal` onward.
 | Auth files | Keeping tokens out of shell history and process listings | **social/vertical**, **answer synthesis** |
 | Observability / serving | Log format/level; HTTP bind address for a host-process deployment | **minimal** (logging), **any tier running `--transport http/sse`** (host/port) |
 | Ledger health | Read-only visibility into `deep-research` skill run health | optional, any tier |
+| Extraction tiering (v0.4) | Browser budget, jittered pacing, per-profile health | **social/vertical** |
+| Block intelligence (v0.4) | Detecting challenge walls instead of burning retries on them | **social/vertical** |
+| Proxy subsystem (v0.4) | Optional residential/ISP egress with geo-coherent fingerprints | only when funded (see `docs/extraction/proxy-funding-guide.md`) |
+| Stealth / impersonation (v0.4) | Camoufox anonymous tier + curl_cffi TLS impersonation | experimental, opt-in |
+| Read_url stages (v0.4) | Jina → Trafilatura → readability extraction pipeline | **minimal** |
+| CN tier (v0.4) | zhihu/weibo/baidu/toutiao + bilibili wbi signing | opt-in (`SEARCH_GATEWAY_CN_SOURCES=1`) |
 
 ## Infrastructure
 
@@ -242,3 +248,70 @@ files and never writes to it. A missing directory or a malformed
 `ledger.json` is skipped, not raised.
 
 > Logs always go to **stderr** — stdout is the MCP stdio protocol wire.
+
+---
+
+## v0.4 extraction layer (Project Gatekeeper)
+
+*Everything the extraction overhaul added. Risky capabilities ship disabled;
+the gateway's behavior is unchanged when the flags below sit at their
+defaults. Full rationale: `docs/extraction/PLAN.md`.*
+
+### Browser budget & pacing
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_BROWSER_BUDGET` | `1` | concurrent browser ops (1 = old single-bridge behavior; raise per profile farm) |
+| `SEARCH_GATEWAY_RATE_LIMIT_JITTER` | `0.3` | ± fraction of the inter-query interval — fixed intervals are a fingerprint |
+| `SEARCH_GATEWAY_PROFILE_DIR` | `~/.agent-reach/profiles` | JSON profile definitions for the browser farm |
+| `SEARCH_GATEWAY_PROFILE_HEALTH_TTL` | `3600` | base cooldown TTL for profile health transitions (seconds) |
+
+### Block & challenge intelligence
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_BLOCK_DETECTION` | `1` | classify CLI/HTTP outputs for challenge markers; blocked → fail immediately, never retry |
+| `SEARCH_GATEWAY_PLATFORM_BLOCK_LIMIT` | `3` | failures before a profile enters cooldown; N cooldown cycles → quarantine |
+| `SEARCH_GATEWAY_PLATFORM_COOLDOWN_TTL` | `900` | per-platform circuit-breaker pause (seconds) |
+
+### Stealth & impersonation (experimental, default OFF)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_STEALTH` | `0` | enable the Camoufox anonymous tier (`docs/extraction/camoufox-migration.md`) |
+| `SEARCH_GATEWAY_STEALTH_PROFILE` | `""` | pinned Camoufox fingerprint preset (empty = random browserforge) |
+| `SEARCH_GATEWAY_IMPERSONATE` | `0` | curl_cffi TLS/JA3 impersonation for bilibili/zhihu/weibo HTTP |
+
+### Proxy subsystem (default OFF)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_PROXY_ENABLED` | `0` | master switch (`docs/extraction/proxy-funding-guide.md`) |
+| `SEARCH_GATEWAY_PROXY_PROTOCOL` | `http` | `http` \| `socks5` |
+| `SEARCH_GATEWAY_PROXY_GATEWAY` | `""` | provider gateway `host:port` |
+| `SEARCH_GATEWAY_PROXY_USERNAME` | `""` | targeting-grammar username (verbatim wins; else auto-built `country-sid-ttl`) |
+| `SEARCH_GATEWAY_PROXY_PASSWORD` | `""` | provider password |
+| `SEARCH_GATEWAY_PROXY_AUTH_FILE` | `~/.agent-reach/proxy.env` | 0600 file for the three credentials above |
+| `SEARCH_GATEWAY_PROXY_COUNTRY` | `""` | persona egress country (ISO) |
+| `SEARCH_GATEWAY_PROXY_STICKY_TTL` | `30m` | sticky-session lifetime per profile |
+| `SEARCH_GATEWAY_PROXY_GEO_ALIGN` | `1` | derive TZ/locale/languages from egress geo into the fingerprint bundle |
+
+### read_url stages
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_READ_URL_STAGES` | `jina,trafilatura,readability` | stage order; first to return ≥50 chars wins |
+| `SEARCH_GATEWAY_TRAFILATURA_MIN_LEN` | `300` | minimum usable length for the trafilatura stage |
+| `SEARCH_GATEWAY_LLM_PARSE` | `0` | gated LLM-assisted extraction for degenerate parse shapes (validated) |
+
+### CN tier (opt-in)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEARCH_GATEWAY_CN_SOURCES` | `0` | register-visible zhihu/weibo/baidu/toutiao become queryable |
+| `ZHIHU_COOKIE` | `""` | `d_c0` + `z_c0` from a browser session (zhihu blocks anonymous, 401) |
+| `WEIBO_SUB` | `""` | logged-in `SUB` cookie (weibo keyword search; hot list works without) |
+| `SEARCH_GATEWAY_BILIBILI_WBI` | `1` | wbi signing for bilibili (always on; keys Redis-cached) |
+| `SEARCH_GATEWAY_BILIBILI_WBI_KEY_TTL` | `82800` | wbi key cache TTL (23h — keys rotate daily) |
+| `SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN` | `""` | yt-dlp PO-token provider plugin (e.g. `bgutil-ytdlp-pot-provider`) |
+| `SEARCH_GATEWAY_YOUTUBE_PO_SERVER` | `http://127.0.0.1:4416` | PO-token HTTP server URL when a provider plugin needs one |

@@ -34,6 +34,10 @@ class FakeResp:
     def text(self):
         return self._text
 
+    @property
+    def headers(self):
+        return {}
+
 
 class FakeClient:
     """httpx.AsyncClient drop-in: returns a scripted response per call."""
@@ -49,6 +53,13 @@ class FakeClient:
         return False
 
     async def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        if self.responses:
+            return self.responses.pop(0)
+        return FakeResp({})
+
+    async def request(self, method, url, **kwargs):
+        # extract.http uses client.request(); route to the scripted queue.
         self.calls.append((url, kwargs))
         if self.responses:
             return self.responses.pop(0)
@@ -202,8 +213,11 @@ def test_arxiv_malformed_xml(monkeypatch):
 
 
 def test_bilibili_parses_blocks(monkeypatch):
+    import httpx as _httpx
+
     import search_gateway.sources.bilibili as mod
-    _mock_http(monkeypatch, mod, [FakeResp({"code": 0, "data": {"result": [
+    monkeypatch.setattr(mod, "BILIBILI_WBI", False)  # parser test, not signing
+    payload = {"code": 0, "data": {"result": [
         {"result_type": "video", "data": [
             {"title": '<em class="keyword">异步</em>编程', "arcurl": "https://b23.tv/1",
              "description": "desc", "author": "up主", "play": 100},
@@ -212,7 +226,9 @@ def test_bilibili_parses_blocks(monkeypatch):
         {"result_type": "bili_user", "data": [
             {"title": "某人", "url": "https://space.bilibili.com/2", "description": "x"},
         ]},
-    ]}})])
+    ]}}
+    monkeypatch.setattr(_httpx, "AsyncClient",
+                        lambda **kw: FakeClient([FakeResp(payload)], **kw))
 
     async def run():
         out = await _r("bilibili").search("异步")
@@ -225,15 +241,20 @@ def test_bilibili_parses_blocks(monkeypatch):
 
 
 def test_bilibili_api_error(monkeypatch):
+    import httpx as _httpx
+
     import search_gateway.sources.bilibili as mod
-    _mock_http(monkeypatch, mod, [FakeResp({"code": -412, "message": "risk control"})])
+    monkeypatch.setattr(mod, "BILIBILI_WBI", False)
+    monkeypatch.setattr(_httpx, "AsyncClient",
+                        lambda **kw: FakeClient(
+                            [FakeResp({"code": -412, "message": "risk control"})],
+                            **kw))
 
     async def run():
         with pytest.raises(SourceError, match="risk control"):
             await _r("bilibili").search("x")
 
     asyncio.run(run())
-
 
 def test_openalex_search_filters(monkeypatch):
     import search_gateway.sources.openalex as mod
@@ -567,3 +588,175 @@ async def test_cli_sources_reject_leading_dash(monkeypatch):
         await yt.YouTubeSource().search("-l user")
     with pytest.raises(SourceError, match="flag-injection"):
         await rd.RedditSource().search("-l user")
+
+
+# --- CN tier (v0.4): zhihu / weibo / baidu / toutiao -------------------------
+
+_ZHIHU_PAYLOAD = {
+    "data": [
+        {"object": {"type": "answer", "id": 9001, "question": {
+            "id": 123, "name": "<em>异步</em>编程怎么做?"},
+            "excerpt": "<p>先学事件循环</p>", "voteup_count": 42,
+            "comment_count": 3, "author": {"name": "某乎友"},
+            "created_time": 1700000000}},
+        {"object": {"type": "article", "id": 777, "title": "RAG 综述",
+                    "url": "https://zhuanlan.zhihu.com/p/777",
+                    "excerpt": "检索增强生成", "author": {"name": "A"},
+                    "created": 1700000001}},
+        {"object": {"type": "question", "id": 555, "title": "如何学习 Rust?",
+                    "excerpt": "求路线", "answer_count": 9}},
+        {"object": {"type": "zvideo", "id": 1, "title": "忽略我"}},
+    ]
+}
+
+
+@pytest.mark.asyncio
+async def test_zhihu_parses_answer_article_question(monkeypatch):
+    import httpx as _httpx
+
+    import search_gateway.sources.zhihu as zh
+    monkeypatch.setattr(zh, "CN_SOURCES", True)
+    monkeypatch.setattr(zh, "ZHIHU_COOKIE", "d_c0=abc; z_c0=def")
+    monkeypatch.setattr(_httpx, "AsyncClient",
+                        lambda **kw: FakeClient([FakeResp(_ZHIHU_PAYLOAD)], **kw))
+
+    out = await zh.ZhihuSource().search("异步")
+    assert len(out) == 3  # zvideo filtered
+    answer, article, question = out
+    assert answer.title == "异步编程怎么做?"  # html stripped
+    assert answer.url == "https://www.zhihu.com/question/123/answer/9001"
+    assert answer.meta["zhihu_type"] == "answer"
+    assert answer.meta["voteup_count"] == 42
+    assert answer.meta["author"] == "某乎友"
+    assert article.meta["zhihu_type"] == "article"
+    assert question.meta["answer_count"] == 9
+
+
+@pytest.mark.asyncio
+async def test_zhihu_requires_cookie(monkeypatch):
+    import search_gateway.sources.zhihu as zh
+    monkeypatch.setattr(zh, "CN_SOURCES", True)
+    monkeypatch.setattr(zh, "ZHIHU_COOKIE", "")
+    with pytest.raises(SourceError, match="auth:"):
+        await zh.ZhihuSource().search("x")
+
+
+@pytest.mark.asyncio
+async def test_zhihu_disabled_without_flag(monkeypatch):
+    import search_gateway.sources.zhihu as zh
+    monkeypatch.setattr(zh, "CN_SOURCES", False)
+    with pytest.raises(SourceError, match="disabled"):
+        await zh.ZhihuSource().search("x")
+
+
+_WEIBO_HOT = {"data": {"realtime": [
+    {"word": "某品牌道歉", "rank": 1, "num": 2845013, "category": "社会",
+     "is_new": True, "is_hot": True},
+    {"word": "某球星退役", "rank": 2, "num": 999999, "category": "体育"},
+], "hotgovs": [{"word": "官方政策解读", "rank": 100}]}}
+
+
+@pytest.mark.asyncio
+async def test_weibo_hot_list_fallback(monkeypatch):
+    import httpx as _httpx
+
+    import search_gateway.sources.weibo as wb
+    monkeypatch.setattr(wb, "CN_SOURCES", True)
+    monkeypatch.setattr(wb, "WEIBO_SUB", "")  # no SUB → hot list
+    monkeypatch.setattr(_httpx, "AsyncClient",
+                        lambda **kw: FakeClient([FakeResp(_WEIBO_HOT)], **kw))
+
+    out = await wb.WeiboSource().search("")
+    assert len(out) == 3
+    assert out[0].title == "某品牌道歉"
+    assert out[0].meta["rank"] == 1
+    assert out[0].meta["heat"] == 2845013
+    assert "s.weibo.com" in out[0].url
+    # query filter narrows the hot list
+    filtered = await wb.WeiboSource().search("球星")
+    assert [r.title for r in filtered] == ["某球星退役"]
+
+
+_WEIBO_SUB_SEARCH = {"data": {"cards": [
+    {"card_group": [{"mblog": {"text": "今天<em>天气</em>不错",
+                               "mid": "M1", "bid": "B1",
+                               "user": {"screen_name": "博主"},
+                               "reposts_count": 5, "comments_count": 2,
+                               "attitudes_count": 9,
+                               "created_at": "2026-08-01"}}]},
+]}}
+
+@pytest.mark.asyncio
+async def test_weibo_keyword_search_with_sub(monkeypatch):
+    import httpx as _httpx
+
+    import search_gateway.sources.weibo as wb
+    monkeypatch.setattr(wb, "CN_SOURCES", True)
+    monkeypatch.setattr(wb, "WEIBO_SUB", "SUB=abc")
+    monkeypatch.setattr(_httpx, "AsyncClient",
+                        lambda **kw: FakeClient([FakeResp(_WEIBO_SUB_SEARCH)],
+                                                **kw))
+
+    out = await wb.WeiboSource().search("天气")
+    assert len(out) == 1
+    assert out[0].title == "今天天气不错"  # em stripped
+    assert out[0].url == "https://weibo.com/博主/B1"
+    assert out[0].meta["likes"] == 9
+
+
+_BAIDU_BOARD = {"data": {"cards": [
+    {"word": "百度热搜第一", "hotScore": 12345, "index": 1,
+     "category": "综合"},
+    {"word": "另一个话题", "hotScore": 543, "index": 2, "url": "https://b"},
+]}}
+
+@pytest.mark.asyncio
+async def test_baidu_board(monkeypatch):
+    import httpx as _httpx
+
+    import search_gateway.sources.baidu as bd
+    monkeypatch.setattr(bd, "CN_SOURCES", True)
+    monkeypatch.setattr(_httpx, "AsyncClient",
+                        lambda **kw: FakeClient([FakeResp(_BAIDU_BOARD)], **kw))
+
+    out = await bd.BaiduSource().search("")
+    assert len(out) == 2
+    assert out[0].title == "百度热搜第一"
+    assert out[0].meta["heat"] == 12345
+    assert "baidu.com" in out[0].url
+    assert [r.title for r in await bd.BaiduSource().search("话题")] \
+        == ["另一个话题"]
+
+
+_TOUTIAO_BOARD = {"data": [
+    {"Title": "头条热榜第一", "Url": "https://t/1", "HotValue": 888,
+     "Label": "热", "Category": "科技", "Index": 1},
+    {"Title": "普通新闻", "Url": "https://t/2", "HotValue": 100,
+     "Label": "新", "Index": 2},
+]}
+
+@pytest.mark.asyncio
+async def test_toutiao_board(monkeypatch):
+    import httpx as _httpx
+
+    import search_gateway.sources.toutiao as tt
+    monkeypatch.setattr(tt, "CN_SOURCES", True)
+    monkeypatch.setattr(_httpx, "AsyncClient",
+                        lambda **kw: FakeClient([FakeResp(_TOUTIAO_BOARD)],
+                                                **kw))
+
+    out = await tt.ToutiaoSource().search("")
+    assert len(out) == 2
+    assert out[0].title == "头条热榜第一"
+    assert out[0].meta["heat"] == 888
+    assert out[0].meta["is_hot"] is True
+    assert out[1].meta["is_new"] is True
+
+
+@pytest.mark.asyncio
+async def test_cn_sources_disabled_by_default():
+    import search_gateway.sources.baidu as bd
+    import search_gateway.sources.toutiao as tt
+    for src in (bd.BaiduSource(), tt.ToutiaoSource()):
+        with pytest.raises(SourceError, match="disabled"):
+            await src.search("x")

@@ -1,8 +1,10 @@
-"""Golden contract: 18 sources + 14 tools + Result surface unchanged.
+"""Golden contract: 22 sources + 14 tools + Result surface unchanged.
 
 Any change to a tool name, the source registry, or the `Result` shape is a
 SemVer-major event (see docs/api/tools.md + docs/meta-schema.md). These tests
-fail loudly to catch that.
+fail loudly to catch that. The CN tier (zhihu/weibo/baidu/toutiao) is
+registered but gated by SEARCH_GATEWAY_CN_SOURCES — presence in the registry
+is the contract; availability is runtime state.
 """
 
 import asyncio
@@ -16,6 +18,8 @@ EXPECTED_SOURCES = {
     "instagram", "linkedin", "openalex", "reddit", "searxng",
     "semantic_scholar", "stackoverflow", "twitter", "v2ex", "web",
     "xiaohongshu", "youtube",
+    # CN tier (v0.4, gated)
+    "zhihu", "weibo", "baidu", "toutiao",
 }
 
 EXPECTED_TOOLS = {
@@ -34,8 +38,8 @@ EXPECTED_META_KEYS = {
 }
 
 
-def test_18_sources_registered():
-    assert len(ALL_SOURCES) == 18
+def test_22_sources_registered():
+    assert len(ALL_SOURCES) == 22
     assert set(ALL_SOURCES) == EXPECTED_SOURCES
 
 

@@ -1,6 +1,6 @@
 """CLI exit-code / output tests (fast — no network, no model loads).
 
-`doctor` is intentionally not exercised here: it probes all 18 sources over
+`doctor` is intentionally not exercised here: it probes all 22 sources over
 the network. Its structure is asserted by `test_contract.py` via the shared
 `health.report()`; run `search-gateway doctor` by hand for a live report.
 """
@@ -32,10 +32,10 @@ def test_help_lists_subcommands():
         assert cmd in r.stdout
 
 
-def test_check_reports_18_sources_and_exit_code_matches_redis():
+def test_check_reports_22_sources_and_exit_code_matches_redis():
     r = _run("check")
     out = json.loads(r.stdout)
-    assert out["sources"] == 18
+    assert out["sources"] == 22
     assert "redis" in out and "llm" in out
     # exit 0 iff Redis is reachable (the strict gate)
     assert (r.returncode == 0) == bool(out["redis"].get("ok"))

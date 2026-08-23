@@ -5,11 +5,11 @@
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 <!-- ci badge placeholder: wire to .github/workflows/ci.yml once the hosted run is validated -->
 
-One server, eighteen sources, one client-agnostic contract. `search-gateway` is
-an MCP server that fuses the web, code, video, social, forum, and academic
-worlds behind a single `search()` tool — then de-duplicates, fuses (weighted
-RRF), re-ranks (cross-encoder), diversifies (MMR), and, via `research_answer`,
-synthesizes a cited answer with DeepSeek.
+One server, twenty-two sources, one client-agnostic contract. `search-gateway`
+is an MCP server that fuses the web, code, video, social, forum, academic,
+and Chinese-ecosystem worlds behind a single `search()` tool — then
+de-duplicates, fuses (weighted RRF), re-ranks (cross-encoder), diversifies
+(MMR), and, via `research_answer`, synthesizes a cited answer with DeepSeek.
 
 The problem it kills is fragmentation. Without a gateway, every agent client
 wires its own search — one API key per silo, no shared cache, no shared
@@ -61,7 +61,7 @@ flowchart TD
         S --> Q
     end
 
-    subgraph FanOut["fan-out — asyncio.wait, 18 sources, 50s global budget"]
+    subgraph FanOut["fan-out — asyncio.wait, 22 sources, 50s global budget"]
         direction LR
         SRC1["web: searxng · exa"]
         SRC2["code: github · stackoverflow"]
@@ -112,7 +112,7 @@ sequenceDiagram
     participant C as MCP client
     participant S as server.py
     participant O as orchestrator.search()
-    participant SRC as 18 sources (fan-out)
+    participant SRC as 22 sources (fan-out)
     participant P as fuse → rerank → MMR
     participant R as Redis cache
 
@@ -169,7 +169,7 @@ flowchart LR
 
     subgraph GW["search-gateway"]
         G1["client"] -->|"one call_tool"| G2["server.py — 14 tools"]
-        G2 --> G3["18 sources, fanned out"]
+        G2 --> G3["22 sources, fanned out"]
         G3 --> G4["one Result schema<br/>tests/test_contract.py"]
     end
 ```
@@ -178,7 +178,7 @@ flowchart LR
 |----------|----------|--------------------|---------------|-----------------------------|
 | Single search API (e.g. Bing/Google API only) | One index's view of the web | None — you get what it gives you | One shape, but no code/social/academic depth | Not possible — you're locked to the vendor's index |
 | Per-source SDKs, wired ad hoc | As wide as you're willing to integrate | Manual, per-integration | N different shapes, N different clients to write | A new SDK, a new client, a new parser, every time |
-| `search-gateway` | 18 sources across web/code/video/social/forum/academic | Rolling 24h success rate feeds fusion weight automatically (`docs/adrs/0003-weighted-rrf.md`) | One `Result` schema, enforced by `tests/test_contract.py` | Subclass `Source`, emit `Result`, register in `ALL_SOURCES` (`docs/architecture.md`) |
+| `search-gateway` | 22 sources across web/code/video/social/forum/academic/CN | Rolling 24h success rate feeds fusion weight automatically (`docs/adrs/0003-weighted-rrf.md`) | One `Result` schema, enforced by `tests/test_contract.py` | Subclass `Source`, emit `Result`, register in `ALL_SOURCES` (`docs/architecture.md`) |
 
 The bet only pays off if degradation is explicit rather than silent — which is
 why `doctor` reports per-source status and `search`'s response envelope always
@@ -190,8 +190,8 @@ handing back whatever fused successfully and staying quiet about the rest.
 ```bash
 pip install .                              # Python ≥ 3.12; or: pip install -e . for development
 cd infra && docker compose up -d && cd ..  # Redis (AOF) + SearXNG (JSON, :8888)
-search-gateway check                       # verified gate: 18 sources + Redis reachable, exit 0
-search-gateway doctor                      # full health report (18 sources)
+search-gateway check                       # verified gate: 22 sources + Redis reachable, exit 0
+search-gateway doctor                      # full health report (22 sources)
 search-gateway serve                       # run the stdio MCP server
 ```
 
@@ -328,11 +328,15 @@ tools" is a testable claim here, not a hope.
 | social | twitter, reddit, facebook, instagram, xiaohongshu, linkedin |
 | forum | v2ex |
 | academic | arxiv, openalex, crossref, semantic_scholar |
+| CN tier (opt-in) | zhihu, weibo, baidu, toutiao — enabled with `SEARCH_GATEWAY_CN_SOURCES=1` |
 
 Sources degrade explicitly by capability tier — `search-gateway doctor`
 doubles as the tier report, and `docs/deployment.md` maps each tier to the
-binaries and env vars it needs. Adding source #19 is a bounded, four-step
+binaries and env vars it needs. Adding source #23 is a bounded, four-step
 change documented in `docs/architecture.md`'s source-adapter contract.
+The v0.4 extraction layer (`search_gateway/extract/`) adds tiered routing,
+block detection, a browser profile farm, an env-gated proxy subsystem, and
+multi-stage `read_url` — see `docs/extraction/PLAN.md`.
 
 ## CLI
 
@@ -340,7 +344,7 @@ change documented in `docs/architecture.md`'s source-adapter contract.
 |---------|----------|
 | `search-gateway serve` | run the MCP server (default; `--transport stdio\|http\|sse`) |
 | `search-gateway doctor` | health report as JSON, exit 0/1 |
-| `search-gateway check` | strict gate (18 sources + Redis), for `ExecStartPre`/CI |
+| `search-gateway check` | strict gate (22 sources + Redis), for `ExecStartPre`/CI |
 | `search-gateway version` | print `__version__` |
 | `search-gateway warm` | preload rerank + embed models |
 
@@ -362,7 +366,7 @@ tool is a **minor** bump. Removing or renaming a tool, or changing a `Result`
 or return-field shape, is a **major** bump with a deprecation cycle — because
 `docs/api/tools.md` and `docs/meta-schema.md` are the contract, and
 `tests/test_contract.py` holds the gateway to it by checking the live
-`tools/list` against exactly 18 sources, 14 tools, and the `Result` shape.
+`tools/list` against exactly 22 sources, 14 tools, and the `Result` shape.
 `docs/architecture.md#versioning` has the full rule set.
 
 ## Orchestration skills
@@ -378,6 +382,10 @@ history, not rewritten here.
 | Doc | Covers |
 |-----|--------|
 | `docs/project-map.md` | whole-repo navigational map — vision & goals, layout, module map, sources, tools, reliability, tests, skills, ADRs |
+| `docs/extraction/PLAN.md` | the v0.4 extraction overhaul — assignment, phases, decisions, status board |
+| `docs/extraction/LESSONS.md` | running research journal — anti-bot field state, proxy economics, platform playbooks |
+| `docs/extraction/proxy-funding-guide.md` | funding + provisioning the optional proxy tier |
+| `docs/extraction/camoufox-migration.md` | the staged OpenCLI → Camoufox migration track |
 | `docs/architecture.md` | pipeline, request lifecycle, reliability model, source-adapter contract, decoupling boundary, design decisions, versioning |
 | `docs/api/tools.md` | canonical 14-tool surface — args, returns, worked examples, error semantics |
 | `docs/meta-schema.md` | `Result.meta` contract + one example per `source_type` |
@@ -385,7 +393,7 @@ history, not rewritten here.
 | `docs/deployment.md` | capability tiers, docker/systemd/native, troubleshooting, upgrade path |
 | `docs/mcp-registration.md` | any-client registration — stdio vs HTTP, six clients, troubleshooting |
 | `docs/security.md` | threat model, per-tool attack surface, hardening checklist |
-| `docs/faq.md` | why 18 sources, model sizes, CJK behavior, adding a source, transports, PyPI, the DeepSeek key |
+| `docs/faq.md` | why 22 sources, model sizes, CJK behavior, adding a source, transports, PyPI, the DeepSeek key |
 | `docs/adrs/` | six short ADRs — the standing design decisions, linked from `architecture.md` |
 | `docs/voice.md` | the writing voice used across this documentation |
 | `CONTRIBUTING.md` | setup, tests, lint, adding a source, release notes |

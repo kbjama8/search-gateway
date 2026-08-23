@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-22
+
+Project Gatekeeper — the extraction-architecture overhaul
+(`docs/extraction/PLAN.md`).
+
+### Added
+- `search_gateway/extract/` package: multi-shape parsing (`parse.py`),
+  block & challenge intelligence (`detectors.py`), extraction tiering
+  (`router.py`), browser budget + jittered pacing (`scheduler.py`), browser
+  profile farm + health state machine (`profiles.py`), fingerprint bundles +
+  coherence lint + geo alignment (`fingerprints.py`), env-gated proxy
+  subsystem with sticky sessions (`proxies.py`), HTTP facade with optional
+  curl_cffi TLS/JA3 impersonation (`http.py`), Camoufox anonymous-tier
+  adapter, experimental (`camoufox.py`).
+- Envelope v0.4 signals (additive): `extract{tier}`, `blocked[]`, `auth{}`.
+- `read_url` multi-stage extraction: Jina (SPA) → Trafilatura (precision) →
+  readability (recall), configurable via `SEARCH_GATEWAY_READ_URL_STAGES`.
+- Bilibili **wbi signing** (w_rid/wts, Redis-cached daily keys) — verified
+  against the canonical bilibili-API-collect worked example.
+- Chinese-ecosystem tier (gated by `SEARCH_GATEWAY_CN_SOURCES=1`):
+  **zhihu** (v4 search API, cookie-gated), **weibo** (hot search + SUB-gated
+  keyword search), **baidu** + **toutiao** hot boards (public, no auth).
+  Registry 18 → **22 sources**.
+- Block detection in the subprocess layer: challenge walls fail immediately
+  (`blocked (vendor/level)`) instead of burning retries; Cloudflare's
+  official `cf-mitigated: challenge` header is the primary signal.
+- `docs/extraction/`: PLAN (assignment), LESSONS (research journal),
+  `proxy-funding-guide.md`, `camoufox-migration.md`, `project-map.md` vision
+  & goals section.
+
+### Changed
+- `OPENCLI_LOCK` replaced by the configurable browser budget
+  (`SEARCH_GATEWAY_BROWSER_BUDGET`, default 1 — old single-bridge behavior
+  preserved).
+- Core deps: `trafilatura`, `readability-lxml` (read_url stages).
+- `search-gateway check` gate: 18 → 22 sources.
+- Golden contract test: 22 sources + 14 tools + `Result` shape.
+
+### Fixed
+- Bilibili search silently degrading without wbi signing (unsigned requests
+  returned `v_voucher` risk-control payloads).
+
 ## [0.3.0] - 2026-08-15
 
 ### Added

@@ -2,7 +2,7 @@
 
 The 14 MCP tools are the public API. Renaming a tool, removing one, or changing
 a return field is a **major** version bump (`docs/architecture.md#versioning`).
-Two tests hold this surface: `tests/test_contract.py` asserts 18 sources + 14
+Two tests hold this surface: `tests/test_contract.py` asserts 22 sources + 14
 tools + `Result` shape against the live `tools/list`, and
 `tests/test_mcp_handshake.py` proves the bare `search-gateway` command serves
 it over stdio.
@@ -23,7 +23,7 @@ different failure surfaces — this table is the ground truth per tool.
 | `get_paper` | Per-sub-lookup errors are folded into the merged dict as `{"error": "<message>"}` under that sub-source's key (`arxiv`/`crossref`/`openalex`) — the tool itself always returns 200-shaped data, never raises. |
 | `get_citations` / `get_references` | Falls back OpenAlex → Semantic Scholar (citations) or Crossref → OpenAlex → Semantic Scholar (references); if every engine fails, returns `{"identifier": ..., "error": "<message>"}` with no `results` key. |
 | `research_answer` | Empty search results → `{"answer": "No results found to synthesize from.", "citations": [], "results": []}`. A DeepSeek failure → `{"answer": "(answer synthesis failed: <exc>)", "citations": [...], "results": [...]}` — the search results are never discarded even if synthesis fails. |
-| `read_url` | `{"url": url, "error": "<message>"}` on any Jina Reader failure — no partial content field. |
+| `read_url` | `{"url": url, "error": "<message>"}` when every extraction stage fails — no partial content field. |
 | `doctor` | Per-source probe failures appear as `"error: <message>"` string values inside `sources{}`; the tool call itself does not fail. |
 | `stats_report` | Redis errors are swallowed inside `stats.snapshot()` (logged at `debug`) and simply omit that source's entry — never raises. |
 | `saved_queries` | Unknown `action` → `{"error": "unknown action: <action> (save|list|delete|run|diff)"}`. `run`/`delete` on an unknown `name` → `{"error": "unknown saved query: <name>"}`. |
@@ -52,12 +52,16 @@ Every `search*` tool returns the same envelope, set in `orchestrator.search()`
 | `partial` | bool | true when at least one source missed the fan-out budget |
 | `pending` | list[str] | the sources that missed the budget (present when `partial`) |
 | `elapsed_ms` | int | wall-clock fan-out → response, in ms |
+| `extract` | dict | v0.4: per-source extraction tier — `{name: {tier: api\|cli\|browser}}` |
+| `blocked` | list | v0.4: detected challenge walls — `[{source, vendor, level}]` (e.g. `cloudflare`/`datadome`/`kasada`/`xhs`, level `transient`/`ip`/`account`) |
+| `auth` | dict | v0.4: auth state of cookie-gated sources — `{name: ok\|missing\|unknown}` |
 
 On a cache hit the envelope is abbreviated to `{query, results, count, sources,
-cached, elapsed_ms}` — `reranked`/`partial`/`pending` appear only on a live
-fuse. The per-tool examples below show a representative subset (the fields that
-differ across tools); `cached`/`reranked`/`partial`/`pending`/`elapsed_ms` are
-identical for every `search*` tool and shown in full only on `search`.
+cached, elapsed_ms, extract, blocked, auth}` — `reranked`/`partial`/`pending`
+appear only on a live fuse. The per-tool examples below show a representative
+subset (the fields that differ across tools); `cached`/`reranked`/`partial`/
+`pending`/`elapsed_ms`/`extract`/`blocked`/`auth` are identical for every
+`search*` tool and shown in full only on `search`.
 
 ### `search(query, sources?, category, limit, freshness?)`
 
@@ -66,7 +70,7 @@ Unified fan-out + fuse + re-rank + diversity. Each result is a `Result` dict.
 | Arg | Type | Default | Notes |
 |-----|------|---------|-------|
 | `query` | str | — | required |
-| `sources` | list[str]? | fast set | subset of `[searxng, exa, github, youtube, bilibili, v2ex, twitter, reddit, facebook, instagram, linkedin]` |
+| `sources` | list[str]? | fast set | subset of `[arxiv, bilibili, crossref, exa, facebook, github, instagram, linkedin, openalex, reddit, searxng, semantic_scholar, stackoverflow, twitter, v2ex, web, xiaohongshu, youtube]` (+ `zhihu`, `weibo`, `baidu`, `toutiao` when `SEARCH_GATEWAY_CN_SOURCES=1`) |
 | `category` | str | `general` | `general` \| `news` \| `science` \| `social media` |
 | `limit` | int | 10 | clamped 1..30 |
 | `freshness` | str? | — | `day` \| `week` \| `month` \| `year` |

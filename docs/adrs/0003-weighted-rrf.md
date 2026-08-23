@@ -10,7 +10,7 @@ directly: `score(doc) = sum over sources s of w_s / (K + rank_s(doc))`. The
 open question was what `w_s` should be. A source having a bad day (upstream
 outage, expired auth, a rate-limit ban) shouldn't get the same fusion weight
 as a source that's healthy — but that determination needs to be automatic,
-because nobody is watching 18 sources' health in real time between searches.
+because nobody is watching 22 sources' health in real time between searches.
 
 ## Decision
 

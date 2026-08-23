@@ -1,12 +1,12 @@
 # FAQ
 
-## Why 18 sources instead of one search engine?
+## Why 22 sources instead of one search engine?
 
 Because one engine has one blind spot, consistently. Bing/Google-style
 metasearch (via SearXNG) covers general web queries well and academic
 literature barely at all; a single engine has no concept of a GitHub repo's
 stars or a Stack Overflow answer's accepted status. `search-gateway` fuses
-18 sources spanning web, code, video, social, forum, and academic verticals
+22 sources spanning web, code, video, social, forum, academic, and (opt-in) Chinese-ecosystem verticals
 precisely so that one `search()` call doesn't inherit one engine's coverage
 gaps. `README.md`'s "Why a gateway and not one search API" framing and its
 source table lay out the full list.

@@ -84,7 +84,7 @@ async def report() -> dict:
 
 
 async def check() -> tuple[bool, dict]:
-    """Strict gate: 18 sources registered + Redis reachable. DeepSeek key is a
+    """Strict gate: 22 sources registered + Redis reachable. DeepSeek key is a
     soft signal (answer synthesis is an optional tier) — recorded but never a
     failure. Returns (ok, report)."""
     result: dict = {
@@ -93,8 +93,8 @@ async def check() -> tuple[bool, dict]:
         "llm": {"available": llm.available()},
     }
     ok = True
-    if len(ALL_SOURCES) != 18:
-        result["error"] = f"expected 18 sources, got {len(ALL_SOURCES)}"
+    if len(ALL_SOURCES) != 22:
+        result["error"] = f"expected 22 sources, got {len(ALL_SOURCES)}"
         ok = False
     if not result["redis"].get("ok"):
         result["error"] = result.get("error", "redis unreachable")

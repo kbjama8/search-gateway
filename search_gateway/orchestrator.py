@@ -22,6 +22,7 @@ from .config import (
     ADAPTIVE_TIMEOUT_FACTOR,
     ADAPTIVE_TIMEOUT_MAX,
     ADAPTIVE_TIMEOUT_MIN,
+    AUTH_GATED_SOURCES,
     DEFAULT_LIMIT,
     DEFAULT_SOURCES,
     EMBEDDING_DEDUP,
@@ -41,6 +42,7 @@ from .config import (
 from .dedup import dedup
 from .diversity import mmr_select
 from .embeddings import cjk_dominant, encode
+from .extract.router import tiers_for
 from .fusion import rrf_fuse
 from .models import Result
 from .rerank import rerank
@@ -48,6 +50,9 @@ from .sources import get_sources
 from .sources.base import SourceError
 
 logger = logging.getLogger("search_gateway.orchestrator")
+
+_BLOCKED_RE = re.compile(r"blocked \(([^/]+)/([^)]+)\)")
+_AUTH_RE = re.compile(r"auth: ([^)]*)$")
 
 # Singleflight: concurrent searches for the same (source, query) share one
 # in-flight task instead of hammering the backend N times.
@@ -187,6 +192,41 @@ def _expansion_needed(base_total: int, gate: int = EXPANSION_GATE_RESULTS) -> bo
     return base_total < gate
 
 
+def _extract_signals(statuses: dict[str, Any]) -> tuple[dict, dict]:
+    """Parse outcome strings into envelope signals (v0.4).
+
+    Source outcomes already carry the machine-readable facts: `blocked
+    (vendor/level)` and `auth: reason`. This turns them into structured
+    envelope fields — the envelope names the state, never guesses it.
+    """
+    blocked: list[dict] = []
+    auth: dict[str, str] = {}
+    for name, outcome in statuses.items():
+        if isinstance(outcome, list):
+            if name in AUTH_GATED_SOURCES:
+                auth[name] = "ok"
+            continue
+        if not isinstance(outcome, str):
+            continue
+        m = _BLOCKED_RE.search(outcome)
+        if m:
+            blocked.append({"source": name, "vendor": m.group(1),
+                            "level": m.group(2)})
+        if outcome.startswith("auth:"):
+            auth[name] = "missing"
+        elif name in AUTH_GATED_SOURCES:
+            if outcome.startswith("ok"):
+                auth[name] = "ok"
+            elif outcome.startswith("error") or outcome == "pending (timeout)":
+                auth[name] = "unknown"
+    return blocked, auth
+
+
+def _extract_tiers(source_names: list[str]) -> dict[str, dict]:
+    """Which extraction tier each requested source declares (api/cli/browser)."""
+    return {n: {"tier": tiers_for(n)[0]} for n in source_names}
+
+
 def _category_lambda(category: str) -> float:
     return MMR_LAMBDA_BY_CATEGORY.get(category, MMR_LAMBDA)
 
@@ -274,7 +314,9 @@ async def search(query: str, sources: list[str] | None, category: str = "general
     if cached is not None:
         return {"query": query, "results": cached, "count": len(cached),
                 "sources": {}, "cached": True,
-                "elapsed_ms": int((time.monotonic() - start) * 1000)}
+                "elapsed_ms": int((time.monotonic() - start) * 1000),
+                "extract": _extract_tiers(source_names),
+                "blocked": [], "auth": {}}
 
     objs = get_sources(source_names)
     statuses: dict[str, Any] = {}
@@ -362,6 +404,8 @@ async def search(query: str, sources: list[str] | None, category: str = "general
     result_dicts = [r.to_dict() for r in final]
     cache.set(query, source_names, category, limit, result_dicts, filters=fkey)
 
+    blocked, auth = _extract_signals(statuses)
+
     return {
         "query": query,
         "results": result_dicts,
@@ -379,4 +423,8 @@ async def search(query: str, sources: list[str] | None, category: str = "general
             "mmr": int((t_mmr - t_rerank) * 1000),
             "total": int((time.monotonic() - start) * 1000),
         },
+        # v0.4 extraction-layer signals (additive, optional for clients)
+        "extract": _extract_tiers(source_names),
+        "blocked": blocked,
+        "auth": auth,
     }
