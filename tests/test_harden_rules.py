@@ -20,14 +20,12 @@ table inet sg_egress {
 \t}
 
 \tchain block_private {
-\t\tip daddr 127.0.0.0/8 drop
 \t\tip daddr 10.0.0.0/8 drop
 \t\tip daddr 172.16.0.0/12 drop
 \t\tip daddr 192.168.0.0/16 drop
 \t\tip daddr 169.254.0.0/16 drop
 \t\tip daddr 100.64.0.0/10 drop
 \t\tip daddr 0.0.0.0/8 drop
-\t\tip6 daddr ::1/128 drop
 \t\tip6 daddr fe80::/10 drop
 \t\tip6 daddr ::/128 drop
 \t\tip6 daddr fd00:ec2::254/128 drop
@@ -54,10 +52,15 @@ class TestBuildRules:
                     "100.64.0.0/10", "fd00:ec2::254/128"):
             assert net in rules
 
-    def test_no_exemptions_in_kernel_layer(self):
+    def test_loopback_exempt_by_design(self):
+        # live-discovery 2026-08-25: dropping 127.0.0.0/8 locks the scoped
+        # process out of its own CDP/extension/proxy machinery (and, when
+        # mis-scoped, out of Redis) — loopback is exempt; link-local is not.
         rules = harden.build_rules("/s.scope")
-        assert "accept" in rules  # only after the drops
-        assert rules.index("ip daddr 127.0.0.0/8 drop") < rules.rindex("accept")
+        assert "ip daddr 127.0.0.0/8 drop" not in rules
+        assert "ip6 daddr ::1/128 drop" not in rules
+        assert "ip daddr 169.254.0.0/16 drop" in rules
+        assert "ip daddr 10.0.0.0/8 drop" in rules
 
 
 class TestStatus:
@@ -104,6 +107,32 @@ class TestStatus:
         monkeypatch.setattr(harden, "HARDEN", "permissive")
         st = harden.status()
         assert st["mode"] == "permissive"
+
+
+class TestInstalledProbe:
+    """Live-discovery fix (2026-08-25): unprivileged `nft list table` fails
+    with EPERM, so table_installed() falls back to the load-marker state."""
+
+    def test_kernel_probe_wins_when_root(self, monkeypatch):
+        monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, "table"))
+        monkeypatch.setattr(harden, "_load_state", lambda: {})
+        assert harden.table_installed() is True
+
+    def test_marker_fallback_when_probe_eperm(self, monkeypatch):
+        monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (1, "Operation not permitted"))
+        monkeypatch.setattr(harden, "_load_state", lambda: {"installed_at": 1})
+        assert harden.table_installed() is True
+
+    def test_neither_probe_nor_marker(self, monkeypatch):
+        monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (1, "EPERM"))
+        monkeypatch.setattr(harden, "_load_state", lambda: {})
+        assert harden.table_installed() is False
+
+    def test_mark_installed_writes_receipt(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
+        out = harden.mark_installed()
+        assert out["ok"] is True
+        assert harden._load_state()["installed_at"] == out["installed_at"]
 
 
 class TestEnforce:
@@ -155,7 +184,7 @@ class TestInstallUninstall:
     def test_install_dry_run_prints_rules(self, monkeypatch):
         monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
         monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
-        monkeypatch.setattr(harden, "current_cgroup",
+        monkeypatch.setattr(harden, "_scope_cgroup_path",
                            lambda: "/user.slice/user-1000.slice/sg-egress.scope")
         out = harden.install(sudo=True, dry_run=True)
         assert out["ok"] is True
@@ -166,7 +195,7 @@ class TestInstallUninstall:
     def test_install_loads_and_saves_state(self, monkeypatch, tmp_path):
         monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
         monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
-        monkeypatch.setattr(harden, "current_cgroup",
+        monkeypatch.setattr(harden, "_scope_cgroup_path",
                            lambda: "/user.slice/user-1000.slice/sg-egress.scope")
         monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))
@@ -179,7 +208,7 @@ class TestInstallUninstall:
     def test_install_pending_without_sudo(self, monkeypatch, tmp_path):
         monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
         monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
-        monkeypatch.setattr(harden, "current_cgroup", lambda: "/u.scope")
+        monkeypatch.setattr(harden, "_scope_cgroup_path", lambda: "/u.scope")
         monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
         monkeypatch.setattr(harden, "HARDEN_SUDO", False)
         monkeypatch.setattr(harden, "os", __import__("os"))

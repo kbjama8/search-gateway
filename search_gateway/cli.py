@@ -81,6 +81,12 @@ def _cmd_harden(args: argparse.Namespace) -> int:
         out = harden.uninstall()
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0 if out.get("ok") else 1
+    if args.harden_action == "mark-installed":
+        # receipt for a successful privileged load (the unprivileged gateway
+        # cannot probe the kernel table — the loader's success is the proof)
+        out = harden.mark_installed()
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0 if out.get("ok") else 1
     st = harden.status()
     print(json.dumps(st, ensure_ascii=False, indent=2))
     if args.harden_action == "check":
@@ -141,6 +147,11 @@ def build_parser() -> argparse.ArgumentParser:
                         const="uninstall", help="delete the sg_egress table")
     harden.add_argument("--check", dest="harden_action", action="store_const",
                         const="check", help="report browser-tier enforceability")
+    harden.add_argument("--mark-installed", dest="harden_action",
+                        action="store_const", const="mark-installed",
+                        help="record a successful privileged load (run after "
+                             "'sudo nft -f' — the unprivileged probe cannot "
+                             "read the kernel table)")
     harden.add_argument("--sudo", action="store_true",
                         help="load the ruleset with elevation (root already: "
                         "auto); without it, rules are written for manual load")

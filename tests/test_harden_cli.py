@@ -82,7 +82,7 @@ class TestHardenCli:
         from search_gateway.extract import harden
         monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
         monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
-        monkeypatch.setattr(harden, "current_cgroup", lambda: "/u.scope")
+        monkeypatch.setattr(harden, "_scope_cgroup_path", lambda: "/u.scope")
         assert _run(["harden", "--install", "--dry-run", "--sudo"]) == 0
         out = json.loads(capsys.readouterr().out)
         assert out["ok"] is True

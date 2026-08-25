@@ -154,14 +154,18 @@ private/link-local/metadata range — no suid binary, no kernel module
 **Ad-hoc gateway** (browser children wrapped in a transient scope):
 
 ```bash
-# one-time install, from INSIDE the scope that will wrap browser children:
-systemd-run --user --scope --unit=sg-egress -- \
-  search-gateway harden --install --sudo
-search-gateway harden --status       # installed + covered
-search-gateway harden --check        # browser-tier enforceability report
+search-gateway harden --install --sudo   # derives the wrapper scope itself
+search-gateway harden --status           # installed + covered state
+search-gateway harden --check            # browser-tier enforceability report
 ```
 
-With the filter live, `run_opencli` automatically wraps each browser child in
+`install` derives the ruleset path from a probe of the `sg-egress` transient
+scope (the one `run_opencli` wraps browser children into) — the gateway
+itself never sits under the strict cgroup, so its loopback (Redis/SearXNG)
+stays open. The kernel floor exempts loopback by design (the browser's own
+CDP/extension machinery + the L2 egress proxy live there) and absolutely
+blocks link-local/IMDS, RFC1918, CGNAT and v6 equivalents for scoped
+children. `run_opencli` wraps each browser child in
 `systemd-run --user --scope --unit=sg-egress` (serialized — keep
 `SEARCH_GATEWAY_BROWSER_BUDGET=1` in ad-hoc scoped mode). For the Camoufox
 anonymous tier the *gateway itself* must run inside the scope (Camoufox

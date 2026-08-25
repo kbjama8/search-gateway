@@ -42,8 +42,16 @@ STATE_PATH = Path(os.path.expanduser("~/.config/search-gateway/harden.json"))
 
 # Everything the floor blocks, expressed for the kernel. No exemptions here —
 # this is the absolute egress floor for scoped browser children.
+#
+# LOOPBACK IS EXEMPT BY DESIGN (live-discovery 2026-08-25): the browser's own
+# machinery lives on 127.0.0.1 — opencli's CDP bridge, the extension
+# websocket, and the L2 egress proxy. Dropping loopback locks the scoped
+# process out of its own stack (and, in a mis-scoped deploy, out of Redis —
+# observed). Compensating controls: Redis is password-protected, the L1 floor
+# gates URLs pre-nav/post-redirect, and the L2 forced-proxy routes the
+# browser's external egress. What the kernel floor still absolutely blocks:
+# link-local/IMDS (169.254.0.0/16 etc.), RFC1918, CGNAT, v6 equivalents.
 _PRIVATE_V4 = (
-    "127.0.0.0/8",      # loopback
     "10.0.0.0/8",       # RFC1918
     "172.16.0.0/12",    # RFC1918
     "192.168.0.0/16",   # RFC1918
@@ -52,7 +60,6 @@ _PRIVATE_V4 = (
     "0.0.0.0/8",        # "this network"
 )
 _PRIVATE_V6 = (
-    "::1/128",          # loopback
     "fe80::/10",        # link-local
     "::/128",           # unspecified
     "fd00:ec2::254/128",  # Azure IMDS v6
@@ -169,9 +176,33 @@ def _save_state(state: dict) -> None:
 
 
 def table_installed() -> bool:
-    """Is the sg_egress table live in the kernel? (authoritative probe)."""
+    """Is the sg_egress table live? (authoritative where possible).
+
+    Probing order (live-discovery 2026-08-25 — unprivileged `nft list table`
+    fails with EPERM, so the kernel probe only works as root):
+      1. direct `nft list table` — root/system contexts;
+      2. the installed-at state marker — written by the privileged load path
+         (`install --sudo` or `harden --mark-installed` after a successful
+         `sudo nft -f`); `nft -f` both validates and applies, so a successful
+         load is kernel-verified at load time.
+    """
     code, _ = _run_nft(["list", "table", *NFT_TABLE.split()])
-    return code == 0
+    if code == 0:
+        return True
+    state = _load_state()
+    return bool(state.get("installed_at"))
+
+
+def mark_installed() -> dict:
+    """Record a successful privileged load (ran after `sudo nft -f`).
+
+    The unprivileged gateway cannot probe the kernel table (EPERM); the
+    loader's success is the verification — this marker is its receipt.
+    """
+    state = _load_state()
+    state["installed_at"] = int(time.time())
+    _save_state(state)
+    return {"ok": True, "installed_at": state["installed_at"]}
 
 
 def systemd_run_available() -> bool:
@@ -233,19 +264,55 @@ def enforce(require_coverage: bool = False) -> None:
             raise EgressUnhardened()
 
 
+def _scope_cgroup_path() -> str | None:
+    """cgroup2 path of the transient scope `run_opencli` wraps children in.
+
+    The wrapper uses the FIXED unit name `sg-egress`; where the scope lands
+    depends on the caller's context (a shell's scope lands under app.slice;
+    a unit's scope under that unit's slice), so install() must derive it by
+    launching a probe scope from ITS OWN context, reading the cgroup, and
+    letting it expire. The rules then match exactly what the wrapper creates
+    from the same context (live-verified 2026-08-25).
+    """
+    systemd_run = shutil.which("systemd-run") or "systemd-run"
+    systemctl = shutil.which("systemctl") or "systemctl"
+    probe = subprocess.Popen(  # noqa: S603 — operator-triggered hardening probe
+        [systemd_run, "--user", "--scope", "--collect", "--unit", "sg-egress",
+         "--", "sleep", "5"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        time.sleep(0.7)  # let systemd create the scope and move the process
+        r = subprocess.run(  # noqa: S603 — operator-triggered hardening probe
+            [systemctl, "--user", "show", "sg-egress.scope",
+             "-p", "ControlGroup", "--value"],
+            capture_output=True, text=True, timeout=5)
+        path = (r.stdout or "").strip()
+        return path if path.startswith("/") else None
+    finally:
+        probe.wait(timeout=6)
+
+
 def install(*, sudo: bool = False, dry_run: bool = False) -> dict:
-    """Idempotent install: derive the scope cgroup from the current process,
-    write the nft ruleset, load it, save state. Refuses (reports, never
-    crashes) when nft or cgroupv2 is absent. `--sudo` runs the nft load with
-    elevation; without sudo, the ruleset is written to a file for the
-    operator to load (`nft -f`), and state marks it pending."""
+    """Idempotent install: derive the browser-child scope cgroup from THIS
+    context (probe scope), write the nft ruleset for it, load it, save state.
+    Refuses (reports, never crashes) when nft or cgroupv2 is absent.
+    `--sudo` runs the nft load with elevation; without sudo, the ruleset is
+    written to a file for the operator to load (`nft -f`), and state marks it
+    pending.
+
+    The rules target the WRAPPER scope (`sg-egress`), never the installer's
+    own cgroup — a scoped gateway would be locked out of its own loopback
+    (Redis/SearXNG), observed live 2026-08-25.
+    """
     if _nft() is None:
         return {"ok": False, "error": "nft not on PATH — cannot harden"}
     if not cgroupv2_mounted():
         return {"ok": False, "error": "cgroupv2 not mounted at /sys/fs/cgroup"}
-    cg = current_cgroup()
+    cg = _scope_cgroup_path()
     if not cg:
-        return {"ok": False, "error": "cannot read /proc/self/cgroup"}
+        return {"ok": False,
+                "error": "cannot derive the sg-egress scope cgroup (is the "
+                         "user systemd manager running?)"}
     rules = build_rules(cg)
     if dry_run:
         return {"ok": True, "dry_run": True, "cgroup_path": cg, "rules": rules}
@@ -259,16 +326,14 @@ def install(*, sudo: bool = False, dry_run: bool = False) -> dict:
         code, err = _run_nft(["-f", str(rules_path)])
         if code != 0:
             return {"ok": False, "error": f"nft -f failed: {err or code}"}
-    else:
-        logger.info("harden: rules written to %s — load with 'sudo nft -f %s'",
-                    rules_path, rules_path)
-        _save_state({"cgroup_path": cg, "installed_at": int(time.time()),
-                     "pending_load": str(rules_path)})
-        return {"ok": True, "pending_load": str(rules_path),
-                "cgroup_path": cg,
-                "note": "rules written; load with 'sudo nft -f' or re-run with --sudo"}
-    _save_state({"cgroup_path": cg, "installed_at": int(time.time())})
-    return {"ok": True, "cgroup_path": cg, "rules_file": str(rules_path)}
+        _save_state({"cgroup_path": cg, "installed_at": int(time.time())})
+        return {"ok": True, "cgroup_path": cg, "rules_file": str(rules_path)}
+    logger.info("harden: rules written to %s — load with 'sudo nft -f %s'",
+                rules_path, rules_path)
+    _save_state({"cgroup_path": cg, "pending_load": str(rules_path)})
+    return {"ok": True, "pending_load": str(rules_path),
+            "cgroup_path": cg,
+            "note": "rules written; load with 'sudo nft -f' or re-run with --sudo"}
 
 
 def uninstall() -> dict:

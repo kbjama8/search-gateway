@@ -48,6 +48,9 @@ ExecStartPre=%h/.local/bin/search-gateway harden --install
 # Auto-load the L3 ruleset (option B — requires the sudoers drop-in in
 # /etc/sudoers.d/search-gateway-nft; without it, load once by hand)
 ExecStartPre=/usr/bin/sudo /usr/bin/nft -f %h/.config/search-gateway/sg-egress.nft
+# receipt for the privileged load above — the unprivileged gateway cannot
+# probe the kernel table (EPERM), so the loader's success is the proof
+ExecStartPre=%h/.local/bin/search-gateway harden --mark-installed
 ExecStartPre=%h/.local/bin/search-gateway harden --status
 ExecStart=%h/.local/bin/search-gateway serve --transport http --host 127.0.0.1 --port %i
 Restart=on-failure
@@ -55,7 +58,12 @@ RestartSec=3
 TimeoutStopSec=30
 
 # --- containment (v0.4.2) ---
-NoNewPrivileges=yes
+# NOTE: NoNewPrivileges is intentionally ABSENT — it is mutually exclusive
+# with D7.1's in-unit load: sudo cannot setuid under PR_SET_NO_NEW_PRIVS
+# ("no new privileges" error, live-verified 2026-08-25). The envelope keeps
+# every other control (ProtectSystem, PrivateTmp, address families, IP
+# denials); the browser children additionally sit under the strict nft
+# cgroup floor, which is the layer that matters most for drive-by risk.
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
