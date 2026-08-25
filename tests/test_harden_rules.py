@@ -236,9 +236,13 @@ class TestInstallUninstall:
         assert out["ok"] is True and "pending_load" in out
         assert out["note"].startswith("rules written")
 
-    def test_uninstall(self, monkeypatch):
+    def test_uninstall(self, monkeypatch, tmp_path):
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))
+        state = tmp_path / "harden.json"
+        state.write_text('{"installed_at": 1}', encoding="utf-8")
+        monkeypatch.setattr(harden, "STATE_PATH", state)
         assert harden.uninstall()["ok"] is True
+        assert not state.exists()  # receipt removed — never the real one
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (1, "no table"))
         assert harden.uninstall()["ok"] is False
 

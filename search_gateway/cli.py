@@ -94,8 +94,9 @@ def _cmd_harden(args: argparse.Namespace) -> int:
         # `check` reports enforceability (exit 0 even when not enforced —
         # the unit logs the report; in-process enforce() is the real gate)
         enforceable = st["installed"] and st["systemd_run"]
+        detail = "; ".join(st["problems"]) or "permissive"
         print(f"browser-tier enforceability: "
-              f"{'yes' if enforceable else 'no — ' + '; '.join(st['problems']) or 'permissive'}")
+              f"{'yes' if enforceable else 'no — ' + detail}")
         return 0
     return 0 if st["installed"] else 1
 
