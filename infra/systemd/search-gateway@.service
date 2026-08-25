@@ -59,9 +59,9 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
-# The gateway's writable state: the vault (secrets + profile farm) and the HF
-# model cache (model loads write here on first use).
-ReadWritePaths=%h/.agent-reach/profiles %h/.cache/huggingface
+# The gateway's writable state: the harden ruleset + state, the vault
+# (secrets + profile farm), and the HF model cache (model loads write here).
+ReadWritePaths=%h/.config/search-gateway %h/.agent-reach/profiles %h/.cache/huggingface
 # Service-level egress floor: loopback stays open (Redis/SearXNG); browser
 # children get the strict per-cgroup nft rules instead.
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
