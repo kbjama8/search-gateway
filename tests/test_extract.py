@@ -447,6 +447,79 @@ class TestCamoufox:
         import search_gateway.extract.camoufox as cf
         assert await cf.html(None, "https://x") is None
 
+    @pytest.mark.asyncio
+    async def test_launch_returns_started_browser_and_forced_proxy_args(self,
+                                                                        monkeypatch):
+        # live-verified API contract (2026-08-25): AsyncCamoufox.start()
+        # RETURNS the Playwright Browser — the adapter must return that, and
+        # the L2 forced-proxy args must be attached when the proxy is on
+        import search_gateway.extract.camoufox as cf
+        from search_gateway.extract import harden
+        monkeypatch.setattr(cf, "STEALTH_ENABLED", True)
+        monkeypatch.setattr(harden, "HARDEN", "permissive")
+        monkeypatch.setattr(cf, "EGRESS_PROXY", True)
+
+        import types
+
+        class FakeEgress:
+            port = 4444
+
+        async def fake_get_proxy():
+            return FakeEgress()
+
+        monkeypatch.setattr(cf, "get_proxy", fake_get_proxy)
+
+        class FakeBrowser:
+            pass
+
+        fake = types.ModuleType("camoufox")
+
+        class FakeAsyncCamoufox:
+            kw: dict = {}
+
+            def __init__(self, **kw):
+                FakeAsyncCamoufox.kw = kw
+
+            async def start(self):
+                return FakeBrowser()
+
+        fake.AsyncCamoufox = FakeAsyncCamoufox
+        monkeypatch.setitem(__import__("sys").modules, "camoufox", fake)
+
+        browser, why = await cf.launch("p")
+        assert why == ""
+        assert isinstance(browser, FakeBrowser)  # start()'s return value
+        started = FakeAsyncCamoufox.kw
+        assert started["args"] == [
+            "--proxy-server=http://127.0.0.1:4444",
+            "--host-resolver-rules=MAP * 0.0.0.0, EXCLUDE 127.0.0.1",
+        ]
+        assert "proxy" not in started  # the egress proxy chains upstream itself
+
+    @pytest.mark.asyncio
+    async def test_default_headless_is_native(self, monkeypatch):
+        # live-verified: headless=True needs no Xvfb; "virtual" does
+        import search_gateway.extract.camoufox as cf
+        from search_gateway.extract import harden
+        monkeypatch.setattr(cf, "STEALTH_ENABLED", True)
+        monkeypatch.setattr(harden, "HARDEN", "permissive")
+
+        import types
+
+        fake = types.ModuleType("camoufox")
+
+        class FakeAsyncCamoufox:
+            def __init__(self, **kw):
+                FakeAsyncCamoufox.kw = kw
+
+            async def start(self):
+                return object()
+
+        fake.AsyncCamoufox = FakeAsyncCamoufox
+        monkeypatch.setitem(__import__("sys").modules, "camoufox", fake)
+        await cf.launch("p")
+        assert FakeAsyncCamoufox.kw["headless"] is True
+
 
 # --- parse.py llm_assist + shape ladder -------------------------------------
 

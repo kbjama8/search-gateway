@@ -33,16 +33,22 @@ def available() -> tuple[bool, str]:
     return True, "ok"
 
 
-async def launch(profile: str, *, headless: str = "virtual"):
+async def launch(profile: str, *, headless: bool | str = True):
     """Launch a Camoufox browser bound to the profile's proxy + fingerprint.
 
     Returns (browser, reason); browser is None on any failure — never raise.
+    `browser` is the Playwright Browser object (`AsyncCamoufox(...).start()`
+    returns it — live-verified 2026-08-25); callers use `browser.new_page()`
+    and `browser.close()`.
+
+    `headless=True` (default) uses Firefox's native headless mode (no Xvfb
+    needed); `"virtual"` uses Camoufox's virtual display (needs Xvfb) for
+    maximum fingerprint fidelity.
 
     Containment (0.4.2): L3 enforcement requires the kernel filter AND the
     gateway process itself to sit inside the scoped cgroup (Camoufox spawns
     its own children — unlike opencli, we cannot wrap them, so coverage is
-    mandatory; run the gateway under `systemd-run --user --scope --unit
-    sg-egress` or the hardened systemd unit). L2: when
+    mandatory; run the gateway under the hardened systemd unit). L2: when
     `SEARCH_GATEWAY_EGRESS_PROXY=1` (default), the browser is pointed at the
     loopback egress proxy with forced-proxy flags so every socket it opens
     passes the floor.
@@ -78,8 +84,8 @@ async def launch(profile: str, *, headless: str = "virtual"):
         kwargs["proxy"] = proxy
 
     try:
-        browser = AsyncCamoufox(**kwargs)
-        await browser.start()
+        camou = AsyncCamoufox(**kwargs)
+        browser = await camou.start()
         logger.info("camoufox started (profile=%s, preset=%s)",
                     profile, STEALTH_PROFILE or "browserforge")
         return browser, ""
