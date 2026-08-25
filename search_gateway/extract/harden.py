@@ -292,27 +292,54 @@ def _scope_cgroup_path() -> str | None:
         probe.wait(timeout=6)
 
 
-def install(*, sudo: bool = False, dry_run: bool = False) -> dict:
-    """Idempotent install: derive the browser-child scope cgroup from THIS
-    context (probe scope), write the nft ruleset for it, load it, save state.
-    Refuses (reports, never crashes) when nft or cgroupv2 is absent.
-    `--sudo` runs the nft load with elevation; without sudo, the ruleset is
-    written to a file for the operator to load (`nft -f`), and state marks it
-    pending.
+def _unit_cgroup_path(unit: str) -> str | None:
+    """cgroup2 path of a running user unit (e.g. `search-gateway@8765.service`).
 
-    The rules target the WRAPPER scope (`sg-egress`), never the installer's
-    own cgroup — a scoped gateway would be locked out of its own loopback
-    (Redis/SearXNG), observed live 2026-08-25.
+    Used by the companion loader (`search-gateway-harden.service`): the rules
+    must target the gateway unit's own cgroup (browser children inherit it),
+    which only exists while the unit runs — so the loader runs After= it.
+    """
+    systemctl = shutil.which("systemctl") or "systemctl"
+    r = subprocess.run(  # noqa: S603 — operator-triggered hardening probe
+        [systemctl, "--user", "show", unit, "-p", "ControlGroup", "--value"],
+        capture_output=True, text=True, timeout=5)
+    path = (r.stdout or "").strip()
+    return path if path.startswith("/") else None
+
+
+def install(*, sudo: bool = False, dry_run: bool = False,
+            for_unit: str | None = None) -> dict:
+    """Idempotent install: derive the target cgroup, write the nft ruleset,
+    load it, save state. Refuses (reports, never crashes) when nft or
+    cgroupv2 is absent. `--sudo` runs the nft load with elevation; without
+    sudo, the ruleset is written to a file for the operator to load
+    (`nft -f`), and state marks it pending.
+
+    Target derivation (live-verified 2026-08-25):
+      * default: a probe of the `sg-egress` transient scope — the one
+        `run_opencli` wraps browser children into (ad-hoc deployment; the
+        gateway itself never sits under the strict cgroup, so its loopback
+        stays open);
+      * `for_unit`: the cgroup of a running user unit — used by the companion
+        loader for the systemd deployment (children inherit the unit cgroup;
+        the unit's loopback is exempt from the floor by design).
     """
     if _nft() is None:
         return {"ok": False, "error": "nft not on PATH — cannot harden"}
     if not cgroupv2_mounted():
         return {"ok": False, "error": "cgroupv2 not mounted at /sys/fs/cgroup"}
-    cg = _scope_cgroup_path()
-    if not cg:
-        return {"ok": False,
-                "error": "cannot derive the sg-egress scope cgroup (is the "
-                         "user systemd manager running?)"}
+    if for_unit:
+        cg = _unit_cgroup_path(for_unit)
+        if not cg:
+            return {"ok": False,
+                    "error": f"unit {for_unit!r} not running — cannot derive "
+                             "its cgroup (the loader must run After= it)"}
+    else:
+        cg = _scope_cgroup_path()
+        if not cg:
+            return {"ok": False,
+                    "error": "cannot derive the sg-egress scope cgroup (is the "
+                             "user systemd manager running?)"}
     rules = build_rules(cg)
     if dry_run:
         return {"ok": True, "dry_run": True, "cgroup_path": cg, "rules": rules}

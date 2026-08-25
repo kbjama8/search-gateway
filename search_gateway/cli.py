@@ -74,7 +74,8 @@ def _cmd_harden(args: argparse.Namespace) -> int:
     from .extract import harden
 
     if args.harden_action == "install":
-        out = harden.install(sudo=args.sudo, dry_run=args.dry_run)
+        out = harden.install(sudo=args.sudo, dry_run=args.dry_run,
+                             for_unit=args.for_unit)
         print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0 if out.get("ok") else 1
     if args.harden_action == "uninstall":
@@ -152,10 +153,15 @@ def build_parser() -> argparse.ArgumentParser:
                         help="record a successful privileged load (run after "
                              "'sudo nft -f' — the unprivileged probe cannot "
                              "read the kernel table)")
+    harden.add_argument("--for", dest="for_unit", metavar="UNIT",
+                        default=None,
+                        help="target a running user unit's cgroup instead of "
+                             "the sg-egress wrapper scope (companion-loader "
+                             "deployments)")
     harden.add_argument("--sudo", action="store_true",
                         help="load the ruleset with elevation (root already: "
                         "auto); without it, rules are written for manual load")
-    harden.set_defaults(harden_action="status")
+    harden.set_defaults(harden_action="status", for_unit=None)
     return parser
 
 

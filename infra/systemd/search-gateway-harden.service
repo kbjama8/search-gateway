@@ -1,0 +1,30 @@
+# Search Gateway — L3 egress-filter loader (companion unit, PHASE8 Plan 7).
+#
+# Why a separate unit (live-verified 2026-08-25): the gateway unit's namespace
+# sandbox (ProtectSystem=strict etc.) runs it in a user namespace mapping only
+# the invoking uid — root-owned files read as the overflow uid (65534), so
+# sudo's setuid check fails categorically ("must be owned by uid 0"). The
+# privileged nft load therefore lives HERE, in a deliberately NON-sandboxed
+# unit that runs after the gateway (its cgroup must exist for the rule path).
+#
+# Ordering: `After=search-gateway@8765.service` + `Wants=` — the loader runs
+# at boot after the gateway unit's cgroup exists, writes the ruleset for the
+# gateway unit's cgroup (children inherit it), loads it via the sudoers
+# drop-in (NOPASSWD `nft -f <ruleset>`), and records the load receipt.
+# nft rules are volatile — this unit is what makes the floor survive reboots.
+#
+#   systemctl --user enable --now search-gateway@8765.service search-gateway-harden.service
+#
+[Unit]
+Description=Search Gateway L3 egress-filter loader
+After=search-gateway@8765.service
+Wants=search-gateway@8765.service
+
+[Service]
+Type=oneshot
+ExecStartPre=%h/.local/bin/search-gateway harden --install --for search-gateway@8765.service
+ExecStart=/usr/bin/sudo /usr/bin/nft -f %h/.config/search-gateway/sg-egress.nft
+ExecStartPost=%h/.local/bin/search-gateway harden --mark-installed
+
+[Install]
+WantedBy=default.target

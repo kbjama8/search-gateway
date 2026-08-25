@@ -134,6 +134,25 @@ class TestInstalledProbe:
         assert out["ok"] is True
         assert harden._load_state()["installed_at"] == out["installed_at"]
 
+    def test_install_for_unit_derives_cgroup(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
+        monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
+        monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
+        monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))
+        monkeypatch.setattr(harden, "_unit_cgroup_path",
+                           lambda unit: f"/u.slice/{unit}")
+        out = harden.install(sudo=True, for_unit="search-gateway@8765.service")
+        assert out["ok"] is True
+        assert out["cgroup_path"] == "/u.slice/search-gateway@8765.service"
+        assert harden._load_state()["cgroup_path"] == out["cgroup_path"]
+
+    def test_install_for_unit_requires_running_unit(self, monkeypatch):
+        monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
+        monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
+        monkeypatch.setattr(harden, "_unit_cgroup_path", lambda unit: None)
+        out = harden.install(sudo=True, for_unit="nope.service")
+        assert out["ok"] is False and "not running" in out["error"]
+
 
 class TestEnforce:
     def test_required_without_filter_raises(self, monkeypatch):

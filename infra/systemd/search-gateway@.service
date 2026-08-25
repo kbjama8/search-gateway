@@ -35,22 +35,19 @@ Type=simple
 # Non-secret runtime config; keep 0600 (it may reference paths).
 EnvironmentFile=%h/.config/search-gateway/gateway.env
 Environment=SEARCH_GATEWAY_LOG_FMT=json
-# Vault secrets as systemd credentials — files in $CREDENTIALS_DIRECTORY,
-# never env vars (LESSONS.md §1.5). Names match the vault files so the
-# credentials-dir-aware loader finds them (<kind>.env).
-LoadCredential=twitter.env:%h/.agent-reach/profiles/kaiser/twitter.env
-LoadCredential=deepseek.env:%h/.agent-reach/profiles/kaiser/deepseek.env
-LoadCredential=proxy.env:%h/.agent-reach/profiles/kaiser/proxy.env
-Environment=SEARCH_GATEWAY_CREDENTIALS_DIR=%d
-# Pre-flight gates
+# NOTE: LoadCredential is intentionally NOT used here (live-verified
+# 2026-08-25): in --user units, LoadCredential + any namespace-based sandbox
+# property (ProtectSystem/ProtectHome/ProtectKernel*) forces a user namespace
+# in which root-owned files read as the overflow uid — sudo's setuid check
+# fails with "must be owned by uid 0", breaking the L3 auto-load below.
+# Secrets resolve from the 0600 user-owned vault files directly (the
+# credentials-dir bridge in config.load_env_file_credential remains available
+# for manual/system deployments that do not need the in-unit sudo load).
+# Pre-flight gates. The L3 ruleset is NOT loaded here (live-verified
+# 2026-08-25: the namespace sandbox runs this unit in a user namespace where
+# sudo cannot setuid) — the companion unit search-gateway-harden.service owns
+# the privileged load; this unit only verifies + reports state.
 ExecStartPre=%h/.local/bin/search-gateway check
-ExecStartPre=%h/.local/bin/search-gateway harden --install
-# Auto-load the L3 ruleset (option B — requires the sudoers drop-in in
-# /etc/sudoers.d/search-gateway-nft; without it, load once by hand)
-ExecStartPre=/usr/bin/sudo /usr/bin/nft -f %h/.config/search-gateway/sg-egress.nft
-# receipt for the privileged load above — the unprivileged gateway cannot
-# probe the kernel table (EPERM), so the loader's success is the proof
-ExecStartPre=%h/.local/bin/search-gateway harden --mark-installed
 ExecStartPre=%h/.local/bin/search-gateway harden --status
 ExecStart=%h/.local/bin/search-gateway serve --transport http --host 127.0.0.1 --port %i
 Restart=on-failure
@@ -58,13 +55,18 @@ RestartSec=3
 TimeoutStopSec=30
 
 # --- containment (v0.4.2) ---
-# NOTE: NoNewPrivileges is intentionally ABSENT — it is mutually exclusive
-# with D7.1's in-unit load: sudo cannot setuid under PR_SET_NO_NEW_PRIVS
-# ("no new privileges" error, live-verified 2026-08-25). The envelope keeps
-# every other control (ProtectSystem, PrivateTmp, address families, IP
-# denials); the browser children additionally sit under the strict nft
-# cgroup floor, which is the layer that matters most for drive-by risk.
-PrivateTmp=yes
+# NOTE: NoNewPrivileges AND PrivateTmp are intentionally ABSENT (live-verified
+# 2026-08-25):
+#   * NoNewPrivileges is mutually exclusive with D7.1's in-unit load — sudo
+#     cannot setuid under PR_SET_NO_NEW_PRIVS ("no new privileges" error).
+#   * PrivateTmp=yes breaks sudo in --user units the same way (setuid exec
+#     fails inside the unit's private mount namespace; observed as the
+#     "must be owned by uid 0" error / silent rc=1).
+# The envelope keeps every other control (ProtectSystem, ProtectHome, address
+# families, IP denials); the browser children additionally sit under the
+# strict nft cgroup floor, which is the layer that matters most for drive-by
+# risk.
+ProtectSystem=strict
 ProtectSystem=strict
 ProtectHome=read-only
 # The gateway's writable state: the harden ruleset + state, the vault

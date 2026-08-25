@@ -57,6 +57,19 @@ class TestVaultCli:
         assert deepseek["status"] == "migrated"
         assert not (legacy / "deepseek.env").exists()
 
+    def test_harden_install_for_unit(self, monkeypatch, capsys, tmp_path):
+        from search_gateway.extract import harden
+        monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
+        monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
+        monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
+        monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))
+        monkeypatch.setattr(harden, "_unit_cgroup_path",
+                           lambda unit: f"/u.slice/{unit}")
+        assert _run(["harden", "--install", "--sudo", "--for",
+                     "search-gateway@8765.service"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["cgroup_path"] == "/u.slice/search-gateway@8765.service"
+
 
 class TestHardenCli:
     def test_harden_status(self, monkeypatch, capsys):
