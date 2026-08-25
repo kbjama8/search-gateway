@@ -863,7 +863,7 @@ def test_fusion_tolerates_none_snippet(monkeypatch, rds):
     asyncio.run(run())
 
 
-def test_toutiao_empty_label_is_empty_string():
+def test_toutiao_empty_label_is_empty_string(monkeypatch):
     import search_gateway.sources.toutiao as tt
     payload = {"data": [{"Title": "无标签", "Url": "https://t/1",
                          "Label": "", "HotValue": 1, "Index": 1}]}
@@ -871,16 +871,9 @@ def test_toutiao_empty_label_is_empty_string():
     async def fake_get_json(*a, **k):
         return payload
 
-    class FakeSource(tt.ToutiaoSource):
-        pass
+    monkeypatch.setattr(tt, "get_json", fake_get_json)
+    monkeypatch.setattr(tt, "CN_SOURCES", True)
 
     import asyncio
-    src = FakeSource()
-    orig = tt.get_json
-    tt.get_json = fake_get_json
-    tt.CN_SOURCES = True
-    try:
-        out = asyncio.run(src.search(""))
-    finally:
-        tt.get_json = orig
+    out = asyncio.run(tt.ToutiaoSource().search(""))
     assert out[0].snippet == ""  # never None
