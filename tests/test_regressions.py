@@ -826,3 +826,61 @@ def test_run_opencli_wrapper_is_quiet(monkeypatch):
     import asyncio
     asyncio.run(run())
     assert "--quiet" in seen[0]  # banner suppression for stdout-bound JSON
+
+
+# --------------------------------------------------------------------------
+# I11 — None snippets must not crash fusion (toutiao Label-less items)
+# (CN smoke-test discovery 2026-08-25)
+# --------------------------------------------------------------------------
+
+def test_fusion_tolerates_none_snippet(monkeypatch, rds):
+    from search_gateway import orchestrator as orch
+    from search_gateway.sources.base import Source
+
+    class NoneSnippetSource(Source):
+        name = "toutiao"
+
+        async def search(self, query, limit=10):
+            from search_gateway.models import Result
+            return [Result(title="no label", url="https://t/1",
+                           snippet=None, source="toutiao")]
+
+    def fake_get_sources(names):
+        return [NoneSnippetSource()]
+
+    monkeypatch.setattr(orch, "get_sources", fake_get_sources)
+    monkeypatch.setattr(orch, "SEMANTIC_RERANK", False)
+    monkeypatch.setattr(orch, "MMR_ENABLED", False)
+    monkeypatch.setattr(orch, "EMBEDDING_DEDUP", False)
+    monkeypatch.setattr(orch, "QUERY_EXPANSION", False)
+
+    async def run():
+        out = await orch.search("", ["toutiao"], category="general", limit=5)
+        assert out["count"] == 1
+        assert out["results"][0]["title"] == "no label"
+
+    import asyncio
+    asyncio.run(run())
+
+
+def test_toutiao_empty_label_is_empty_string():
+    import search_gateway.sources.toutiao as tt
+    payload = {"data": [{"Title": "无标签", "Url": "https://t/1",
+                         "Label": "", "HotValue": 1, "Index": 1}]}
+
+    async def fake_get_json(*a, **k):
+        return payload
+
+    class FakeSource(tt.ToutiaoSource):
+        pass
+
+    import asyncio
+    src = FakeSource()
+    orig = tt.get_json
+    tt.get_json = fake_get_json
+    tt.CN_SOURCES = True
+    try:
+        out = asyncio.run(src.search(""))
+    finally:
+        tt.get_json = orig
+    assert out[0].snippet == ""  # never None

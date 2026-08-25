@@ -17,6 +17,16 @@ class Result:
     score: float = 0.0    # final score (RRF and/or re-rank)
     meta: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        # never let None sneak into string fields — downstream (fusion, dedup)
+        # slices these unconditionally (CN smoke-test discovery 2026-08-25)
+        if self.snippet is None:
+            self.snippet = ""
+        if self.title is None:
+            self.title = ""
+        if self.url is None:
+            self.url = ""
+
     def to_dict(self) -> dict:
         return asdict(self)
 

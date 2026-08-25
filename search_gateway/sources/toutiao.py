@@ -53,7 +53,7 @@ class ToutiaoSource(Source):
             out.append(Result(
                 title=title[:140],
                 url=str(it.get("Url") or ""),
-                snippet=(it.get("Label") or "") or None,
+                snippet=it.get("Label") or "",
                 source=self.name, engine="toutiao-board",
                 meta={"heat": it.get("HotValue"),
                       "category": it.get("Category"),

@@ -385,7 +385,8 @@ async def search(query: str, sources: list[str] | None, category: str = "general
     # fusion (weighted RRF + exact dedup) → near-dup dedup (embedding)
     t_fusion = time.monotonic()
     fused = rrf_fuse(ranked_lists)
-    dedup_docs = [(r.title + " " + r.snippet[:200]) for r in fused]
+    # snippet may be None on malformed source output — never let fusion crash
+    dedup_docs = [(r.title + " " + (r.snippet or "")[:200]) for r in fused]
     multilingual = cjk_dominant(dedup_docs)
     emb_for_dedup = None
     if EMBEDDING_DEDUP and len(fused) > 1:
