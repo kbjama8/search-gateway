@@ -109,8 +109,9 @@ class TestHardenCli:
         out = json.loads(capsys.readouterr().out)
         assert out["ok"] is False
 
-    def test_harden_uninstall(self, monkeypatch, capsys):
+    def test_harden_uninstall(self, monkeypatch, capsys, tmp_path):
         from search_gateway.extract import harden
+        monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))
         assert _run(["harden", "--uninstall"]) == 0
         assert json.loads(capsys.readouterr().out)["ok"] is True
