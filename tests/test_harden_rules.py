@@ -72,6 +72,7 @@ class TestStatus:
 
     def test_not_installed_reported(self, no_nft, monkeypatch):
         monkeypatch.setattr(harden, "_nft", lambda: None)
+        monkeypatch.setattr(harden, "_load_state", lambda: {})
         st = harden.status()
         assert st["installed"] is False
         assert st["mode"] == "required"
