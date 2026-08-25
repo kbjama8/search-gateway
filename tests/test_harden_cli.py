@@ -76,6 +76,7 @@ class TestHardenCli:
         from search_gateway.extract import harden
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (127, "no"))
         monkeypatch.setattr(harden, "_nft", lambda: None)
+        monkeypatch.setattr(harden, "_load_state", lambda: {})
         assert _run(["harden", "--status"]) == 1  # not installed
         out = json.loads(capsys.readouterr().out)
         assert out["installed"] is False
