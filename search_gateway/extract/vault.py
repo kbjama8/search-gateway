@@ -2,14 +2,17 @@
 
 Doctrine (LESSONS.md §1.5): env vars are NOT suitable for secrets — files
 with 0600 modes are. This module is the single authority on where each
-secret file lives, how it is migrated there, and whether it is healthy.
+secret file lives and whether it is healthy.
 
 Resolution order for every env-file kind:
   1. `SEARCH_GATEWAY_CREDENTIALS_DIR` (systemd `$CREDENTIALS_DIRECTORY`
      bridge — files named `<kind>.env` arrive from `LoadCredential=`)
   2. the configured vault path (defaults in config.py)
-  3. the legacy flat path (`~/.agent-reach/<legacy>.env`) — honored for one
-     release with a doctor-deprecation flag; removed 0.4.3 (decision D7.3)
+
+Legacy flat paths (`~/.agent-reach/<name>.env`) were honored through 0.4.2
+and REMOVED in 0.4.3 (decision D7.3). `migrate()` still reads them as the
+migration *source* — machines that never migrated must run `search-gateway
+vault migrate` before upgrading past 0.4.2.
 
 `hygiene()` is warn-not-fail (degradation doctrine) — but the doctor section
 it feeds colors the findings red so an operator never misses them.
@@ -36,7 +39,8 @@ from ..config import (
 
 logger = logging.getLogger("search_gateway.extract.vault")
 
-# Legacy flat paths (D7.3: honored one release, removed 0.4.3).
+# Legacy flat paths — migration SOURCE ONLY since 0.4.3 (runtime fallback
+# removed per D7.3). Kept so `migrate()` can rescue never-migrated machines.
 LEGACY_PATHS: dict[str, str] = {
     "twitter": os.path.expanduser("~/.agent-reach/twitter-auth.env"),
     "deepseek": os.path.expanduser("~/.agent-reach/deepseek.env"),
@@ -60,9 +64,6 @@ _CONFIG_PATHS: dict[str, str] = {
 }
 
 _STALE_DAYS = 90
-
-# legacy fallback in use this process (kind -> legacy path) — feeds doctor
-_legacy_used: dict[str, str] = {}
 
 
 @dataclass(frozen=True)
@@ -92,29 +93,18 @@ def _vault_path(kind: str, persona: str | None = None) -> Path:
 
 
 def env_file_for(kind: str) -> str:
-    """Effective env-file path for a secret kind.
+    """Effective env-file path for a secret kind: the configured vault path.
 
-    Vault path if present; legacy flat path (flagged) if that is what exists;
-    otherwise the configured path (may not exist — caller degrades). The
-    credentials-dir bridge is handled by `load_env_file_credential` at read
-    time; here we only resolve where the *file* lives.
+    Since 0.4.3 the legacy flat paths are no longer a runtime fallback
+    (D7.3); a missing file simply means the secret is absent — callers
+    degrade explicitly.
     """
-    configured = Path(_CONFIG_PATHS.get(kind, "")).expanduser()
-    if configured.exists():
-        return str(configured)
-    legacy = Path(LEGACY_PATHS.get(kind, "")).expanduser()
-    if legacy.exists():
-        _legacy_used[kind] = str(legacy)
-        logger.warning(
-            "vault: %s uses legacy flat path %s (deprecated; run "
-            "'search-gateway vault migrate' — removed 0.4.3)", kind, legacy)
-        return str(legacy)
-    return str(configured)
+    return str(Path(_CONFIG_PATHS.get(kind, "")).expanduser())
 
 
 def load_secrets(kind: str, keys: set[str]) -> dict[str, str]:
-    """Read a secret kind through the full resolution chain:
-    credentials-dir bridge → vault path → legacy path."""
+    """Read a secret kind through the resolution chain:
+    credentials-dir bridge → vault path."""
     path = env_file_for(kind)
     return _config.load_env_file_credential(kind, keys, fallback_path=path)
 
@@ -243,14 +233,13 @@ def hygiene() -> list[Finding]:
 
 
 def status() -> dict:
-    """Doctor section: layout, legacy fallbacks in use, hygiene findings."""
+    """Doctor section: layout + hygiene findings."""
     findings = hygiene()
     return {
         "persona": PERSONA,
         "vault_dir": str(vault_root()),
         "credentials_dir": _config.CREDENTIALS_DIR or None,
         "profiles": list_profiles(),
-        "legacy_in_use": dict(_legacy_used),
         "hygiene": {
             "ok": not any(f.severity in ("warn", "error") for f in findings),
             "findings": [f.as_dict() for f in findings],

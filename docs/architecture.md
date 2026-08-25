@@ -207,7 +207,7 @@ against `Result`, not against any individual source's shape.
 | `health.py` | `report()` / `check()` shared by the `doctor` tool + CLI |
 | `log.py` | structured logging (text/json → stderr) |
 | `orchestrator.py` | fan-out + fuse + re-rank + diversity pipeline |
-| `sources/` | 22 source adapters, all subclassing `Source` → `Result` |
+| `sources/` | 23 source adapters, all subclassing `Source` → `Result` |
 | `extract/` | v0.4 extraction layer: tier routing, block detection, browser budget/pacing, profile farm, fingerprints, env-gated proxies, HTTP impersonation, multi-shape parsing, Camoufox adapter |
 | `models.py` | `Result` dataclass (the universal contract) |
 | `fusion.py` | weighted RRF |
@@ -258,7 +258,7 @@ The boundary holds by four invariants:
 - **Everything machine-specific is an env override.** No hardcoded
   `~/.config/opencode/...` path survives in code; Redis, SearXNG, and secrets
   all arrive via environment variables (`docs/config-reference.md`).
-- **`Result` is the universal contract.** All 22 sources emit it; fusion,
+- **`Result` is the universal contract.** All 23 sources emit it; fusion,
   re-rank, dedup, and the report skills consume it. Any tool-surface or
   `meta` change is therefore a SemVer-major event.
 

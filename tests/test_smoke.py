@@ -29,7 +29,7 @@ EXPECTED_SOURCES = {
     "semantic_scholar", "stackoverflow", "twitter", "v2ex", "web",
     "xiaohongshu", "youtube",
     # CN tier (v0.4, gated)
-    "zhihu", "weibo", "baidu", "toutiao",
+    "zhihu", "zhihu_hot", "weibo", "baidu", "toutiao",
 }
 
 
@@ -42,8 +42,8 @@ def test_package_imports():
     import search_gateway.stats  # noqa: F401
 
 
-def test_all_22_sources_registered():
-    assert len(ALL_SOURCES) == 22, f"expected 22 sources, got {len(ALL_SOURCES)}"
+def test_all_23_sources_registered():
+    assert len(ALL_SOURCES) == 23, f"expected 23 sources, got {len(ALL_SOURCES)}"
     assert set(ALL_SOURCES) == EXPECTED_SOURCES
 
 

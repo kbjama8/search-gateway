@@ -32,10 +32,10 @@ def test_help_lists_subcommands():
         assert cmd in r.stdout
 
 
-def test_check_reports_22_sources_and_exit_code_matches_redis():
+def test_check_reports_23_sources_and_exit_code_matches_redis():
     r = _run("check")
     out = json.loads(r.stdout)
-    assert out["sources"] == 22
+    assert out["sources"] == 23
     assert "redis" in out and "llm" in out
     # exit 0 iff Redis is reachable (the strict gate)
     assert (r.returncode == 0) == bool(out["redis"].get("ok"))

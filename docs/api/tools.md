@@ -363,7 +363,7 @@ error instead of fetching:
 ### `doctor()`
 Health report: Redis, models, every source, academic latency/rate-limit status,
 ledger health, and (0.4.1+) the containment sections `egress`/`vault`/`blocks`/
-`profiles`. 22 sources + `redis`/`rerank`/`embed`/`llm`/`ledger` keys. Shared
+`profiles`. 23 sources + `redis`/`rerank`/`embed`/`llm`/`ledger` keys. Shared
 with the CLI via `health.report()` — `search-gateway doctor` prints the same
 JSON.
 
@@ -383,7 +383,8 @@ JSON.
   "profiles": {},
   "sources": { "searxng": "ok", "exa": "ok", "github": "ok", "youtube": "ok", "bilibili": "ok",
                "v2ex": "ok", "twitter": "down — auth expired", "reddit": "ok", "facebook": "down — login wall",
-               "instagram": "ok", "xiaohongshu": "ok", "linkedin": "ok", "web": "ok", "arxiv": "ok",
+               "instagram": "ok", "xiaohongshu": "ok", "linkedin": "ok", "web": "ok",
+               "zhihu_hot": "ok", "arxiv": "ok",
                "openalex": "ok", "crossref": "ok", "stackoverflow": "ok", "semantic_scholar": "ok" },
   "academic": {
     "arxiv": { "status": "ok", "latency_s": 0.41, "reliability": 1.0, "rate_limited": false },

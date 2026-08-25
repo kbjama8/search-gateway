@@ -27,7 +27,8 @@ SOURCE_TIERS: dict[str, tuple[str, ...]] = {
     "twitter": ("cli", "browser"), "reddit": ("browser",),
     "facebook": ("browser",), "instagram": ("browser",),
     "xiaohongshu": ("browser",), "linkedin": ("cli", "browser"),
-    "zhihu": ("api", "browser"), "weibo": ("api", "browser"),
+    "zhihu": ("api", "browser"), "zhihu_hot": ("api",),
+    "weibo": ("api", "browser"),
     "baidu": ("api",), "toutiao": ("api",),
 }
 

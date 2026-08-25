@@ -159,6 +159,7 @@ FALLBACK_CHAINS: dict[str, list[str]] = {
     "web": ["jina-reader", "skip"],
     # CN tier (v0.4): API first, browser as the last-resort tier
     "zhihu": ["zhihu-v4", "browser", "skip"],
+    "zhihu_hot": ["zhihu-hot-api", "skip"],
     "weibo": ["weibo-ajax", "weibo-hot", "browser", "skip"],
     "baidu": ["baidu-board", "skip"],
     "toutiao": ["toutiao-board", "skip"],

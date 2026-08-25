@@ -1,4 +1,4 @@
-"""Golden contract: 22 sources + 14 tools + Result surface unchanged.
+"""Golden contract: 23 sources + 14 tools + Result surface unchanged.
 
 Any change to a tool name, the source registry, or the `Result` shape is a
 SemVer-major event (see docs/api/tools.md + docs/meta-schema.md). These tests
@@ -19,7 +19,7 @@ EXPECTED_SOURCES = {
     "semantic_scholar", "stackoverflow", "twitter", "v2ex", "web",
     "xiaohongshu", "youtube",
     # CN tier (v0.4, gated)
-    "zhihu", "weibo", "baidu", "toutiao",
+    "zhihu", "zhihu_hot", "weibo", "baidu", "toutiao",
 }
 
 EXPECTED_TOOLS = {
@@ -38,8 +38,8 @@ EXPECTED_META_KEYS = {
 }
 
 
-def test_22_sources_registered():
-    assert len(ALL_SOURCES) == 22
+def test_23_sources_registered():
+    assert len(ALL_SOURCES) == 23
     assert set(ALL_SOURCES) == EXPECTED_SOURCES
 
 

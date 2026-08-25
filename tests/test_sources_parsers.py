@@ -759,10 +759,153 @@ async def test_toutiao_board(monkeypatch):
     assert out[1].meta["is_new"] is True
 
 
+
+# --------------------------------------------------------------------------
+# Baidu board (0.4.3: dual-shape parser + drift guard, PHASE8 Plan 1)
+# --------------------------------------------------------------------------
+
+_BAIDU_LEGACY = {"data": {"cards": [
+    {"word": "旧版热搜", "hotScore": 123456, "index": 1,
+     "url": "https://www.baidu.com/s?wd=x", "is_hot": True},
+    {"word": "旧版第二", "hotScore": 100, "index": 2},
+]}}
+
+
+def _baidu_fixture() -> dict:
+    import json as _json
+    from pathlib import Path
+    return _json.loads(
+        Path(__file__).parent.joinpath(
+            "fixtures/platforms/baidu_board.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.asyncio
+async def test_baidu_board_current_shape(monkeypatch):
+    import search_gateway.sources.baidu as bd
+    monkeypatch.setattr(bd, "CN_SOURCES", True)
+    async def _fake(*_a, **_k):
+        return _baidu_fixture()
+    monkeypatch.setattr(bd, "get_json", _fake)
+    out = await bd.BaiduSource().search("", limit=50)
+    assert len(out) >= 30
+    first = out[0]
+    assert first.title and first.url.startswith("http")
+    assert first.meta["rank"] >= 0
+    assert "heat" in first.meta
+    assert "pinned" in first.meta
+    # query filtering works on the current shape
+    top = out[0].title
+    filtered = await bd.BaiduSource().search(top[:6])
+    assert filtered and filtered[0].title == top
+
+
+@pytest.mark.asyncio
+async def test_baidu_board_legacy_shape(monkeypatch):
+    import search_gateway.sources.baidu as bd
+    monkeypatch.setattr(bd, "CN_SOURCES", True)
+    async def _fake(*_a, **_k):
+        return _BAIDU_LEGACY
+    monkeypatch.setattr(bd, "get_json", _fake)
+    out = await bd.BaiduSource().search("")
+    assert len(out) == 2
+    assert out[0].title == "旧版热搜"
+    assert out[0].meta["heat"] == 123456
+    assert out[0].meta["is_hot"] is True
+
+
+@pytest.mark.asyncio
+async def test_baidu_board_shape_drift_raises(monkeypatch):
+    import search_gateway.sources.baidu as bd
+    monkeypatch.setattr(bd, "CN_SOURCES", True)
+    # cards present but structurally unrecognized → loud drift, never [].
+    async def _fake(*_a, **_k):
+        return {"data": {"cards": [{"bogus": 1}]}}
+    monkeypatch.setattr(bd, "get_json", _fake)
+    with pytest.raises(SourceError, match="shape drift"):
+        await bd.BaiduSource().search("")
+
+
+@pytest.mark.asyncio
+async def test_baidu_board_empty_cards_is_empty_board(monkeypatch):
+    import search_gateway.sources.baidu as bd
+    monkeypatch.setattr(bd, "CN_SOURCES", True)
+    async def _fake(*_a, **_k):
+        return {"data": {"cards": []}}
+    monkeypatch.setattr(bd, "get_json", _fake)
+    assert await bd.BaiduSource().search("") == []
+
+
+# --------------------------------------------------------------------------
+# Zhihu hot list (0.4.3: anonymous hot-list source, PHASE8 Plan 2)
+# --------------------------------------------------------------------------
+
+
+def _zhihu_hot_fixture() -> dict:
+    import json as _json
+    from pathlib import Path
+    return _json.loads(
+        Path(__file__).parent.joinpath(
+            "fixtures/platforms/zhihu_hot.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.asyncio
+async def test_zhihu_hot_parses_fixture(monkeypatch):
+    import search_gateway.sources.zhihu_hot as zh
+    monkeypatch.setattr(zh, "CN_SOURCES", True)
+    async def _fake(*_a, **_k):
+        return _zhihu_hot_fixture()
+    monkeypatch.setattr(zh, "get_json", _fake)
+    out = await zh.ZhihuHotSource().search("", limit=10)
+    assert len(out) == 10
+    first = out[0]
+    # URL rewritten to the human surface
+    assert first.url.startswith("https://www.zhihu.com/question/")
+    assert "api.zhihu.com" not in first.url
+    assert first.meta["rank"] == 1
+    assert first.meta["answer_count"] >= 0
+    assert first.meta["follower_count"] is not None
+    assert first.title
+    # query filtering
+    q = first.title[:8]
+    filtered = await zh.ZhihuHotSource().search(q, limit=10)
+    assert filtered and filtered[0].title == first.title
+
+
+@pytest.mark.asyncio
+async def test_zhihu_hot_limit_capped_at_30(monkeypatch):
+    import search_gateway.sources.zhihu_hot as zh
+    monkeypatch.setattr(zh, "CN_SOURCES", True)
+    async def _fake(*_a, **_k):
+        return _zhihu_hot_fixture()
+    monkeypatch.setattr(zh, "get_json", _fake)
+    out = await zh.ZhihuHotSource().search("", limit=50)
+    assert len(out) == 30  # endpoint cap
+
+
+@pytest.mark.asyncio
+async def test_zhihu_hot_shape_drift_raises(monkeypatch):
+    import search_gateway.sources.zhihu_hot as zh
+    monkeypatch.setattr(zh, "CN_SOURCES", True)
+    async def _fake(*_a, **_k):
+        return {"data": "junk"}
+    monkeypatch.setattr(zh, "get_json", _fake)
+    with pytest.raises(SourceError, match="shape drift"):
+        await zh.ZhihuHotSource().search("")
+
+
+@pytest.mark.asyncio
+async def test_zhihu_hot_cn_gated(monkeypatch):
+    import search_gateway.sources.zhihu_hot as zh
+    monkeypatch.setattr(zh, "CN_SOURCES", False)
+    with pytest.raises(SourceError, match="disabled"):
+        await zh.ZhihuHotSource().search("x")
+
+
 @pytest.mark.asyncio
 async def test_cn_sources_disabled_by_default():
     import search_gateway.sources.baidu as bd
     import search_gateway.sources.toutiao as tt
-    for src in (bd.BaiduSource(), tt.ToutiaoSource()):
+    import search_gateway.sources.zhihu_hot as zh
+    for src in (bd.BaiduSource(), zh.ZhihuHotSource(), tt.ToutiaoSource()):
         with pytest.raises(SourceError, match="disabled"):
             await src.search("x")

@@ -54,7 +54,7 @@ higher one, and nothing in a higher tier is required to use a lower one.
 git clone <this-repo> && cd search-gateway
 pip install .                  # or: pip install -e . for development
 search-gateway --help
-search-gateway check           # gate: 22 sources + Redis reachable
+search-gateway check           # gate: 23 sources + Redis reachable
 ```
 
 Optional report-tooling extras:
@@ -128,8 +128,10 @@ search-gateway vault status              # layout + hygiene (modes, symlinks, st
 search-gateway doctor                    # `vault` section: hygiene ok + no legacy_in_use
 ```
 
-Legacy flat paths are still honored for one release with a doctor deprecation
-warning (removed in 0.4.3). `gateway.env` for tests (`~/.agent-reach/gateway.env`)
+The legacy flat paths (`~/.agent-reach/twitter-auth.env` etc.) were honored
+through 0.4.2 and **removed in 0.4.3** (D7.3) — migrate before upgrading past
+0.4.2 on any machine that never ran the migration. `gateway.env` for tests
+(`~/.agent-reach/gateway.env`)
 is the *test* environment, not a profile secret — the migration leaves it in
 place by design.
 
@@ -227,7 +229,7 @@ flowchart TD
 
 **Reading `doctor`.** Run `search-gateway doctor` and read top-down: `redis`
 and `sources` are the two fields `search-gateway check`'s exit code depends
-on (`health.check()` fails if `len(ALL_SOURCES) != 22` or `redis.ok` is
+on (`health.check()` fails if `len(ALL_SOURCES) != 23` or `redis.ok` is
 false); `rerank`/`embed`/`llm` are soft signals that degrade the pipeline
 without failing it. Since 0.4.1 the report also carries the containment
 sections — `egress` (floor state + denial counters), `vault` (hygiene),
@@ -281,7 +283,7 @@ and an AOF backup is the only way to recover saved queries after it.
 ```bash
 pip install -U .                    # or: pip install -U search-gateway (if published)
 search-gateway version              # confirm the bump
-search-gateway check                # re-verify 22 sources + Redis after upgrade
+search-gateway check                # re-verify 23 sources + Redis after upgrade
 ```
 
 A minor bump (e.g. `0.2.0` → `0.3.0`) may add a tool — re-read

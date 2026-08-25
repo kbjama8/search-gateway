@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-08-23
+
+"CN truth + vault finalization" (PHASE8 Plan 1/2/3/5 + D7.3).
+
+### Fixed
+- **Baidu hot board was silently broken** (R12, live-verified 2026-08-23):
+  the endpoint's JSON structure changed (`cards[]` with `word`/`hotScore` →
+  `tabTextList` with nested `content[].content[]` items carrying
+  `word`/`url`/`index`/`hotTag`/`newHotName`), so the parser returned
+  empty results. Dual-shape parser now handles both shapes, and a
+  **shape-drift guard** raises `SourceError` on any 200-with-cards-but-
+  unparseable response — the silent-empty failure mode is closed for good.
+
+### Added
+- **Zhihu hot-list source** (`zhihu_hot`, R11): the anonymous
+  `api.zhihu.com/topstory/hot-list` endpoint (verified live, 30-item cap)
+  gives zhihu a zero-cookie presence alongside the cookie-gated v4 search;
+  URLs rewritten to the human surface; registry 22 → **23 sources** (contract
+  + `check` gate updated in the same commit).
+- Fixtures for both CN fixes under `tests/fixtures/platforms/` (recorded
+  live captures).
+- `docs/extraction/stealth-matrix.md` (R2): nodriver vs Patchright vs
+  Camoufox capability matrix + adoption triggers — insurance, not adoption.
+- `docs/adrs/0007-cn-signing-deferred.md` (Plan 5): Douyin/XHS stay deferred
+  with explicit revival triggers (XHS drift + 406 since Mar 2026; Douyin
+  x-gorgon emulation cost).
+- `docs/extraction/PHASE8-PLAN.md`: the approved consolidation plan.
+
+### Changed
+- **D7.3 lands**: legacy flat secret paths (`~/.agent-reach/twitter-auth.env`
+  etc.) are **removed** — `env_file_for` resolves the vault path only;
+  `migrate()` remains as the migration path for never-migrated machines
+  (migrate before upgrading past 0.4.2). Doctor `vault` section drops
+  `legacy_in_use`.
+
 ## [0.4.2] - 2026-08-23
 
 Phase 7 (containment & observability), release 2 of 2 — the sharp end:

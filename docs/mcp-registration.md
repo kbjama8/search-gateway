@@ -161,7 +161,7 @@ curl http://127.0.0.1:8765/mcp/
 ```
 
 `tests/test_mcp_handshake.py` automates the stdio handshake (bare command and
-explicit `serve`); `tests/test_contract.py` asserts the 22 sources + 14 tools +
+explicit `serve`); `tests/test_contract.py` asserts the 23 sources + 14 tools +
 `Result.meta` keys are unchanged.
 
 ## Troubleshooting

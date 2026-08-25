@@ -230,9 +230,10 @@ These are *paths* to files containing `KEY=VALUE` secrets, parsed by
 Since 0.4.1 the defaults live in the **per-persona vault** (0600, decision
 D7.3). Resolution chain per secret kind: `SEARCH_GATEWAY_CREDENTIALS_DIR`
 (systemd `$CREDENTIALS_DIRECTORY` bridge — files arrive via `LoadCredential=`,
-never env vars) → the configured path → the legacy flat path (`~/.agent-reach/
-<name>.env`, honored one release with a doctor deprecation warning, removed
-0.4.3). Migrate with `search-gateway vault migrate`; inspect with `vault status`.
+never env vars) → the configured vault path. The legacy flat paths
+(`~/.agent-reach/<name>.env`) were honored through 0.4.2 and **removed in
+0.4.3** — migrate with `search-gateway vault migrate` before upgrading past
+0.4.2; inspect with `vault status`.
 
 ## Observability / serving
 
@@ -322,6 +323,10 @@ defaults. Full rationale: `docs/extraction/PLAN.md`.*
 | `WEIBO_SUB` | `""` | logged-in `SUB` cookie (weibo keyword search; hot list works without) |
 | `SEARCH_GATEWAY_BILIBILI_WBI` | `1` | wbi signing for bilibili (always on; keys Redis-cached) |
 | `SEARCH_GATEWAY_BILIBILI_WBI_KEY_TTL` | `82800` | wbi key cache TTL (23h — keys rotate daily) |
+
+The CN tier's anonymous members: **baidu** + **toutiao** hot boards and
+**zhihu_hot** (the zero-cookie hot list, R11) work with no cookies at all;
+**zhihu** search and **weibo** keyword search need `ZHIHU_COOKIE` / `WEIBO_SUB`.
 | `SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN` | `""` | yt-dlp PO-token provider plugin (e.g. `bgutil-ytdlp-pot-provider`) |
 | `SEARCH_GATEWAY_YOUTUBE_PO_SERVER` | `http://127.0.0.1:4416` | PO-token HTTP server URL when a provider plugin needs one |
 

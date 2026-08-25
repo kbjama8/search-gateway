@@ -423,7 +423,7 @@ Source: github.com/lexiforest/curl_cffi.
 | # | Question | Feeds |
 |---|----------|-------|
 | R1 | ~~Camoufox API basics~~ → **DONE**: browserforge fingerprints, `os`/`Screen`/`fingerprint_preset` params (camoufox.com/python/usage). Remaining: proxy param + humanize surface — verify at Phase 3 | Phase 3 |
-| R2 | nodriver vs Patchright capability matrix on our target set | DR-1 |
+| R2 | ~~nodriver vs Patchright capability matrix~~ → **DONE**: stealth-matrix.md (nodriver clean 31-target pass; Patchright none) — fixture vault still DR-1 | DR-1 |
 | R3 | ~~Zhihu search API~~ → **DONE**: endpoint + params + cookie contract (§3.7). Remaining: hot-list endpoint verify | Phase 6 |
 | R4 | ~~Weibo ajax endpoints~~ → **DONE**: hotSearch visitor-cookie; SUB-gated search (§3.8) | Phase 6 |
 | R5 | ~~yt-dlp PO-token plugins~~ → **DONE**: bgutil-provider + getpot-wpc (§3.9) | Phase 4/6 |
@@ -432,8 +432,8 @@ Source: github.com/lexiforest/curl_cffi.
 | R8 | ~~firejail vs systemd sandboxing for browser tier~~ → **DONE**: firejail REJECTED (suid + CVE history); systemd eBPF for the service + **nftables cgroupv2** for per-process egress (L3, §1.5) | Phase 7 |
 | R9 | ~~Cloudflare challenge markers~~ → **DONE**: `cf-mitigated: challenge` official header (§1.4); remaining: DataDome/Kasada/Akamai marker catalog — DR-1 fixture task | Phase 4 |
 | R10 | IPRoyal/SOXA API specifics: geo grammar, sticky TTL caps, dashboard/API provisioning | Phase 3.5 |
-| R11 | Zhihu hot-list JSON endpoint (public?) | Phase 6 |
-| R12 | Baidu `top.baidu.com/api/board` + Toutiao hot-board live verification | Phase 6 |
+| R11 | ~~Zhihu hot-list JSON endpoint (public?)~~ → **DONE**: `api.zhihu.com/topstory/hot-list` anonymous, 30-item cap (PHASE8 §2.1); shipped as `zhihu_hot` (0.4.3) | Phase 6 |
+| R12 | ~~Baidu/Toutiao live verification~~ → **DONE**: toutiao fine; **baidu BROKEN** (tabTextList shape, no hotScore) → fixed with dual-shape parser + drift guard (0.4.3) | Phase 6 |
 | R13 | ~~IMDS/SSRF incident class: always-blocked floor~~ → **DONE**: link-local `169.254.0.0/16` bypass → IAM theft; floor checked pre-nav AND post-redirect (hermes-agent PR #21228) (§1.5) | Phase 7 |
 | R14 | ~~systemd credentials for secrets~~ → **DONE**: `LoadCredential=`/`$CREDENTIALS_DIRECTORY`; env vars rejected for secrets (systemd.io/CREDENTIALS, #40333) (§1.5) | Phase 7 |
 | R15 | ~~Chrome 136+ automation constraints~~ → **DONE**: non-default user-data-dir required for remote debugging; CfT recommended (§1.5) | Phase 7 |
@@ -498,3 +498,20 @@ Source: github.com/lexiforest/curl_cffi.
     only (D7.2); kernel filter `required` by default with an explicit
     `permissive` escape for sandboxed CI (D7.1); `nft` rules are kernel state
     and survive service restarts.
+- **2026-08-23 (PHASE8 / 0.4.3 build)** — consolidation: baidu repair,
+  zhihu_hot, D7.3 legacy removal, stealth-matrix, ADR-0007:
+  - **Live probe discipline paid off**: R12 was not a theory — baidu's
+    board had drifted to the `tabTextList` shape (no `hotScore`) and the
+    shipped parser was returning silent empties. The fix pairs a dual-shape
+    parser with a **shape-drift guard**: 200-with-cards-but-unparseable →
+    SourceError, never `[]`. Guard applied to zhihu_hot too; toutiao's
+    existing parser is verified against the live shape.
+  - **zhihu_hot**: `api.zhihu.com/topstory/hot-list` is the zero-cookie win
+    (the `hot-lists/total` variant 401s); 30-item endpoint cap; URLs come
+    back as `api.zhihu.com/questions/<id>` and must be rewritten to the
+    human surface.
+  - **D7.3 executed on schedule**: legacy flat paths removed at runtime
+    (vault path only); `migrate()` kept as the migration source so
+    never-migrated machines have an upgrade path.
+  - **Registry 22 → 23** — contract test + `check` gate + every doc count
+    updated in the same commit (the repo's own rule).

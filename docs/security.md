@@ -96,7 +96,7 @@ echoed back into a tool's return value.
 - Secrets live in the per-persona vault `~/.agent-reach/profiles/<persona>/`
   (0600 files, 0700 dirs) — outside the repo. Migrate legacy flat files with
   `search-gateway vault migrate` (decision D7.3); legacy paths are honored one
-  release with a doctor deprecation warning (removed 0.4.3).
+  release window (D7.3) — removed in 0.4.3; migrate before upgrading past 0.4.2.
 - `.env.example` ships placeholders only; `.gitignore` blocks `.env`, `*.env`,
   `*.pem`, `*.key`, `*.log`.
 - The systemd unit reads `~/.config/search-gateway/gateway.env` (0600) via

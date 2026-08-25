@@ -23,6 +23,7 @@ from .weibo import WeiboSource
 from .xiaohongshu import XiaohongshuSource
 from .youtube import YouTubeSource
 from .zhihu import ZhihuSource
+from .zhihu_hot import ZhihuHotSource
 
 ALL_SOURCES: dict[str, Source] = {
     s.name: s
@@ -47,6 +48,7 @@ ALL_SOURCES: dict[str, Source] = {
         SemanticScholarSource(),
         # Chinese-ecosystem tier (v0.4, gated by SEARCH_GATEWAY_CN_SOURCES)
         ZhihuSource(),
+        ZhihuHotSource(),
         WeiboSource(),
         BaiduSource(),
         ToutiaoSource(),

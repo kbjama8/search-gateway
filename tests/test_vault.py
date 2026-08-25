@@ -18,7 +18,6 @@ def vault_env(tmp_path, monkeypatch):
     monkeypatch.setattr(vault, "VAULT_DIR", str(tmp_path))
     monkeypatch.setattr(vault, "PERSONA", "kaiser")
     monkeypatch.setattr("search_gateway.config.CREDENTIALS_DIR", "")
-    monkeypatch.setattr(vault, "_legacy_used", {})
     vault._CONFIG_PATHS["twitter"] = str(tmp_path / "kaiser" / "twitter.env")
     vault._CONFIG_PATHS["deepseek"] = str(tmp_path / "kaiser" / "deepseek.env")
     vault._CONFIG_PATHS["proxy"] = str(tmp_path / "kaiser" / "proxy.env")
@@ -77,23 +76,23 @@ class TestEnvFileResolution:
         _write(vault_env / "kaiser" / "twitter.env", "TWITTER_AUTH_TOKEN=abc\n")
         assert vault.env_file_for("twitter") == str(
             vault_env / "kaiser" / "twitter.env")
-        assert "twitter" not in vault._legacy_used
 
-    def test_legacy_fallback_flags_deprecation(self, vault_env):
-        legacy = _write(vault_env / "legacy" / "twitter-auth.env",
-                        "TWITTER_AUTH_TOKEN=abc\n")
-        assert vault.env_file_for("twitter") == str(legacy)
-        assert vault._legacy_used["twitter"] == str(legacy)
-        st = vault.status()
-        assert "twitter" in st["legacy_in_use"]
+    def test_legacy_paths_no_longer_honored(self, vault_env):
+        # D7.3: the legacy flat paths are migration-source only since 0.4.3 —
+        # env_file_for returns the configured vault path even when a legacy
+        # file still exists (a never-migrated machine must migrate first)
+        _write(vault_env / "legacy" / "twitter-auth.env",
+               "TWITTER_AUTH_TOKEN=abc\n")
+        assert vault.env_file_for("twitter") == str(
+            vault_env / "kaiser" / "twitter.env")
+        assert vault.load_secrets("twitter", {"TWITTER_AUTH_TOKEN"}) == {}
 
     def test_load_secrets_through_chain(self, vault_env):
-        _write(vault_env / "legacy" / "deepseek.env", "DEEPSEEK_API_KEY=sk-legacy\n")
-        assert vault.load_secrets("deepseek", {"DEEPSEEK_API_KEY"}) == {
-            "DEEPSEEK_API_KEY": "sk-legacy"}
         _write(vault_env / "kaiser" / "deepseek.env", "DEEPSEEK_API_KEY=sk-vault\n")
         assert vault.load_secrets("deepseek", {"DEEPSEEK_API_KEY"}) == {
             "DEEPSEEK_API_KEY": "sk-vault"}
+        # missing file → explicit empty (callers degrade, never crash)
+        assert vault.load_secrets("proxy", {"K"}) == {}
 
     def test_credentials_dir_bridge_wins(self, vault_env, monkeypatch):
         _write(vault_env / "cred" / "deepseek.env", "DEEPSEEK_API_KEY=sk-cred\n")

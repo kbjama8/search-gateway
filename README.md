@@ -328,9 +328,9 @@ tools" is a testable claim here, not a hope.
 | social | twitter, reddit, facebook, instagram, xiaohongshu, linkedin |
 | forum | v2ex |
 | academic | arxiv, openalex, crossref, semantic_scholar |
-| CN tier (opt-in) | zhihu, weibo, baidu, toutiao — enabled with `SEARCH_GATEWAY_CN_SOURCES=1` |
+| CN tier (opt-in) | zhihu, zhihu_hot, weibo, baidu, toutiao — enabled with `SEARCH_GATEWAY_CN_SOURCES=1` |
 
-Sources degrade explicitly by capability tier — `search-gateway doctor`
+Sources degrade explicitly by capability tier (23 registered) — `search-gateway doctor`
 doubles as the tier report, and `docs/deployment.md` maps each tier to the
 binaries and env vars it needs. Adding source #23 is a bounded, four-step
 change documented in `docs/architecture.md`'s source-adapter contract.

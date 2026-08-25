@@ -278,12 +278,17 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
       **bench browser tier** (slow-marked) + **hardened systemd unit**
       (LoadCredential, NoNewPrivileges, ProtectSystem=strict, IPAddressDeny);
       config 82 vars; 296 fast tests green, ruff clean, coverage 86.8%
-- [x] Phase 8 (partial) — contract tests 22 sources, envelope 0.4 fields,
+- [x] Phase 8 follow-ups (0.4.3, `PHASE8-PLAN.md`) — baidu shape repair +
+      drift guard, zhihu_hot source (registry 23), D7.3 legacy removal,
+      stealth-matrix doc, ADR-0007 (douyin/XHS deferral); 307 fast tests
+      green, ruff clean, coverage 86.8%
+- [x] Phase 8 (partial) — contract tests 23 sources, envelope 0.4 fields,
       config-reference/api-tools/README/architecture/project-map/faq/
       deployment/security updated, CHANGELOG 0.4.0, version bumped
 
-> Note: plan predicted 23 sources; actual is **22** (douyin deferred per D3;
-> when XHS/douyin signing lands the registry grows again).
+> Note: plan predicted 23 sources; actual is **23** (douyin + XHS deferred
+> per D3/ADR-0007; zhihu_hot joined in 0.4.3 — when XHS/douyin signing lands
+> the registry grows again).
 
 ## 10. Open questions
 

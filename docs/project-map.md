@@ -121,7 +121,7 @@ search-gateway/
 │   ├── ratelimit.py           # cross-process rate gate + daily budget
 │   ├── saved_queries.py       # recurring queries + {new, removed, unchanged} diff
 │   ├── log.py                 # text|json → stderr ONLY (stdout is the MCP wire)
-│   ├── sources/               # 22 adapters + base.py (Source, run_cmd, run_opencli)
+│   ├── sources/               # 23 adapters + base.py (Source, run_cmd, run_opencli)
 │   └── extract/               # v0.4: parse, detectors, router, scheduler,
 │                              # profiles, fingerprints, proxies, http, camoufox,
 │                              # egress (L1 floor + L2 proxy), vault, harden (L3 kernel)
@@ -193,8 +193,8 @@ partial, pending[], elapsed_ms, stage_ms{fanout, fusion_dedup, rerank, mmr}}`
 
 ## Source adapters
 
-22 adapters in `search_gateway/sources/`, all registered in `ALL_SOURCES`
-(`sources/__init__.py:23`) — the single registry the orchestrator, `doctor`,
+23 adapters in `search_gateway/sources/`, all registered in `ALL_SOURCES`
+(`sources/__init__.py`) — the single registry the orchestrator, `doctor`,
 and `search-gateway check` read from. Three implementation patterns:
 
 | Pattern | Mechanism | Sources |
