@@ -360,10 +360,13 @@ async def search(query: str, sources: list[str] | None, category: str = "general
             statuses[name] = "pending (timeout)"
         fut.cancel()
 
-    # Phase 2: expansion fan-out ONLY when the base results are weak
-    # (gated rewrite — variants are worth the latency when the base is thin).
+    # Phase 2: expansion fan-out ONLY when the base results are weak AND the
+    # caller did not pin sources. Expanding into searxng/exa for an explicit
+    # `sources=[...]` request would silently lie about provenance — the
+    # envelope's `sources`/`extract` fields must name every source that
+    # contributed (smoke-test discovery 2026-08-25).
     base_total = sum(len(rl) for rl in ranked_lists)
-    if expand and _expansion_needed(base_total):
+    if expand and sources is None and _expansion_needed(base_total):
         variants = await _expand_query(query)
         if variants:
             tasks2 = {asyncio.ensure_future(

@@ -716,3 +716,64 @@ def test_mmr_per_category_lambda(monkeypatch, rds):
     assert orch._category_lambda("news") == 0.7
     assert orch._category_lambda("science") == 0.8
     assert orch._category_lambda("unknown") == 0.75
+
+
+# --------------------------------------------------------------------------
+# I9 — expansion must not silently add sources to an explicit-sources request
+# (smoke-test discovery 2026-08-25: sources=["reddit"] fused searxng/exa)
+# --------------------------------------------------------------------------
+
+def _expansion_probe(monkeypatch, rds):
+    from search_gateway import orchestrator as orch
+    from search_gateway.sources.base import Source
+
+    class EmptySource(Source):
+        name = "reddit"
+
+        async def search(self, query, limit=10):
+            return []
+
+    def fake_get_sources(names):
+        # one empty source per request — enough to drive the fan-out flow
+        return [EmptySource()]
+
+    monkeypatch.setattr(orch, "get_sources", fake_get_sources)
+    monkeypatch.setattr(orch, "QUERY_EXPANSION", True)
+    monkeypatch.setattr(orch, "EXPANSION_GATE_RESULTS", 6)
+    monkeypatch.setattr(orch, "SEMANTIC_RERANK", False)
+    monkeypatch.setattr(orch, "MMR_ENABLED", False)
+    monkeypatch.setattr(orch, "EMBEDDING_DEDUP", False)
+    calls: list[str] = []
+
+    async def fake_expand(q):
+        calls.append(q)
+        return []
+
+    monkeypatch.setattr(orch, "_expand_query", fake_expand)
+    return orch, calls
+
+
+def test_expansion_not_run_for_explicit_sources(monkeypatch, rds):
+    orch, calls = _expansion_probe(monkeypatch, rds)
+
+    async def run():
+        out = await orch.search("rust async", ["reddit"], category="general",
+                                limit=3)
+        assert calls == []  # pinned sources → no silent expansion
+        assert out["sources"] == {"reddit": "ok (0)"}
+        assert out["results"] == []
+        assert out["extract"] == {"reddit": {"tier": "browser"}}
+
+    import asyncio
+    asyncio.run(run())
+
+
+def test_expansion_runs_for_default_fanout(monkeypatch, rds):
+    orch, calls = _expansion_probe(monkeypatch, rds)
+
+    async def run():
+        await orch.search("rust async", None, category="general", limit=3)
+        assert calls == ["rust async"]  # default fan-out still enriches
+
+    import asyncio
+    asyncio.run(run())
