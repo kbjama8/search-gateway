@@ -175,12 +175,18 @@ spawns its own children):
 systemd-run --user --scope --unit=sg-egress -- search-gateway serve
 ```
 
-**systemd deployment**: the hardened unit's `ExecStartPre` chain runs
-`harden --install` (writes the ruleset for the unit's own cgroup — browser
-children inherit it), then **auto-loads it** with `sudo nft -f
-~/.config/search-gateway/sg-egress.nft`, then reports `harden --status`.
-Because nft rules are volatile (they do NOT survive reboot), the auto-load
-needs a sudoers drop-in — create it once (PHASE8 Plan 7, option B):
+**systemd deployment**: the gateway unit keeps the full namespace sandbox
+(ProtectSystem=strict etc.) and only *verifies* state (`harden --status`,
+non-fatal). The privileged load lives in the **companion loader unit**
+`search-gateway-harden.service` — a deliberately NON-sandboxed unit (the
+sandbox runs --user units in a user namespace where sudo cannot setuid,
+live-verified 2026-08-25) that runs `After=` the gateway, installs the
+ruleset for the gateway unit's cgroup (`harden --install --for
+search-gateway@8765.service` — children inherit that cgroup, no transient
+scope needed), loads it via the sudoers drop-in, and records the receipt.
+Because nft rules are volatile (they do NOT survive reboot), the loader
+makes the floor survive reboots — create the sudoers drop-in once (PHASE8
+Plan 7, option B):
 
 ```bash
 sudo tee /etc/sudoers.d/search-gateway-nft > /dev/null <<'SUDOERS'

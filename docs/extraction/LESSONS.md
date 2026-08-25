@@ -515,3 +515,36 @@ Source: github.com/lexiforest/curl_cffi.
     never-migrated machines have an upgrade path.
   - **Registry 22 → 23** — contract test + `check` gate + every doc count
     updated in the same commit (the repo's own rule).
+- **2026-08-25 (ops batch, PHASE8 Plans 6-7)** — service + filter live; the
+  containment layer's biggest lessons yet:
+  - **The --user sandbox vs setuid law**: ANY namespace-based sandbox property
+    (ProtectSystem=strict, ProtectHome, ProtectKernel*, ProtectControlGroups,
+    LockPersonality, PrivateTmp) runs a --user unit in a user namespace
+    mapping only the invoking uid — root-owned files read as overflow uid
+    65534, so sudo (and any setuid binary) refuses with "must be owned by
+    uid 0". NoNewPrivileges is a second, independent blocker. In-unit
+    privileged loading is impossible BY DESIGN in --user units.
+  - **Resolution**: the privileged nft load moved to a dedicated NON-sandboxed
+    companion unit (search-gateway-harden.service) running After= the
+    gateway; it installs rules for the gateway unit's cgroup (`--for` flag,
+    resolved via systemctl show ControlGroup), loads via the sudoers drop-in,
+    and records a mark-installed receipt. The gateway unit keeps the full
+    sandbox and only verifies.
+  - **Kernel-floor loopback exemption is load-bearing**: dropping
+    127.0.0.0/8 locked the scoped process out of its own CDP/extension/proxy
+    machinery — and, in a mis-scoped experiment, out of Redis entirely
+    (connect timeouts across the whole session). Loopback is exempt; the
+    floor absolutely blocks link-local/IMDS, RFC1918, CGNAT, v6 equivalents.
+  - **nft loads validate the cgroup path at load time** — the target cgroup
+    must exist (boot-time loads fail on not-yet-created unit cgroups; the
+    companion's After= ordering solves it). systemd's escaped slice names
+    (app-search\x2dgateway.slice) are accepted verbatim while alive.
+  - **Unprivileged `nft list table` fails EPERM** — the enforcement probe
+    falls back to the loader's installed_at receipt (the loader's success IS
+    kernel-verified: `nft -f` both validates and applies).
+  - **Test hygiene regression**: a CLI smoke test writing state to the REAL
+    ~/.config/search-gateway/harden.json left a bogus installed_at (kernel
+    had no table) — tests must patch STATE_PATH. Fixed.
+  - **Service verified end-to-end**: 401 without token; MCP handshake over
+    HTTP (initialize -> session -> tools/list = 14 tools); sg_egress table
+    live in the kernel; loopback intact.

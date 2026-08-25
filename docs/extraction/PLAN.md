@@ -278,6 +278,10 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
       **bench browser tier** (slow-marked) + **hardened systemd unit**
       (LoadCredential, NoNewPrivileges, ProtectSystem=strict, IPAddressDeny);
       config 82 vars; 296 fast tests green, ruff clean, coverage 86.8%
+- [x] Ops batch (PHASE8 Plans 6-7) — systemd service ENABLED + verified
+      (HTTP + auth + session); L3 filter LIVE via the companion loader unit
+      (`search-gateway-harden.service`, sandbox-safe by design); reboot
+      persistence via the sudoers drop-in; see LESSONS §2026-08-25 (ops)
 - [x] Phase 8 follow-ups (0.4.3, `PHASE8-PLAN.md`) — baidu shape repair +
       drift guard, zhihu_hot source (registry 23), D7.3 legacy removal,
       stealth-matrix doc, ADR-0007 (douyin/XHS deferral); 307 fast tests

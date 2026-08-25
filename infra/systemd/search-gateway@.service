@@ -48,7 +48,8 @@ Environment=SEARCH_GATEWAY_LOG_FMT=json
 # sudo cannot setuid) — the companion unit search-gateway-harden.service owns
 # the privileged load; this unit only verifies + reports state.
 ExecStartPre=%h/.local/bin/search-gateway check
-ExecStartPre=%h/.local/bin/search-gateway harden --status
+# non-fatal: reports state; the loader unit performs the install
+ExecStartPre=-%h/.local/bin/search-gateway harden --status
 ExecStart=%h/.local/bin/search-gateway serve --transport http --host 127.0.0.1 --port %i
 Restart=on-failure
 RestartSec=3
