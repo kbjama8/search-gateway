@@ -15,9 +15,11 @@
 #     Redis/SearXNG; 169.254.0.0/16 covers IMDS).
 #   * L3 kernel filter for the browser children: ExecStartPre installs the
 #     ruleset for THIS unit's cgroup (browser children inherit it) and reports
-#     state. `harden --install` without --sudo writes the ruleset and marks it
-#     pending; load it once with:  sudo nft -f %h/.config/search-gateway/sg-egress.nft
-#     (or enable passwordless `sudo nft` and uncomment the sudo line below).
+#     state. Auto-load (option B, PHASE8 Plan 7): the sudoers drop-in
+#     /etc/sudoers.d/search-gateway-nft grants passwordless `nft -f` for
+#     exactly this ruleset, so the load happens on every start (nft rules are
+#     volatile — they do not survive reboot). Without the drop-in, load once
+#     by hand:  sudo nft -f %h/.config/search-gateway/sg-egress.nft
 #     Browser-tier ops refuse with the explicit "egress-unhardened" message
 #     until the table is live (SEARCH_GATEWAY_HARDEN=required, default).
 #
@@ -43,9 +45,10 @@ Environment=SEARCH_GATEWAY_CREDENTIALS_DIR=%d
 # Pre-flight gates
 ExecStartPre=%h/.local/bin/search-gateway check
 ExecStartPre=%h/.local/bin/search-gateway harden --install
+# Auto-load the L3 ruleset (option B — requires the sudoers drop-in in
+# /etc/sudoers.d/search-gateway-nft; without it, load once by hand)
+ExecStartPre=/usr/bin/sudo /usr/bin/nft -f %h/.config/search-gateway/sg-egress.nft
 ExecStartPre=%h/.local/bin/search-gateway harden --status
-# Optional fully-automated load (needs passwordless sudo for nft):
-# ExecStartPre=/usr/bin/sudo /usr/bin/nft -f %h/.config/search-gateway/sg-egress.nft
 ExecStart=%h/.local/bin/search-gateway serve --transport http --host 127.0.0.1 --port %i
 Restart=on-failure
 RestartSec=3

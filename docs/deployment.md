@@ -171,18 +171,23 @@ spawns its own children):
 systemd-run --user --scope --unit=sg-egress -- search-gateway serve
 ```
 
-**systemd deployment**: the hardened unit's `ExecStartPre` installs the
-ruleset for the unit's own cgroup (browser children inherit it) and reports
-state. Without `--sudo` the ruleset is written to
-`~/.config/search-gateway/sg-egress.nft` — load it once:
+**systemd deployment**: the hardened unit's `ExecStartPre` chain runs
+`harden --install` (writes the ruleset for the unit's own cgroup — browser
+children inherit it), then **auto-loads it** with `sudo nft -f
+~/.config/search-gateway/sg-egress.nft`, then reports `harden --status`.
+Because nft rules are volatile (they do NOT survive reboot), the auto-load
+needs a sudoers drop-in — create it once (PHASE8 Plan 7, option B):
 
 ```bash
-sudo nft -f ~/.config/search-gateway/sg-egress.nft
-# or, for fully automated loads: enable passwordless `sudo nft` and uncomment
-# the sudo ExecStartPre line in infra/systemd/search-gateway@.service
+sudo tee /etc/sudoers.d/search-gateway-nft > /dev/null <<'SUDOERS'
+Defaults:kbj !requiretty
+kbj ALL=(root) NOPASSWD: /usr/bin/nft -f /home/kbj/.config/search-gateway/sg-egress.nft
+SUDOERS
+sudo chmod 440 /etc/sudoers.d/search-gateway-nft
 ```
 
-`nft` rules survive service restarts (they are kernel state). Uninstall:
+Without the drop-in, load the ruleset by hand after each boot (`sudo nft -f
+~/.config/search-gateway/sg-egress.nft`). Uninstall:
 `search-gateway harden --uninstall`. Sandboxed CI that cannot run nft sets
 `SEARCH_GATEWAY_HARDEN=permissive` — the explicit opt-out, not the default.
 
