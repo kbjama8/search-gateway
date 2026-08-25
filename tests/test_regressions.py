@@ -777,3 +777,52 @@ def test_expansion_runs_for_default_fanout(monkeypatch, rds):
 
     import asyncio
     asyncio.run(run())
+
+
+# --------------------------------------------------------------------------
+# I10 — CLI banner noise must not silently empty a JSON parse
+# (smoke-test discovery 2026-08-25: systemd-run + opencli update banners)
+# --------------------------------------------------------------------------
+
+def test_parse_json_tolerates_banners():
+    from search_gateway.sources.base import _extract_json, parse_json_or_yaml
+
+    noisy = ('Running as unit: sg-egress.scope; invocation ID: 123\n'
+             '[{"title": "a", "url": "https://x/1"}, {"title": "b", "url": "https://x/2"}]\n'
+             '\n  Update available: v1.8.6 \u2192 v1.8.7\n  Run: npm install -g @x\n')
+    data = parse_json_or_yaml(noisy)
+    assert isinstance(data, list) and len(data) == 2
+    assert data[0]["title"] == "a"
+    assert _extract_json('prefix {"k": "v"} suffix') == '{"k": "v"}'
+
+def test_parse_json_banner_inside_string_not_confused():
+    from search_gateway.sources.base import _extract_json
+    tricky = '[{"snippet": "say \\"hi\\" then {x}", "url": "u"}]'
+    assert _extract_json(tricky) == tricky
+    import json
+    assert json.loads(_extract_json(tricky))[0]["snippet"] == 'say "hi" then {x}'
+
+def test_run_opencli_wrapper_is_quiet(monkeypatch):
+    from search_gateway.extract import harden
+    from search_gateway.sources import base as sb
+    monkeypatch.setattr(harden, "HARDEN", "required")
+    monkeypatch.setattr(harden, "table_installed", lambda: True)
+    monkeypatch.setattr(harden, "systemd_run_available", lambda: True)
+    monkeypatch.setattr(harden, "status", lambda: {
+        "installed": True, "covered": False, "mode": "required",
+        "nft": True, "cgroupv2": True, "systemd_run": True,
+        "cgroup_path": "/x.scope", "problems": []})
+    seen: list[list[str]] = []
+
+    async def fake_run_cmd(cmd, **kwargs):
+        seen.append(cmd)
+        return 0, "[]"
+
+    monkeypatch.setattr(sb, "run_cmd", fake_run_cmd)
+
+    async def run():
+        await sb.run_opencli(["opencli", "doctor"])
+
+    import asyncio
+    asyncio.run(run())
+    assert "--quiet" in seen[0]  # banner suppression for stdout-bound JSON

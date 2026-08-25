@@ -179,15 +179,54 @@ async def run_cmd(
     raise last_err  # type: ignore[misc]
 
 
+def _extract_json(text: str):
+    """Parse the outermost JSON value, tolerating CLI banner noise.
+
+    Subprocess backends print banners around their payloads — systemd-run's
+    "Running as unit: …" (now suppressed with --quiet, but older wrappers /
+    update checks vary) and opencli's "Update available: …" trailer. A banner
+    at either end would otherwise silently degrade the whole parse to None
+    (smoke-test discovery 2026-08-25). Strategy: walk the text, find the
+    outermost JSON object/array span, and parse just that slice.
+    """
+    start = None
+    depth = 0
+    in_str = False
+    esc = False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+            continue
+        if ch in "[{":
+            if start is None:
+                start = i
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
 def parse_json_or_yaml(text: str):
     """Parse JSON first, then YAML (some CLIs emit one or the other)."""
     text = text.strip()
     if not text:
         return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+    span = _extract_json(text)
+    if span is not None:
+        try:
+            return json.loads(span)
+        except json.JSONDecodeError:
+            pass
     import yaml  # local import: optional
     try:
         return yaml.safe_load(text)
@@ -218,8 +257,8 @@ async def run_opencli(cmd: list[str], timeout: int = PER_SOURCE_TIMEOUT,
     async with browser_lease(cmd[0] if cmd else "opencli"):
         st = harden.status()
         if st["installed"] and not st["covered"]:
-            scoped = ["systemd-run", "--user", "--scope", "--collect",
-                      "--unit", "sg-egress", *cmd]
+            scoped = ["systemd-run", "--user", "--scope", "--quiet",
+                      "--collect", "--unit", "sg-egress", *cmd]
             return await run_cmd(scoped, timeout=timeout, env=env,
                                  retries=retries, source=source)
         return await run_cmd(cmd, timeout=timeout, env=env, retries=retries,
