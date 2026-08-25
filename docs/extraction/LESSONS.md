@@ -548,3 +548,29 @@ Source: github.com/lexiforest/curl_cffi.
   - **Service verified end-to-end**: 401 without token; MCP handshake over
     HTTP (initialize -> session -> tools/list = 14 tools); sg_egress table
     live in the kernel; loopback intact.
+- **2026-08-25 (live smoke tests, PHASE8)** — browser + CN + anonymous tiers
+  exercised through the hardened service; four more real bugs caught:
+  - **Expansion provenance lie**: sources=['reddit'] + weak results → the
+    query-expansion fan-out silently fused searxng/exa into the response
+    while the envelope named only reddit. Fixed: expansion only for the
+    default fan-out (sources=None) — pinned sources are strict.
+  - **CLI banner noise**: systemd-run's 'Running as unit: …' + opencli's
+    'Update available: …' broke JSON parses (→ silent 'ok (0)'). Fixed:
+    --quiet on the wrapper + a quote/escape-aware outermost-JSON extractor
+    in parse_json_or_yaml.
+  - **None snippets**: toutiao emits snippet=None for Label-less items;
+    fusion/dedup slice snippets unconditionally → TypeError on any CN board
+    run. Root fix: Result.__post_init__ coerces None string fields to '';
+    toutiao emits ''.
+  - **Camoufox API contract**: AsyncCamoufox.start() RETURNS the Playwright
+    Browser (the wrapper has no page API); headless=True = native Firefox
+    headless (no Xvfb), 'virtual' requires Xvfb. The adapter default was
+    'virtual' — refused to launch on this machine. All fixed + live-verified.
+  - **Live anonymous-tier proof**: a process moved into the gateway unit's
+    cgroup (cgroup.procs write — user-manager cgroups are user-writable)
+    passed the L3 coverage gate, started the L2 egress proxy (ephemeral
+    port), and fetched page content through the forced proxy under the
+    kernel floor. SEARCH_GATEWAY_STEALTH=1 is now set in the service env.
+  - **Empty-query crash** traced to the None-snippet bug (CN board runs);
+  - Stale per-source/final caches repeatedly masked real behavior during the
+    session — flush discipline: sg:s:<src>:* and sg:<category>:<src>:* keys.

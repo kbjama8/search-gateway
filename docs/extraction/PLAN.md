@@ -282,6 +282,11 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
       (HTTP + auth + session); L3 filter LIVE via the companion loader unit
       (`search-gateway-harden.service`, sandbox-safe by design); reboot
       persistence via the sudoers drop-in; see LESSONS §2026-08-25 (ops)
+- [x] Live smoke tests (2026-08-25) — browser tier (reddit/twitter via
+      opencli), CN tier (zhihu_hot/baidu/toutiao boards), anonymous tier
+      (Camoufox L2+L3, STEALTH on); four bugs fixed (expansion provenance,
+      banner-noise parse, None snippets, camoufox API contract) — see
+      LESSONS §2026-08-25 (smoke)
 - [x] Phase 8 follow-ups (0.4.3, `PHASE8-PLAN.md`) — baidu shape repair +
       drift guard, zhihu_hot source (registry 23), D7.3 legacy removal,
       stealth-matrix doc, ADR-0007 (douyin/XHS deferral); 307 fast tests
