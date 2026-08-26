@@ -120,8 +120,12 @@ class FakeResp:
     def __init__(self, payload, status_code=200):
         self._payload = payload
         self.status_code = status_code
-        self.text = ""
         self.headers = {}
+
+    @property
+    def text(self):
+        import json as _json
+        return _json.dumps(self._payload) if self._payload is not None else ""
 
     def raise_for_status(self):
         if self.status_code >= 400:

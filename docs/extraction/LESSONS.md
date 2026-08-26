@@ -608,3 +608,17 @@ Source: github.com/lexiforest/curl_cffi.
   - Test-infra lesson: payload-based global-httpx mocks silently broke under
     the lazy-parse facade — module-level facade patching (per-source queues)
     is the deterministic pattern.
+- **2026-08-26 (THE GAUNTLET)** — an adversarial chaos suite
+  (`tests/test_chaos.py`) holds the pipeline to hard invariants: search()
+  never raises; the envelope never lies (every blocked[] traces to a status
+  string; auth only for gated sources; extract covers requested sources;
+  results bounded); Redis flapping degrades everything to defaults;
+  concurrent stampedes respect per-request limits; cancel storms drain the
+  in-flight table and never orphan subprocesses; SSRF-bait result URLs are
+  data (read_url refuses them at the floor). Includes a seeded 150-iteration
+  fuzz and a cross-source identity-poisoning scenario.
+  - The gauntlet exposed two test-infrastructure truths: payload-based
+    global-httpx mocks silently break under the lazy-parse facade (test
+    doubles must present the payload as TEXT — the transport contract), and
+    `_adaptive_timeout`'s fallback default binds PER_SOURCE_TIMEOUT at import
+    (patch the helper, not the config constant).

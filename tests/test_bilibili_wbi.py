@@ -111,7 +111,8 @@ async def test_search_uses_signed_request(monkeypatch):
 
         @property
         def text(self):
-            return ""
+            import json as _json
+            return _json.dumps(self._payload)
 
         @property
         def headers(self):
