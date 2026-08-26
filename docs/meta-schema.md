@@ -202,8 +202,8 @@ engagement. These six results show the realistic shape of each.
 
 ```json
 {
-  "title": "kbjama8/search-gateway",
-  "url": "https://github.com/kbjama8/search-gateway",
+  "title": "kbjama8/kortex-search",
+  "url": "https://github.com/kbjama8/kortex-search",
   "snippet": "Unified web-search & research MCP server: SearXNG + Exa + agent-reach platform channels, fused and re-ranked.",
   "source": "github",
   "engine": "github-rest",

@@ -7,7 +7,7 @@ repo.
 ---
 
 ```
-Phase 7 handoff execution. You are picking up the search-gateway project
+Phase 7 handoff execution. You are picking up the kortex-search project
 (Project Gatekeeper) at a defined checkpoint — do not explore from scratch.
 
 FIRST, read these three files in order and internalize them:
@@ -23,8 +23,8 @@ LESSONS.md and close parking-lot items R8/R13-R16. Update the PLAN status
 board at the end of each release.
 
 STEP 1 — Release 0.4.1 (zero-risk): L1 egress floor
-(search_gateway/extract/egress.py) with tests/test_egress.py; secrets vault
-(search_gateway/extract/vault.py) with FULL migration per D7.3 +
+(kortex_search/extract/egress.py) with tests/test_egress.py; secrets vault
+(kortex_search/extract/vault.py) with FULL migration per D7.3 +
 tests/test_vault.py; block-event telemetry in stats.py + the four new
 doctor sections (egress/vault/blocks/profiles). Config → 79 vars.
 Bump to 0.4.1, CHANGELOG, sync every affected doc in the SAME commit
@@ -35,7 +35,7 @@ containment floor + vault + telemetry (v0.4.1)") and push.
 
 STEP 2 — Release 0.4.2 (sharp end): L2 forced-proxy egress for anonymous
 engines only (D7.2) with Camoufox launch flags; L3 kernel filter
-(search_gateway/extract/harden.py + `search-gateway harden` CLI) with
+(kortex_search/extract/harden.py + `kortex-search harden` CLI) with
 MANDATORY enforcement per D7.1 (browser-tier ops fail with the explicit
 "egress-unhardened" message until installed) + tests/test_harden_rules.py
 (pure-function ruleset golden test, mocked nft — no kernel in CI);
@@ -54,7 +54,7 @@ DOCTRINE (non-negotiable, from the repo's own docs):
 - Decisions D7.1-D7.4 are LOCKED — do not re-ask.
 - Machine facts: Redis is password-protected; tests get credentials from
   ~/.agent-reach/gateway.env via tests/conftest.py — do not delete it.
-  If the search-gateway MCP channel is down, research via
+  If the kortex-search MCP channel is down, research via
   `mcporter call exa.web_search_exa query="..."` or
   `curl -s https://r.jina.ai/<url>` — never invent tools.
 - Follow the workspace's skill discipline (spec/plan/build/test chains),

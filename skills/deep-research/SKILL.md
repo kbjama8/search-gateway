@@ -5,14 +5,14 @@ description: >
   review, due diligence, "research X thoroughly", "produce a cited report",
   claim verification, fact-checking, or any multi-hop investigation that needs
   auditable sources and citations. Routes every retrieval through the
-  search-gateway MCP tools and maintains a versioned evidence ledger. Do NOT
+  kortex-search MCP tools and maintains a versioned evidence ledger. Do NOT
   use for simple lookups, summaries of already-provided text, translation,
   brainstorming, or casual chat.
 ---
 
 # Deep Research
 
-Run adaptive, evidence-backed research across the search-gateway's sources
+Run adaptive, evidence-backed research across the kortex-search's sources
 while keeping every claim auditable. The goal is not a fixed hop count: search
 widely enough, verify strongly enough, and stop when the answer is well
 supported or the remaining uncertainty is explicit. Record public, auditable
@@ -21,11 +21,11 @@ reasoning out of the ledger.
 
 ## Gateway-first rule (non-negotiable)
 
-**Every retrieval call is a search-gateway MCP tool.** Use `search`, `search_web`,
+**Every retrieval call is a kortex-search MCP tool.** Use `search`, `search_web`,
 `search_news`, `search_science`, `search_academic`, `search_social`,
 `get_paper`, `get_citations`, `get_references`, and `read_url`. Never call a raw
 platform CLI (`twitter`, `opencli`, `bili`, `yt-dlp`, `gh`, `curl`) directly —
-all retrieval flows through or extends `search-gateway`, so caching, stats,
+all retrieval flows through or extends `kortex-search`, so caching, stats,
 rate-limiting, fusion, and failure isolation stay intact.
 
 | Want to | Gateway tool |

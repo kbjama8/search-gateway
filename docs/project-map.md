@@ -102,8 +102,8 @@ concrete — the project's ethics as implemented, not aspirational:
 ## Repo layout
 
 ```
-search-gateway/
-├── search_gateway/            # core package (~3,100 LOC, 17 modules)
+kortex-search/
+├── kortex_search/            # core package (~3,100 LOC, 17 modules)
 │   ├── server.py              # FastMCP app: 14 tools + Bearer auth + main()
 │   ├── orchestrator.py        # the pipeline: fan-out → fuse → dedup → rerank → MMR
 │   ├── cli.py                 # console entry: serve|doctor|check|version|warm
@@ -152,11 +152,11 @@ through (`server.py` → `orchestrator.py:265`). The stages, in order:
 | # | Stage | Module | Behavior |
 |---|-------|--------|----------|
 | 1 | Final cache | `cache.get` | Redis hit (TTL 1h) returns immediately, envelope `cached: true` |
-| 2 | Fan-out | `orchestrator._singleflight` / `_run_one` | `asyncio.wait`, `SEARCH_GATEWAY_TIMEOUT=50s`; per-source: rate-limit → daily budget → per-source cache (15m) → adaptive timeout `min(p95×1.5, 25s)` → search; stragglers cancelled, reported `pending (timeout)`, never fail the request |
-| 3 | Query expansion | `orchestrator._expand_query` | DeepSeek generates ≤2 variants, **only when base results < `SEARCH_GATEWAY_EXPANSION_GATE` (6)**; variants fan out over searxng+exa only |
+| 2 | Fan-out | `orchestrator._singleflight` / `_run_one` | `asyncio.wait`, `KORTEX_SEARCH_TIMEOUT=50s`; per-source: rate-limit → daily budget → per-source cache (15m) → adaptive timeout `min(p95×1.5, 25s)` → search; stragglers cancelled, reported `pending (timeout)`, never fail the request |
+| 3 | Query expansion | `orchestrator._expand_query` | DeepSeek generates ≤2 variants, **only when base results < `KORTEX_SEARCH_EXPANSION_GATE` (6)**; variants fan out over searxng+exa only |
 | 4 | Fusion | `fusion.rrf_fuse` | score = Σ `w_s / (60 + rank)`; `w_s` = rolling 24h success rate (`stats.reliability`) |
 | 5 | Dedup | `dedup.dedup` | canonical URL (tracking params stripped) → title difflib (≥0.92) → embedding cosine (≥0.93); CJK-aware — bge-m3 loads only when CJK share ≥25% (`embeddings.cjk_dominant`) |
-| 6 | Re-rank | `rerank.rerank` | cross-encoder on top `RERANK_CANDIDATES` (30) only; ONNX int8 default (`SEARCH_GATEWAY_INFERENCE_BACKEND`), auto torch fallback |
+| 6 | Re-rank | `rerank.rerank` | cross-encoder on top `RERANK_CANDIDATES` (30) only; ONNX int8 default (`KORTEX_SEARCH_INFERENCE_BACKEND`), auto torch fallback |
 | 7 | Diversity | `diversity.mmr_select` | greedy MMR, relevance floor 0.1, λ per category (news/social 0.7, general 0.75, science 0.8) |
 | 8 | Filters | `orchestrator` | freshness (day/week/month/year) → year_from → open-access-only |
 
@@ -184,7 +184,7 @@ partial, pending[], elapsed_ms, stage_ms{fanout, fusion_dedup, rerank, mmr}}`
 | `embeddings.py` | lazy MiniLM + bge-m3 singletons; `local_files_only=True` fast path with `snapshot_download` on miss; CJK detection | `encode`, `cjk_dominant` |
 | `llm.py` | DeepSeek chat client; thinking-mode aware (reasoning tokens count toward max_tokens); key from env or `~/.agent-reach/deepseek.env` | `complete`, `available` |
 | `cache.py` | Redis: final (`sg:`), per-source (`sg:s:`), negative (`sg:sf:`); `_valid_payload` schema check treats poisoned payloads as miss; `_norm_key_part` cache-poisoning defense | `get/set`, `get_source/set_source`, `mark_source_failed` |
-| `stats.py` | Redis reliability counters (24h window) + bounded latency reservoir (60) → p50/p95, fusion weights, `snapshot()`; `ledger_health()` scans `SEARCH_GATEWAY_LEDGER_DIR` | `record`, `reliability`, `latency_percentiles` |
+| `stats.py` | Redis reliability counters (24h window) + bounded latency reservoir (60) → p50/p95, fusion weights, `snapshot()`; `ledger_health()` scans `KORTEX_SEARCH_LEDGER_DIR` | `record`, `reliability`, `latency_percentiles` |
 | `ratelimit.py` | per-source min-interval gate (Redis, in-memory fallback) + daily budget (300) | `wait_if_needed`, `enforce_daily_budget` |
 | `saved_queries.py` | Redis `sg:sq:*` store; identity-based diff; first run establishes baseline | `save`, `list_all`, `run`, `diff` |
 | `log.py` | text/json formatter → stderr; stdout is reserved for the MCP wire | `configure_logging` |
@@ -193,16 +193,16 @@ partial, pending[], elapsed_ms, stage_ms{fanout, fusion_dedup, rerank, mmr}}`
 
 ## Source adapters
 
-23 adapters in `search_gateway/sources/`, all registered in `ALL_SOURCES`
+23 adapters in `kortex_search/sources/`, all registered in `ALL_SOURCES`
 (`sources/__init__.py`) — the single registry the orchestrator, `doctor`,
-and `search-gateway check` read from. Three implementation patterns:
+and `kortex-search check` read from. Three implementation patterns:
 
 | Pattern | Mechanism | Sources |
 |---------|-----------|---------|
 | HTTP API | `httpx` direct, `SourceError` on failure | searxng (SearXNG JSON), arxiv (Atom), openalex (REST), crossref (REST), semantic_scholar (Graph API), github (REST; token raises rate limit), bilibili (B站 API), v2ex (sov2ex), stackoverflow (Stack Exchange), web (Jina Reader) |
 | Subprocess CLI | `run_cmd` with env allowlist + retry | exa (mcporter), youtube (yt-dlp NDJSON) |
 | Browser / OpenCLI | `run_opencli` (browser budget via `extract/scheduler`, default 1), opt-in via `sources=`, rate-limited 2.5s | twitter (twitter-cli → opencli failover), reddit, facebook, instagram, xiaohongshu (not yet authenticated — errors gracefully), linkedin (mcporter; account blocked on QR verification — errors gracefully) |
-| CN tier (v0.4, gated by `SEARCH_GATEWAY_CN_SOURCES`) | zhihu (v4 API, cookie-gated), weibo (hot list + SUB-gated keyword search), baidu + toutiao hot boards (public JSON); bilibili upgraded with wbi signing (always on) |
+| CN tier (v0.4, gated by `KORTEX_SEARCH_CN_SOURCES`) | zhihu (v4 API, cookie-gated), weibo (hot list + SUB-gated keyword search), baidu + toutiao hot boards (public JSON); bilibili upgraded with wbi signing (always on) |
 
 Contract: subclass `Source`, implement `search()` (+ `available()` for doctor),
 emit `Result` with `meta` keys per `docs/meta-schema.md`. Adding source #19 is
@@ -212,7 +212,7 @@ bump the count in `tests/test_contract.py` → cover it. Nothing else changes.
 Notable per-source capabilities: openalex `get/citations/references` (work-ID
 resolution), crossref `get/references` (structured refs), semantic_scholar
 `citations/references` fallback tier, arxiv `get` by ID. All academic sources
-honor the polite-pool `SEARCH_GATEWAY_MAILTO`.
+honor the polite-pool `KORTEX_SEARCH_MAILTO`.
 
 ## MCP tool surface
 
@@ -254,7 +254,7 @@ Five independent mechanisms, each covering one failure mode
 41 environment variables, all with defaults, precedence env var > env file >
 default (`config.py`; full reference in `docs/config-reference.md`). Groups:
 
-- **Infrastructure**: `SEARXNG_BASE`, `SEARCH_GATEWAY_REDIS_URL`, `GITHUB_TOKEN`, `SEARCH_GATEWAY_HTTP_TOKEN`
+- **Infrastructure**: `SEARXNG_BASE`, `KORTEX_SEARCH_REDIS_URL`, `GITHUB_TOKEN`, `KORTEX_SEARCH_HTTP_TOKEN`
 - **Search behaviour**: `DEFAULT_SOURCES` (fast set: searxng/exa/github/youtube/bilibili/v2ex), `GLOBAL_TIMEOUT` (50), `PER_SOURCE_TIMEOUT` (18), `MAILTO`
 - **Retry / rate-limit**: `RETRY_COUNT` (1), `RETRY_BACKOFF` (1.5), `RATE_LIMIT` (2.5), `DAILY_QUERY_LIMIT` (300)
 - **Fusion / rerank / diversity**: models + pinned `*_REVISION` SHAs, `INFERENCE_BACKEND` (onnx_int8), `RERANK_CANDIDATES` (30), per-category MMR λ, `CJK_SHARE_THRESHOLD` (0.25), `WEIGHTED_RRF`, `EMBEDDING_DEDUP`, `FRESHNESS`
@@ -278,7 +278,7 @@ Host-process by design (ADR 0002 — CLIs + Chromium + warm model cache don't
 dockerize). `infra/docker-compose.yml` runs only the two service dependencies:
 Redis 7 (AOF persistence, password via `REDIS_PASSWORD`) and SearXNG
 (`:8888`, JSON, `SEARXNG_SECRET_KEY`). `infra/Dockerfile` is a headless tier-1
-image; `infra/systemd/search-gateway@.service` uses `search-gateway check` as
+image; `infra/systemd/kortex-search@.service` uses `kortex-search check` as
 `ExecStartPre`. Full tier model: `docs/deployment.md`.
 
 ## Orchestration skills
@@ -315,8 +315,8 @@ Verified on 2026-08-22:
 - Fast test suite passes: 191 tests, exit 0.
 - Code graph current: 619 nodes / 4,395 edges / 59 files, built at
   `bea991b` (matches HEAD).
-- Version: `0.4.0` (`search_gateway/__init__.py`).
+- Version: `0.4.0` (`kortex_search/__init__.py`).
 
 Not re-verified in this pass (live dependencies, expected to vary per machine):
 per-source `available()` probes, model loads, Redis credentials, DeepSeek key.
-Run `search-gateway doctor` / `search-gateway check` for the live picture.
+Run `kortex-search doctor` / `kortex-search check` for the live picture.

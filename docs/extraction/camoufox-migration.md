@@ -31,9 +31,9 @@ therefore *per-source cutover*, not a rewrite.
 ### Stage 1 — Parity (experimental flag, current state)
 
 - `extract/camoufox.py` provides `launch(profile)` + `html(url)` behind
-  `SEARCH_GATEWAY_STEALTH=1`; lazy import; every failure degrades to
+  `KORTEX_SEARCH_STEALTH=1`; lazy import; every failure degrades to
   `(None, reason)`.
-- **Go/no-go:** `search-gateway doctor` reports the stealth tier status;
+- **Go/no-go:** `kortex-search doctor` reports the stealth tier status;
   one anonymous read via the adapter succeeds.
 
 ### Stage 2 — Dual-run (shadow traffic)
@@ -67,7 +67,7 @@ therefore *per-source cutover*, not a rewrite.
   the proxy engine derives TZ/locale/languages from the sticky egress
   (`extract/proxies.align_bundle`) — Camoufox's preset + our geo alignment
   is the complete story (LESSONS.md §1.2).
-- `SEARCH_GATEWAY_STEALTH_PROFILE` pins a bundled preset (random by default)
+- `KORTEX_SEARCH_STEALTH_PROFILE` pins a bundled preset (random by default)
   — pin per persona so the same persona presents the same story session to
   session.
 - Never run the authenticated OpenCLI sessions and anonymous Camoufox

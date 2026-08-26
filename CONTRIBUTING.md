@@ -3,11 +3,11 @@
 ## Setup
 
 ```bash
-git clone <this-repo> && cd search-gateway
+git clone <this-repo> && cd kortex-search
 pip install -e .                 # editable install
 cd infra && docker compose up -d # redis (AOF) + searxng (JSON, :8888)
 cd ..
-search-gateway check             # confirm 22 sources + Redis before you start
+kortex-search check             # confirm 22 sources + Redis before you start
 ```
 
 ## Running tests
@@ -60,7 +60,7 @@ no "This section covers…", no restating the question, no unearned hedging.
 Adding a tool is a **minor** version bump. Removing or renaming a tool, or
 changing a `Result`/return-field shape, is **major**, with a deprecation
 cycle — `docs/architecture.md#versioning` has the full rule.
-`search_gateway/__init__.py`'s `__version__` is the single source of truth
+`kortex_search/__init__.py`'s `__version__` is the single source of truth
 for the current version; update `CHANGELOG.md` alongside any version bump,
 describing the change from the consumer's point of view (what a client
 integration would notice), not as a diff summary.

@@ -3,7 +3,7 @@ name: monitor
 description: >
   Use when the user wants to track recurring queries over time — "watch this
   topic", "monitor X for me", "alert me when this changes", "set up a saved
-  search". Saves queries via the search-gateway `saved_queries` tool and
+  search". Saves queries via the kortex-search `saved_queries` tool and
   reports what's new, removed, or unchanged between runs. Not for one-off
   searches.
 ---
@@ -11,7 +11,7 @@ description: >
 # Monitor
 
 Track recurring queries and surface what changed since the last run. All
-retrieval goes through the search-gateway `saved_queries` MCP tool; this skill
+retrieval goes through the kortex-search `saved_queries` MCP tool; this skill
 interprets the deltas and reports them.
 
 ## Gateway-first rule

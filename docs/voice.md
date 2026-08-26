@@ -48,7 +48,7 @@ buried in a caveats section at the bottom.
 
 **Before:** "The timeout can be configured with an environment variable."
 
-**After:** "`SEARCH_GATEWAY_TIMEOUT=50` bounds the whole fan-out in seconds
+**After:** "`KORTEX_SEARCH_TIMEOUT=50` bounds the whole fan-out in seconds
 (`config.py`). Lower it when sources hang; raise it for slow verticals."
 
 **Why it works:** the before-sentence is true of every env var in the file and
@@ -77,7 +77,7 @@ either direction.
 
 **Before (throat-clearing):**
 
-> This document describes the architecture of the search gateway. The gateway
+> This document describes the architecture of the kortex search. The gateway
 > has many components. These components work together to provide search.
 
 **After (in-voice):**

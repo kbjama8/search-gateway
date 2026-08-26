@@ -1,6 +1,6 @@
 # PROJECT GATEKEEPER — Assignment & Plan
 
-search-gateway v0.4 extraction-architecture overhaul.
+kortex-search v0.4 extraction-architecture overhaul.
 
 | Field | Value |
 |-------|-------|
@@ -91,14 +91,14 @@ Each phase ships with acceptance criteria; no phase merges before its AC is
 green. Feature flags default OFF unless stated.
 
 ### Phase 0 — Ops hygiene
-- [x] Kill stale `search-gateway` processes (3 found 2026-08-22); single
+- [x] Kill stale `kortex-search` processes (3 found 2026-08-22); single
   systemd-managed instance; PID lock in the unit.
 - [x] `.env.example` + README: Redis `requirepass` note (B6 hardening).
 - [x] Baseline: full fast suite + `bench.py search` numbers recorded here.
 - **AC:** one gateway process under systemd; suite green; baseline recorded.
 
 ### Phase 1 — Extraction tiering
-`search_gateway/extract/router.py` + `scheduler.py`
+`kortex_search/extract/router.py` + `scheduler.py`
 - [x] `TierRouter`: A public-API (cost 1) / B CLI (cost 3) / C browser
   (cost 10); extends `FALLBACK_CHAINS` semantics; cheapest-tier-first.
 - [x] `scheduler`: per-profile locks + global browser budget replace
@@ -108,7 +108,7 @@ green. Feature flags default OFF unless stated.
   (RedisStub); envelope field in contract test.
 
 ### Phase 2 — Profile farm & session manager
-`search_gateway/extract/profiles.py`
+`kortex_search/extract/profiles.py`
 - [x] (platform × persona × purpose) registry; persistent `user-data-dir`
   sessions survive restarts.
 - [x] Health state machine `healthy → throttled → cooldown → quarantined`;
@@ -118,9 +118,9 @@ green. Feature flags default OFF unless stated.
   change.
 
 ### Phase 3 — Stealth layer (dual-path)
-`search_gateway/extract/fingerprints.py` + Camoufox adapter
+`kortex_search/extract/fingerprints.py` + Camoufox adapter
 - [x] Path 1: OpenCLI/Chromium authenticated tier (unchanged surface).
-- [x] Path 2: Camoufox adapter (`Source`-contract), `SEARCH_GATEWAY_STEALTH`
+- [x] Path 2: Camoufox adapter (`Source`-contract), `KORTEX_SEARCH_STEALTH`
   flag, experimental.
 - [x] Fingerprint bundles: persona-derived JSON; coherence across all four
   families; geo-alignment hook consumed by the proxy engine (Phase 3.5).
@@ -130,13 +130,13 @@ green. Feature flags default OFF unless stated.
   (schema + coherence lint) tests; migration doc present.
 
 ### Phase 3.5 — Proxy subsystem (env-gated, default OFF)
-`search_gateway/extract/proxies.py`
+`kortex_search/extract/proxies.py`
 - [x] Provider-agnostic gateway interface; username-targeting grammar
   (`country/sid/ttl`), sticky-per-profile sessions, TTL-bound.
 - [x] Geo-consistency engine: at sticky-IP provision, resolve egress geo →
   derive TZ/locale/language bundle → write into profile fingerprint bundle.
 - [x] Per-IP health scoring → feeds profile health + rotation.
-- [x] Config: `SEARCH_GATEWAY_PROXY_ENABLED=0` + provider/credentials/geo/
+- [x] Config: `KORTEX_SEARCH_PROXY_ENABLED=0` + provider/credentials/geo/
   sticky-TTL knobs. Secrets via `~/.agent-reach/` env files, never inline.
 - [x] `docs/extraction/proxy-funding-guide.md`: provider table, cost model,
   procurement checklist, setup walkthrough, gotchas.
@@ -144,7 +144,7 @@ green. Feature flags default OFF unless stated.
   guide present; zero behavior change when disabled.
 
 ### Phase 4 — Block & challenge intelligence
-`search_gateway/extract/detectors.py`
+`kortex_search/extract/detectors.py`
 - [x] Signature matchers: CF (`__cf_bm`, `cf_chl_*`, "Just a moment",
   Turnstile), DataDome, PerimeterX/HUMAN, Kasada (`x-kpsdk-*`), Akamai
   (`ak_bmsc`), Arkose, CN equivalents (Bilibili 风控, XHS 操作过于频繁,
@@ -158,7 +158,7 @@ green. Feature flags default OFF unless stated.
   fields in contract test.
 
 ### Phase 5 — Parser intelligence
-`search_gateway/extract/parse.py` + `tests/fixtures/platforms/`
+`kortex_search/extract/parse.py` + `tests/fixtures/platforms/`
 - [x] Multi-shape pipeline: JSON → JSON-LD → CSS → regex → gated LLM-assist
   (validated), canonical `Result`/`meta` output.
 - [x] Fixture vault: recorded 2026 samples per platform; hermetic parser
@@ -228,16 +228,16 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
 |------|-------|------|
 | `docs/extraction/PLAN.md` | — | this assignment |
 | `docs/extraction/LESSONS.md` | — | running research journal |
-| `search_gateway/extract/__init__.py` + `router.py` + `scheduler.py` | 1 | code |
-| `search_gateway/extract/profiles.py` | 2 | code |
-| `search_gateway/extract/fingerprints.py` + `camoufox.py` | 3 | code |
+| `kortex_search/extract/__init__.py` + `router.py` + `scheduler.py` | 1 | code |
+| `kortex_search/extract/profiles.py` | 2 | code |
+| `kortex_search/extract/fingerprints.py` + `camoufox.py` | 3 | code |
 | `docs/extraction/camoufox-migration.md` | 3 | doc |
-| `search_gateway/extract/proxies.py` | 3.5 | code |
+| `kortex_search/extract/proxies.py` | 3.5 | code |
 | `docs/extraction/proxy-funding-guide.md` | 3.5 | doc |
-| `search_gateway/extract/detectors.py` | 4 | code |
-| `search_gateway/extract/parse.py` + `tests/fixtures/platforms/` | 5 | code + fixtures |
-| `search_gateway/sources/{bilibili,zhihu,weibo,baidu,toutiao}.py` | 6 | code |
-| `search_gateway/extract/http.py` | 3 | code (impersonation seam) |
+| `kortex_search/extract/detectors.py` | 4 | code |
+| `kortex_search/extract/parse.py` + `tests/fixtures/platforms/` | 5 | code + fixtures |
+| `kortex_search/sources/{bilibili,zhihu,weibo,baidu,toutiao}.py` | 6 | code |
+| `kortex_search/extract/http.py` | 3 | code (impersonation seam) |
 | config.py v0.4 block + `.env.example` updates | all | code |
 
 ## 9. Status board
@@ -280,7 +280,7 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
       config 82 vars; 296 fast tests green, ruff clean, coverage 86.8%
 - [x] Ops batch (PHASE8 Plans 6-7) — systemd service ENABLED + verified
       (HTTP + auth + session); L3 filter LIVE via the companion loader unit
-      (`search-gateway-harden.service`, sandbox-safe by design); reboot
+      (`kortex-search-harden.service`, sandbox-safe by design); reboot
       persistence via the sudoers drop-in; see LESSONS §2026-08-25 (ops)
 - [x] Live smoke tests (2026-08-25) — browser tier (reddit/twitter via
       opencli), CN tier (zhihu_hot/baidu/toutiao boards), anonymous tier
@@ -303,7 +303,7 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
 
 | Q | Owner | Note |
 |---|-------|------|
-| ~~Stale-process cleanup: systemd unit ownership~~ | KBJ | **RESOLVED 2026-08-25**: `search-gateway@8765` enabled + verified over HTTP |
+| ~~Stale-process cleanup: systemd unit ownership~~ | KBJ | **RESOLVED 2026-08-25**: `kortex-search@8765` enabled + verified over HTTP |
 | Proxy pilot budget approval (if/when enabled) | KBJ | parked (PHASE8 Plans 4/8) — guide gives $10–30/mo realistic figure |
 | Camoufox cutover per-platform sign-off | KBJ | parked (PHASE8 Plan 9) — Stage 1 parity verified live; Stage 2 needs proxies |
 

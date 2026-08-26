@@ -1,7 +1,7 @@
 # Adaptive Research Protocol
 
 The operational playbook for the deep-research skill. `SKILL.md` stays short;
-this file holds the detailed loop. All retrieval goes through the search-gateway
+this file holds the detailed loop. All retrieval goes through the kortex-search
 MCP tools — never a raw platform CLI.
 
 ## Core loop with quality gates

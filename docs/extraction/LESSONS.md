@@ -118,7 +118,7 @@ Source: developers.cloudflare.com/cloudflare-challenges/challenge-types/challeng
   boundaries); Issue #40333 documents the `EnvironmentFile=%d/app-secrets`
   bridge. **Implication:** the hardened unit passes the vault through
   `LoadCredential=`, and the config loader honors
-  `SEARCH_GATEWAY_CREDENTIALS_DIR` so files arrive via
+  `KORTEX_SEARCH_CREDENTIALS_DIR` so files arrive via
   `$CREDENTIALS_DIRECTORY` without ever touching the process env.
   (Sources: systemd.io/CREDENTIALS/; systemd/systemd#40333.)
 - **Chromium forced-proxy egress is fully supported**:
@@ -223,7 +223,7 @@ Source: support.reddithelp.com/hc/en-us/articles/14945211791892.
 - YouTube progressively enforces **PO tokens** per client type/stream
   protocol/auth state; **yt-dlp cannot generate them** — they must be
   provisioned via extractor args or a plugin (e.g., bgutil-based providers).
-- **Implication:** youtube source gains a `SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN`
+- **Implication:** youtube source gains a `KORTEX_SEARCH_YOUTUBE_PO_PLUGIN`
   seam (plugin name + extractor args passthrough), env-gated; search-only
   usage may not need tokens yet, but failure mode ("Sign in to confirm you're
   not a bot") must be detected and surfaced by Phase 4 detectors.
@@ -294,7 +294,7 @@ Sources: webscrapinghq.com/blog/weibo-scraper-guide (2026-07);
   (BotGuard attestation). PO token ≠ guarantee against 403, but helps
   flagged-IP traffic look legitimate.
 - **Implication:** youtube source gains
-  `SEARCH_GATEWAY_YOUTUBE_PO_PLUGIN`/`..._PO_SERVER` seams; default off;
+  `KORTEX_SEARCH_YOUTUBE_PO_PLUGIN`/`..._PO_SERVER` seams; default off;
   detector flags the "Sign in to confirm you're not a bot" failure mode.
 
 Source: github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide;
@@ -360,7 +360,7 @@ mdisbetter.com/blog/url-to-markdown-benchmark-10-tools-compared (2026-05).
   socks5 incl. auth — the hook we'll use when the proxy tier is enabled),
   `X-Proxy` (Jina's own proxy + optional country code).
 - **Implication:** `read_url` forwards `X-Proxy-Url` when
-  `SEARCH_GATEWAY_PROXY_ENABLED`, and passes `X-Target-Selector` for known
+  `KORTEX_SEARCH_PROXY_ENABLED`, and passes `X-Target-Selector` for known
   platform article bodies (zhihu/weibo playbooks).
 
 Source: r.jina.ai/docs.
@@ -372,7 +372,7 @@ Source: r.jina.ai/docs.
 ### 5.1 Ops: three stale gateway processes + NOAUTH Redis (found 2026-08-22)
 **2026-08-22 · verified (observed) · actionable**
 
-- `pgrep` showed three concurrent `search-gateway` servers; the MCP channel
+- `pgrep` showed three concurrent `kortex-search` servers; the MCP channel
   died mid-session while they lived. Redis answers `NOAUTH` on the default
   URL — the B6 `requirepass` hardening is active but `.env.example` still
   shows the passwordless URL.
@@ -410,7 +410,7 @@ Source: r.jina.ai/docs.
   precompiled wheels; faster than httpx.
 - **Implication:** the Phase 3 impersonation seam (`extract/http.py`) is a
   thin httpx-compatible facade that swaps to curl_cffi when
-  `SEARCH_GATEWAY_IMPERSONATE=1` and the source is on the impersonate
+  `KORTEX_SEARCH_IMPERSONATE=1` and the source is on the impersonate
   allowlist (bilibili/XHS/weibo class). Default OFF; self-hosted + pure APIs
   keep httpx.
 
@@ -525,7 +525,7 @@ Source: github.com/lexiforest/curl_cffi.
     uid 0". NoNewPrivileges is a second, independent blocker. In-unit
     privileged loading is impossible BY DESIGN in --user units.
   - **Resolution**: the privileged nft load moved to a dedicated NON-sandboxed
-    companion unit (search-gateway-harden.service) running After= the
+    companion unit (kortex-search-harden.service) running After= the
     gateway; it installs rules for the gateway unit's cgroup (`--for` flag,
     resolved via systemctl show ControlGroup), loads via the sudoers drop-in,
     and records a mark-installed receipt. The gateway unit keeps the full
@@ -543,7 +543,7 @@ Source: github.com/lexiforest/curl_cffi.
     falls back to the loader's installed_at receipt (the loader's success IS
     kernel-verified: `nft -f` both validates and applies).
   - **Test hygiene regression**: a CLI smoke test writing state to the REAL
-    ~/.config/search-gateway/harden.json left a bogus installed_at (kernel
+    ~/.config/kortex-search/harden.json left a bogus installed_at (kernel
     had no table) — tests must patch STATE_PATH. Fixed.
   - **Service verified end-to-end**: 401 without token; MCP handshake over
     HTTP (initialize -> session -> tools/list = 14 tools); sg_egress table
@@ -570,7 +570,7 @@ Source: github.com/lexiforest/curl_cffi.
     cgroup (cgroup.procs write — user-manager cgroups are user-writable)
     passed the L3 coverage gate, started the L2 egress proxy (ephemeral
     port), and fetched page content through the forced proxy under the
-    kernel floor. SEARCH_GATEWAY_STEALTH=1 is now set in the service env.
+    kernel floor. KORTEX_SEARCH_STEALTH=1 is now set in the service env.
   - **Empty-query crash** traced to the None-snippet bug (CN board runs);
   - Stale per-source/final caches repeatedly masked real behavior during the
     session — flush discipline: sg:s:<src>:* and sg:<category>:<src>:* keys.

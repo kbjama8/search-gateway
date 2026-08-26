@@ -1,6 +1,6 @@
 # Monitor Skill
 
-Track recurring queries and report deltas via the search-gateway
+Track recurring queries and report deltas via the kortex-search
 `saved_queries` MCP tool.
 
 ## Layout

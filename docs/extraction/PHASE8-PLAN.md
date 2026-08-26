@@ -81,7 +81,7 @@ search (LESSONS.md §1.5 conventions).
   **`proxy.env` absent** → the hardened unit's `LoadCredential=proxy.env`
   would fail startup → create an empty 0600 proxy.env (vault layout
   completion).
-- Service `search-gateway@8765.service` never enabled.
+- Service `kortex-search@8765.service` never enabled.
 
 ---
 
@@ -189,11 +189,11 @@ douyin/xhs still out).
 
 ### 4.1 Plan 6 — systemd service enablement
 
-1. Create `~/.config/search-gateway/gateway.env` (0600): non-secret config +
-   `SEARCH_GATEWAY_HTTP_TOKEN` (long random; required for HTTP transport).
+1. Create `~/.config/kortex-search/gateway.env` (0600): non-secret config +
+   `KORTEX_SEARCH_HTTP_TOKEN` (long random; required for HTTP transport).
 2. Complete the vault layout: empty `profiles/kaiser/proxy.env` (0600) so the
    unit's `LoadCredential=proxy.env` resolves.
-3. `systemctl --user enable --now search-gateway@8765.service`; verify with
+3. `systemctl --user enable --now kortex-search@8765.service`; verify with
    `systemctl --user status`, journal, and a token-authenticated HTTP call.
 4. Coexistence: stdio client-spawned instances still work (share Redis;
    no port conflict).
@@ -205,23 +205,23 @@ restart.
 
 ### 4.2 Plan 7 — L3 kernel-filter install
 
-1. Prepare: `search-gateway harden --install` (writes the ruleset for the
+1. Prepare: `kortex-search harden --install` (writes the ruleset for the
    current cgroup + pending state; idempotent).
 2. **Operator action (sudo password):** one copy-paste command —
-   `sudo nft -f ~/.config/search-gateway/sg-egress.nft` (exact command
+   `sudo nft -f ~/.config/kortex-search/sg-egress.nft` (exact command
    delivered at execution; never handled by the agent).
 3. Verify: `harden --status` → installed+covered; `harden --check` →
    enforceable; one browser-tier source query returns results (or the
    explicit refusal message pre-install).
 4. **Reboot persistence (engineered decision):** recommend the sudoers
-   drop-in `search-gateway-nft` (NOPASSWD for exactly
-   `nft -f ~/.config/search-gateway/sg-egress.nft`) so the unit's
+   drop-in `kortex-search-nft` (NOPASSWD for exactly
+   `nft -f ~/.config/kortex-search/sg-egress.nft`) so the unit's
    ExecStartPre auto-loads on every start — created as a documented snippet
    for the operator to place (root-owned file), OR option A (manual re-run
    after reboot) if the operator prefers zero sudoers edits. Decision
    recorded in LESSONS.
 5. Enforcement end-to-end: with the table live, browser-tier ops run; with
-   it absent and `SEARCH_GATEWAY_HARDEN=required`, the explicit
+   it absent and `KORTEX_SEARCH_HARDEN=required`, the explicit
    `blocked (egress-unhardened)` message (already unit-tested).
 
 **AC:** `harden --status` installed+covered; persistence choice recorded;

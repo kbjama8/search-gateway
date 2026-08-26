@@ -129,14 +129,14 @@ flowchart LR
     D --> GD
 ```
 
-**Retry.** `SEARCH_GATEWAY_RETRY_COUNT=1` with `SEARCH_GATEWAY_RETRY_BACKOFF=1.5`
+**Retry.** `KORTEX_SEARCH_RETRY_COUNT=1` with `KORTEX_SEARCH_RETRY_BACKOFF=1.5`
 (seconds, doubling per retry) applies to transient, curl-style exit codes
 (`RETRYABLE_EXIT_CODES = (1, 8, 52, 56)` in `config.py`) — an auth failure or a
 404 is not retried, since retrying won't fix it.
 
 **Rate limiting on cookie-logged sources.** `twitter`, `reddit`, `facebook`,
 and `instagram` (`RATE_LIMITED_SOURCES`) share a minimum 2.5-second interval
-between queries (`SEARCH_GATEWAY_RATE_LIMIT`), enforced in `ratelimit.py` via
+between queries (`KORTEX_SEARCH_RATE_LIMIT`), enforced in `ratelimit.py` via
 a Redis `SET NX EX` gate with an in-memory fallback — the mechanism exists
 because these sources authenticate with browser cookies, and burst traffic
 risks the account, not just a 429.
@@ -144,13 +144,13 @@ risks the account, not just a 429.
 **Two-tier fan-out + opencli serialization.** Fast, non-browser sources
 (`searxng`, `exa`, `github`, `youtube`, `bilibili`, `v2ex`) are the default
 fan-out; browser-backed social sources are opt-in via `sources=` because they
-route through one shared Chromium bridge (`SEARCH_GATEWAY_OPENCLI_PROFILES=1`
+route through one shared Chromium bridge (`KORTEX_SEARCH_OPENCLI_PROFILES=1`
 profile by default) — running them by default would serialize every default
 search behind a single browser session.
 
 **Cache TTLs.** Per-source results cache for 15 minutes
-(`SEARCH_GATEWAY_SOURCE_CACHE_TTL=900`); the final fused-and-reranked result
-caches for 1 hour (`SEARCH_GATEWAY_CACHE_TTL=3600`). The asymmetry is
+(`KORTEX_SEARCH_SOURCE_CACHE_TTL=900`); the final fused-and-reranked result
+caches for 1 hour (`KORTEX_SEARCH_CACHE_TTL=3600`). The asymmetry is
 deliberate: a per-source result is reusable across many different final
 queries (different `limit`, different fused neighbors), so it earns a shorter,
 more frequently-refreshed TTL, while the expensive fused+reranked output is
@@ -189,7 +189,7 @@ To add source #19:
    `docs/meta-schema.md` (`source_type`, and whichever bibliographic/engagement
    keys apply).
 3. Register the instance in `ALL_SOURCES` in `sources/__init__.py` — this is
-   the single source of truth the orchestrator, `doctor`, and `search-gateway
+   the single source of truth the orchestrator, `doctor`, and `kortex-search
    check` all read from.
 4. Update `tests/test_contract.py`'s expected source count (18 → 19) and add
    coverage — the test asserts the live `tools/list`/source registry, so an
@@ -227,7 +227,7 @@ flowchart LR
         B["Claude Code"]
         C["any MCP client"]
     end
-    subgraph Gateway["search-gateway (this repo)"]
+    subgraph Gateway["kortex-search (this repo)"]
         M["server.py — FastMCP, 14 tools"]
         SK["skills/ — orchestration"]
     end
@@ -279,7 +279,7 @@ record of why it was made the way it was.
 
 ## Versioning
 
-SemVer from `search_gateway/__init__.py`. Adding a tool is a minor bump;
+SemVer from `kortex_search/__init__.py`. Adding a tool is a minor bump;
 removing or renaming a tool, or changing a `Result`/return field, is major, with
 a deprecation cycle. `docs/api/tools.md` + `docs/meta-schema.md` are the
 canonical contract, matched against the live `tools/list` by

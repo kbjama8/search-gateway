@@ -4,7 +4,7 @@ The 14 MCP tools are the public API. Renaming a tool, removing one, or changing
 a return field is a **major** version bump (`docs/architecture.md#versioning`).
 Two tests hold this surface: `tests/test_contract.py` asserts 22 sources + 14
 tools + `Result` shape against the live `tools/list`, and
-`tests/test_mcp_handshake.py` proves the bare `search-gateway` command serves
+`tests/test_mcp_handshake.py` proves the bare `kortex-search` command serves
 it over stdio.
 
 Every example on this page derives its return shape from `server.py` and
@@ -70,7 +70,7 @@ Unified fan-out + fuse + re-rank + diversity. Each result is a `Result` dict.
 | Arg | Type | Default | Notes |
 |-----|------|---------|-------|
 | `query` | str | — | required |
-| `sources` | list[str]? | fast set | subset of `[arxiv, bilibili, crossref, exa, facebook, github, instagram, linkedin, openalex, reddit, searxng, semantic_scholar, stackoverflow, twitter, v2ex, web, xiaohongshu, youtube]` (+ `zhihu`, `weibo`, `baidu`, `toutiao` when `SEARCH_GATEWAY_CN_SOURCES=1`) |
+| `sources` | list[str]? | fast set | subset of `[arxiv, bilibili, crossref, exa, facebook, github, instagram, linkedin, openalex, reddit, searxng, semantic_scholar, stackoverflow, twitter, v2ex, web, xiaohongshu, youtube]` (+ `zhihu`, `weibo`, `baidu`, `toutiao` when `KORTEX_SEARCH_CN_SOURCES=1`) |
 | `category` | str | `general` | `general` \| `news` \| `science` \| `social media` |
 | `limit` | int | 10 | clamped 1..30 |
 | `freshness` | str? | — | `day` \| `week` \| `month` \| `year` |
@@ -328,7 +328,7 @@ sequenceDiagram
   "answer": "No — RRF is order-only. Each source contributes 1/(k+rank) regardless of that source's native score scale, so nothing needs to be normalized across sources before fusion. The trade-off is that RRF ignores how confident a source was in its own top result, which is why this gateway re-ranks the fused top-30 with a cross-encoder afterward [1][2].",
   "citations": [
     { "n": 1, "title": "Example paper explaining RRF's rank-only design", "url": "https://example.org/rrf-explainer" },
-    { "n": 2, "title": "search-gateway rerank.py — cross-encoder re-rank stage", "url": "https://github.com/kbjama8/search-gateway" }
+    { "n": 2, "title": "kortex-search rerank.py — cross-encoder re-rank stage", "url": "https://github.com/kbjama8/kortex-search" }
   ],
   "results": [ { "title": "Example paper explaining RRF's rank-only design", "url": "https://example.org/rrf-explainer",
     "snippet": "...", "source": "openalex", "engine": "openalex", "published": "2021-04-02", "score": 2.881,
@@ -364,7 +364,7 @@ error instead of fetching:
 Health report: Redis, models, every source, academic latency/rate-limit status,
 ledger health, and (0.4.1+) the containment sections `egress`/`vault`/`blocks`/
 `profiles`. 23 sources + `redis`/`rerank`/`embed`/`llm`/`ledger` keys. Shared
-with the CLI via `health.report()` — `search-gateway doctor` prints the same
+with the CLI via `health.report()` — `kortex-search doctor` prints the same
 JSON.
 
 ```json

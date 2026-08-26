@@ -20,13 +20,13 @@ egress filter + bench browser tier + hardened systemd unit).
 | Item | Value |
 |---|---|
 | HEAD | `6f38682` "feat: Project Gatekeeper extraction overhaul (v0.4.0)" — **pushed** to `main` |
-| Version | `0.4.0` (`search_gateway/__init__.py`) |
+| Version | `0.4.0` (`kortex_search/__init__.py`) |
 | Tests | **199 green** (`pytest -m "not slow"`), ruff clean, coverage **85.47%** (gate 85%) |
 | Sources | **22** registered (18 + zhihu/weibo/baidu/toutiao, CN-gated) |
 | Code graph | refreshed at `6f38682` (crg build_or_update) |
 | Working tree | clean at handoff |
 
-What v0.4.0 shipped (for orientation): `search_gateway/extract/` package
+What v0.4.0 shipped (for orientation): `kortex_search/extract/` package
 (parse, detectors, router, scheduler, profiles, fingerprints, proxies, http,
 camoufox), bilibili **wbi signing** (canonical-example-verified), read_url
 multi-stage (Jina→Trafilatura→readability), envelope `extract{}`/`blocked[]`/
@@ -36,7 +36,7 @@ multi-stage (Jina→Trafilatura→readability), envelope `extract{}`/`blocked[]`
 
 - **Redis is password-protected** (B6 hardening): plain `redis://127.0.0.1:6379/0`
   answers `NOAUTH`. The working credentials live in `~/.agent-reach/gateway.env`
-  (`SEARCH_GATEWAY_REDIS_URL=redis://:<pw>@…`), which `tests/conftest.py`
+  (`KORTEX_SEARCH_REDIS_URL=redis://:<pw>@…`), which `tests/conftest.py`
   loads at import. Tests pass because of that file — do not delete it.
 - **Stale gateway processes** were killed in Phase 0 (3 orphans). Lesson:
   stdio MCP servers orphan when their client dies; they do NOT die on
@@ -96,14 +96,14 @@ R8/R13–R16).
 
 | ID | Decision | Semantics |
 |---|---|---|
-| D7.1 | **L3 mandatory** | Browser-tier ops REFUSE to launch without the kernel filter installed. `SEARCH_GATEWAY_HARDEN=required` (default) \| `permissive` (explicit opt-out for sandboxed CI). API/CLI tiers unaffected (default fan-out has no browser sources). systemd deployment gets it via the unit; ad-hoc gateways run `search-gateway harden --install --sudo`. |
+| D7.1 | **L3 mandatory** | Browser-tier ops REFUSE to launch without the kernel filter installed. `KORTEX_SEARCH_HARDEN=required` (default) \| `permissive` (explicit opt-out for sandboxed CI). API/CLI tiers unaffected (default fan-out has no browser sources). systemd deployment gets it via the unit; ad-hoc gateways run `kortex-search harden --install --sudo`. |
 | D7.2 | **L2 anonymous engines only** | Forced-proxy applies to Camoufox/anonymous launches (full flag control). OpenCLI authenticated tier keeps L1+L3; a bench live-test gate must pass before that policy ever changes. |
 | D7.3 | **Vault: full migration now** | Move `twitter-auth.env`/`deepseek.env`/`proxy.env` into `~/.agent-reach/profiles/<persona>/` this cycle; legacy flat paths honored one release with a `doctor` deprecation warning (removed 0.4.3). |
 | D7.4 | **Split into two releases** | 0.4.1 = L1 floor + vault migration + telemetry (zero-risk). 0.4.2 = L2 + L3 + bench + hardened unit (the sharp end). Commit + push each. |
 
 ## 5. Release 0.4.1 — floor, vault, telemetry
 
-### 5.1 L1 egress floor — `search_gateway/extract/egress.py` (new)
+### 5.1 L1 egress floor — `kortex_search/extract/egress.py` (new)
 
 - `ALWAYS_BLOCKED_NETWORKS`: `127.0.0.0/8`, `::1/128`, `10.0.0.0/8`,
   `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `100.64.0.0/10`,
@@ -117,53 +117,53 @@ R8/R13–R16).
   layer catches what the floor can't see). **Checked pre-nav AND post-redirect**
   (hermes lesson).
 - **Local-infra exemption only**: hosts of `SEARXNG_BASE` and `REDIS_URL`
-  (the gateway's own loopback deps) + `SEARCH_GATEWAY_FLOOR_EXEMPT`
+  (the gateway's own loopback deps) + `KORTEX_SEARCH_FLOOR_EXEMPT`
   (comma-separated operator allowlist). Nothing else.
 - Hooks: `extract/http.py` (all API-tier `request()`/`get_json` calls),
   `web.py::_read_*` (all three read_url stages), `camoufox.py::html`,
   `server.py::read_url` entry.
-- Config: `SEARCH_GATEWAY_EGRESS_FLOOR=1` (default ON), `SEARCH_GATEWAY_FLOOR_EXEMPT=""`.
+- Config: `KORTEX_SEARCH_EGRESS_FLOOR=1` (default ON), `KORTEX_SEARCH_FLOOR_EXEMPT=""`.
 - Tests: `tests/test_egress.py` — IMDS variants (AWS/GCP/Azure/Alibaba/ECS),
   RFC1918/v6/CGNAT, searxng exemption, post-redirect, exempt-list override.
 
-### 5.2 Secrets vault — `search_gateway/extract/vault.py` (new) + full migration
+### 5.2 Secrets vault — `kortex_search/extract/vault.py` (new) + full migration
 
-Target layout (persona from `SEARCH_GATEWAY_PERSONA`, default `kaiser`):
+Target layout (persona from `KORTEX_SEARCH_PERSONA`, default `kaiser`):
 
 ```
 ~/.agent-reach/profiles/<persona>/
 ├── twitter.env       0600   (TWITTER_AUTH_TOKEN, TWITTER_CT0)
 ├── deepseek.env      0600   (DEEPSEEK_API_KEY)
-├── proxy.env         0600   (SEARCH_GATEWAY_PROXY_USERNAME/PASSWORD/GATEWAY)
+├── proxy.env         0600   (KORTEX_SEARCH_PROXY_USERNAME/PASSWORD/GATEWAY)
 ├── fingerprint.json  0644   (bundle — NOT secret)
 └── notes.md          0600
 ```
 
 - Config default changes: `TWITTER_ENV_FILE`, `DEEPSEEK_ENV_FILE`,
   `PROXY_ENV_FILE` → the vault paths. `config.load_env_file` gains a
-  **credentials-dir-aware loader** honoring `SEARCH_GATEWAY_CREDENTIALS_DIR`
+  **credentials-dir-aware loader** honoring `KORTEX_SEARCH_CREDENTIALS_DIR`
   (systemd `$CREDENTIALS_DIRECTORY` bridge).
 - **Deprecation cycle**: legacy flat paths still honored for one release with
   a `doctor` warning; removal scheduled 0.4.3.
 - `vault.hygiene() -> list[Finding]`: mode enforcement (0600), symlink-trap
   detection, stale files (>90d), out-of-vault `*_AUTH_FILE` vars.
   **Warn-not-fail** (degradation doctrine) but doctor colors it red.
-- CLI: `search-gateway vault migrate [--dry-run]`, `search-gateway vault
+- CLI: `kortex-search vault migrate [--dry-run]`, `kortex-search vault
   status`. Runs on this machine at execution time (moves the flat files;
   `gateway.env` for tests stays where it is — it is the test env, not a
   profile secret).
 - Tests: `tests/test_vault.py` — mode enforcement, symlink trap, migrate
   dry-run/real on a tmp tree, legacy fallback + deprecation warning,
   credentials-dir bridge.
-- Config: `SEARCH_GATEWAY_VAULT_DIR` (default `~/.agent-reach/profiles`),
-  `SEARCH_GATEWAY_PERSONA` (default `kaiser`), `SEARCH_GATEWAY_CREDENTIALS_DIR` (default `""`).
+- Config: `KORTEX_SEARCH_VAULT_DIR` (default `~/.agent-reach/profiles`),
+  `KORTEX_SEARCH_PERSONA` (default `kaiser`), `KORTEX_SEARCH_CREDENTIALS_DIR` (default `""`).
 
 ### 5.3 Telemetry
 
 - `stats.py`: block-event reservoir `sg:bl:<source>:<vendor>` (bounded,
   TTL 24h) + counters; `record_block(source, vendor, level)` called from
   `base._blocked_error`, `orchestrator._extract_signals`, egress denials;
-  `snapshot()` gains `blocks`. Config `SEARCH_GATEWAY_BLOCK_RESERVOIR=120`.
+  `snapshot()` gains `blocks`. Config `KORTEX_SEARCH_BLOCK_RESERVOIR=120`.
 - `health.py` doctor sections: `egress{floor, proxy, kernel, denied_count,
   last_denial}`, `vault{profiles, hygiene, findings}`, `blocks`, `profiles`
   (surface the Phase 2 `ProfileStore.status()`).
@@ -185,12 +185,12 @@ ruff + ≥85% coverage; version bump `0.4.1` + CHANGELOG + docs (config-ref
   lazy. **Anonymous engines only (D7.2).**
 - Camoufox launch flags: `--proxy-server=http://127.0.0.1:<port>` +
   `--host-resolver-rules="MAP * 0.0.0.0, EXCLUDE 127.0.0.1"`.
-- Config: `SEARCH_GATEWAY_EGRESS_PROXY=1` (default ON for the anonymous tier),
+- Config: `KORTEX_SEARCH_EGRESS_PROXY=1` (default ON for the anonymous tier),
   `=0` to disable.
 - Tests: real asyncio sockets on loopback (no external net): CONNECT allow/
   deny, floor composition, chain-through-proxies mocked.
 
-### 6.2 L3 kernel filter — `search_gateway/extract/harden.py` (new) + CLI `harden`
+### 6.2 L3 kernel filter — `kortex_search/extract/harden.py` (new) + CLI `harden`
 
 - `build_rules(cgroup_path) -> str` **pure function** (golden-tested): nft
   table `inet sg_egress`, `socket cgroupv2 level 2 "<path>"` verdict map →
@@ -201,10 +201,10 @@ ruff + ≥85% coverage; version bump `0.4.1` + CHANGELOG + docs (config-ref
   `uninstall()`.
 - **Enforcement (D7.1)**: browser-tier sources + anonymous engine check
   `harden.status()` before spawning; absent → `SourceError("blocked
-  (egress-unhardened): run 'search-gateway harden --install --sudo'")` →
-  negative-cache + envelope machinery names it. `SEARCH_GATEWAY_HARDEN=
-  required` (default) | `permissive`; `SEARCH_GATEWAY_HARDEN_SUDO=1`.
-- CLI: `search-gateway harden --install|--status|--uninstall [--sudo]`;
+  (egress-unhardened): run 'kortex-search harden --install --sudo'")` →
+  negative-cache + envelope machinery names it. `KORTEX_SEARCH_HARDEN=
+  required` (default) | `permissive`; `KORTEX_SEARCH_HARDEN_SUDO=1`.
+- CLI: `kortex-search harden --install|--status|--uninstall [--sudo]`;
   `check` reports browser-tier enforceability.
 - Tests: `tests/test_harden_rules.py` — golden ruleset string, `--status`
   parsing (mocked `nft`), no-`nft`/no-cgroupv2 degradation. NO kernel touched
@@ -215,7 +215,7 @@ ruff + ≥85% coverage; version bump `0.4.1` + CHANGELOG + docs (config-ref
 - `scripts/bench.py browser` (slow-marked): cold/warm launch, navigate→
   extract→teardown op cost, profile rotation, egress-proxy overhead (direct
   vs floor-checked p50/p90), RSS delta.
-- `infra/systemd/search-gateway@.service` hardening: `LoadCredential=` for
+- `infra/systemd/kortex-search@.service` hardening: `LoadCredential=` for
   the vault, `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict` +
   `ReadWritePaths` for vault/profile dirs, `RestrictAddressFamilies`,
   `IPAddressDeny=169.254.0.0/16 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16

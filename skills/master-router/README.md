@@ -1,6 +1,6 @@
 # Master Router Skill
 
-Classifies a research/search request, routes it to the right search-gateway
+Classifies a research/search request, routes it to the right kortex-search
 tools and sources at the right effort, and decides between a full ledger-based
 `deep-research` run and a quick cited answer.
 

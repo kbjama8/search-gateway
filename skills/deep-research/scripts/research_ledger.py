@@ -4,7 +4,7 @@
 
 This script performs NO retrieval. It maintains a single JSON ledger
 (`ledger.json`, schema v1) that the agent fills in as it drives the
-search-gateway MCP tools (`search_*`, `get_paper`, `get_citations`,
+kortex-search MCP tools (`search_*`, `get_paper`, `get_citations`,
 `get_references`, `read_url`). It is intentionally auditable, portable, and
 runs on Python's standard library alone.
 

@@ -8,7 +8,7 @@ honest:
 flowchart LR
     subgraph Trusted["trusted — you + localhost"]
         C["your MCP client"]
-        GW["search-gateway"]
+        GW["kortex-search"]
         RD[("Redis")]
         SX["SearXNG"]
     end
@@ -35,9 +35,9 @@ specifics.
 | Social auth tokens in subprocess env (`TWITTER_AUTH_TOKEN` / `CT0`) | child-process env only, never logged; `.gitignore` blocks `*.env`; `doctor`/`check` never echo secrets. |
 | Model download supply chain | pinned `*_REVISION` (empty = unpinned) fixes commit-churn re-downloads and pins provenance. |
 | `read_url` fetching arbitrary URLs (SSRF) | **L1 egress floor (0.4.1)** blocks private/link-local/metadata egress pre-nav AND post-redirect (the whole `169.254.0.0/16`, RFC1918, CGNAT, cloud IMDS ranges — LESSONS.md §1.5: the hermes-agent IAM-credential incident class). Denials surface as `blocked (egress-floor/…)` with telemetry. **L2 (0.4.2)**: the anonymous browser tier is forced through a loopback CONNECT proxy that re-checks every target; **L3 (0.4.2)**: an nftables per-cgroup DROP table covers browser children at the kernel — browser ops refuse to launch until it is installed (D7.1). |
-| Secret leakage via logs | logs go to stderr with `SEARCH_GATEWAY_LOG_FMT`; JSON formatter never serializes env/tokens. |
+| Secret leakage via logs | logs go to stderr with `KORTEX_SEARCH_LOG_FMT`; JSON formatter never serializes env/tokens. |
 | Saved-query loss on Redis reset | Redis AOF enabled in `infra/docker-compose.yml`; backup documented in `docs/deployment.md`. |
-| Secrets on disk (mode/symlink/stale) | per-persona vault `~/.agent-reach/profiles/<persona>/` (0600/0700, decision D7.3); `search-gateway vault status` hygiene checks (modes, symlink escapes, stale files, out-of-vault config) with doctor red findings. |
+| Secrets on disk (mode/symlink/stale) | per-persona vault `~/.agent-reach/profiles/<persona>/` (0600/0700, decision D7.3); `kortex-search vault status` hygiene checks (modes, symlink escapes, stale files, out-of-vault config) with doctor red findings. |
 
 ## Per-tool attack surface
 
@@ -75,14 +75,14 @@ echoed back into a tool's return value.
   for the GitHub source's rate-limit boost — nothing here needs write access
   to anything. Scope it down explicitly rather than reusing a broader
   personal token.
-- **`LOG_FMT` in production.** Set `SEARCH_GATEWAY_LOG_FMT=json` for any
+- **`LOG_FMT` in production.** Set `KORTEX_SEARCH_LOG_FMT=json` for any
   host-process deployment (`docs/deployment.md`'s HTTP/systemd path) — one
   JSON object per line is what makes `journalctl`/log-aggregation queries
   possible; the `text` default is for interactive/local use only.
 - **Kernel egress floor (0.4.2).** Browser-tier operations refuse to launch
-  without the L3 nftables filter (D7.1): `search-gateway harden --install
+  without the L3 nftables filter (D7.1): `kortex-search harden --install
   --sudo`, and for systemd deployments the shipped unit's `ExecStartPre`
-  installs it for the unit's cgroup. `permissive` (`SEARCH_GATEWAY_HARDEN`)
+  installs it for the unit's cgroup. `permissive` (`KORTEX_SEARCH_HARDEN`)
   is the explicit opt-out for sandboxed CI only — an operator who disables it
   outside CI is disabling the containment envelope's last layer on purpose.
 - **Review `research_answer` output before acting on it.** Given the prompt
@@ -95,11 +95,11 @@ echoed back into a tool's return value.
 
 - Secrets live in the per-persona vault `~/.agent-reach/profiles/<persona>/`
   (0600 files, 0700 dirs) — outside the repo. Migrate legacy flat files with
-  `search-gateway vault migrate` (decision D7.3); legacy paths are honored one
+  `kortex-search vault migrate` (decision D7.3); legacy paths are honored one
   release window (D7.3) — removed in 0.4.3; migrate before upgrading past 0.4.2.
 - `.env.example` ships placeholders only; `.gitignore` blocks `.env`, `*.env`,
   `*.pem`, `*.key`, `*.log`.
-- The systemd unit reads `~/.config/search-gateway/gateway.env` (0600) via
+- The systemd unit reads `~/.config/kortex-search/gateway.env` (0600) via
   `EnvironmentFile=` — that file is never committed. The hardened unit
   (0.4.2) additionally passes vault secrets via `LoadCredential=` so they
   arrive as files, never env vars (systemd's own doctrine, LESSONS.md §1.5).

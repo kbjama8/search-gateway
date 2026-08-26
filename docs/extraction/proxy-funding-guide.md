@@ -1,8 +1,8 @@
 # Proxy Funding Guide
 
 How to fund, provision, and operate the optional residential/ISP proxy tier
-for search-gateway (Phase 3.5 of Project Gatekeeper). The subsystem ships
-**disabled** (`SEARCH_GATEWAY_PROXY_ENABLED=0`); this guide is what you read
+for kortex-search (Phase 3.5 of Project Gatekeeper). The subsystem ships
+**disabled** (`KORTEX_SEARCH_PROXY_ENABLED=0`); this guide is what you read
 before flipping it on.
 
 All prices are 2026 market figures (verified 2026-08-22 — LESSONS.md §2).
@@ -40,7 +40,7 @@ actually defeats risk control at our volume); budget buys entry.
 
 ## Cost model for our actual load
 
-- Daily budget: `SEARCH_GATEWAY_DAILY_QUERY_LIMIT=300` source-queries/day.
+- Daily budget: `KORTEX_SEARCH_DAILY_QUERY_LIMIT=300` source-queries/day.
 - Browser-tier pages ≈ 1–3 MB; API-tier (CN signed) ≈ 10–50 KB.
 - Worst case (every query through proxies): ≈ 18 GB/mo → $32–90/mo.
 - **Realistic: $10–30/mo** — only browser-tier + CN sources route through
@@ -63,20 +63,20 @@ envelope: $30/mo worst-case pilot, $60/mo farm.
    personal one (the persona model extends to vendors).
 2. Generate API credentials → store in `~/.agent-reach/proxy.env` (0600):
    ```
-   SEARCH_GATEWAY_PROXY_GATEWAY=gate.provider.com:8080
-   SEARCH_GATEWAY_PROXY_USERNAME=<targeting-grammar username>
-   SEARCH_GATEWAY_PROXY_PASSWORD=<password>
+   KORTEX_SEARCH_PROXY_GATEWAY=gate.provider.com:8080
+   KORTEX_SEARCH_PROXY_USERNAME=<targeting-grammar username>
+   KORTEX_SEARCH_PROXY_PASSWORD=<password>
    ```
    Never commit; `.gitignore` already blocks `*.env`.
 3. Confirm the provider supports the **username-targeting grammar** (sticky
    `sid` + `ttl` tokens — LESSONS.md §2.2). ProxyHat documents the canonical
    form: `-country-us-sid-<id>-ttl-30m`. If the provider's grammar differs,
-   set `SEARCH_GATEWAY_PROXY_USERNAME` verbatim and skip the auto-grammar.
-4. Set `SEARCH_GATEWAY_PROXY_COUNTRY` to the persona's home region, and keep
-   `SEARCH_GATEWAY_PROXY_GEO_ALIGN=1` — the fingerprint bundle derives
+   set `KORTEX_SEARCH_PROXY_USERNAME` verbatim and skip the auto-grammar.
+4. Set `KORTEX_SEARCH_PROXY_COUNTRY` to the persona's home region, and keep
+   `KORTEX_SEARCH_PROXY_GEO_ALIGN=1` — the fingerprint bundle derives
    timezone/locale/languages from the egress country (the coherence
    doctrine, LESSONS.md §1.2).
-5. Smoke-test with `search-gateway doctor` (proxy health section) and one
+5. Smoke-test with `kortex-search doctor` (proxy health section) and one
    live CN query.
 
 ## Setup walkthrough (SOAX-style, representative)
@@ -86,15 +86,15 @@ envelope: $30/mo worst-case pilot, $60/mo farm.
 touch ~/.agent-reach/proxy.env && chmod 600 ~/.agent-reach/proxy.env
 
 # 2. enable the tier
-export SEARCH_GATEWAY_PROXY_ENABLED=1
-export SEARCH_GATEWAY_PROXY_PROTOCOL=http
+export KORTEX_SEARCH_PROXY_ENABLED=1
+export KORTEX_SEARCH_PROXY_PROTOCOL=http
 
 # 3. point the gateway at the env file (values load from it)
-export SEARCH_GATEWAY_PROXY_AUTH_FILE=~/.agent-reach/proxy.env
+export KORTEX_SEARCH_PROXY_AUTH_FILE=~/.agent-reach/proxy.env
 
 # 4. verify
-search-gateway doctor | jq .proxy          # health + geo alignment status
-search-gateway serve                       # stdio as usual; browser tier
+kortex-search doctor | jq .proxy          # health + geo alignment status
+kortex-search serve                       # stdio as usual; browser tier
                                            # picks up sticky proxies per profile
 ```
 
@@ -108,7 +108,7 @@ IP → quarantine), never opportunistically.
 - **Per-IP health** is tracked in Redis (`sg:px:*`): a sticky IP with falling
   reliability gets rotated before it burns the persona.
 - **Geo drift**: if the provider's egress country differs from
-  `SEARCH_GATEWAY_PROXY_COUNTRY`, the coherence lint (`doctor`) will flag it.
+  `KORTEX_SEARCH_PROXY_COUNTRY`, the coherence lint (`doctor`) will flag it.
 - **Overage**: committed plans bill overage at higher rates; prefer PAYG
   while the load is sub-10 GB/mo.
 - **Never** mix the personal account's egress with the burner personas —
@@ -123,5 +123,5 @@ IP → quarantine), never opportunistically.
 - Free proxies are a honeypot for credential theft and are instantly
   reputation-burned — never.
 - Residential IP pools have variable latency (2–10 Mbps typical) — the
-  adaptive-timeout machinery (`SEARCH_GATEWAY_ADAPTIVE_TIMEOUT_*`) already
+  adaptive-timeout machinery (`KORTEX_SEARCH_ADAPTIVE_TIMEOUT_*`) already
   absorbs this; raise `ADAPTIVE_TIMEOUT_MAX` if the proxy tier feels slow.

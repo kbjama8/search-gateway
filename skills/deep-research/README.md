@@ -1,13 +1,13 @@
 # Deep Research Skill
 
 Adaptive, evidence-backed research orchestration for the KBJ Singular Core
-Ecosystem. This skill drives the `search-gateway` MCP tools in a controlled loop
+Ecosystem. This skill drives the `kortex-search` MCP tools in a controlled loop
 and maintains a versioned JSON evidence ledger, so every claim is auditable and
 every source is re-checkable.
 
 ## What it does
 
-- Routes every retrieval through the search-gateway (`search_*`, `get_paper`,
+- Routes every retrieval through the kortex-search (`search_*`, `get_paper`,
   `get_citations`, `get_references`, `read_url`) — never a raw platform CLI.
 - Runs an adaptive loop: Frame → Map → Seed → Extract → Verify → Synthesize.
 - Maintains `ledger.json` (schema v1) via `scripts/research_ledger.py`

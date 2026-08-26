@@ -3,7 +3,7 @@ name: master-router
 description: >
   Use when a search or research request arrives and must be classified and
   routed — deciding between academic / web / social / forum / hybrid / news /
-  code / quick-fact, choosing the right search-gateway tools and sources, and
+  code / quick-fact, choosing the right kortex-search tools and sources, and
   deciding between a full ledger-based deep-research run and a quick cited
   answer. Use before dispatching any non-trivial retrieval so the request goes
   through the correct path at the right effort.
@@ -11,7 +11,7 @@ description: >
 
 # Master Router
 
-Classify a research request, route it to the right search-gateway tools and
+Classify a research request, route it to the right kortex-search tools and
 sources at the right effort, and decide whether it needs a full ledger-based
 deep-research run or a quick answer. The router emits a short plan; it does not
 perform the research itself.
@@ -68,6 +68,6 @@ reviewable:
 
 ## Gateway-first rule
 
-Every tool named in the plan is a search-gateway MCP tool. Never route to a raw
+Every tool named in the plan is a kortex-search MCP tool. Never route to a raw
 platform CLI (`twitter`, `opencli`, `bili`, `yt-dlp`, `gh`, `curl`) — all
-retrieval flows through or extends `search-gateway`.
+retrieval flows through or extends `kortex-search`.

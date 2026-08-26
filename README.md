@@ -1,11 +1,11 @@
-# search-gateway
+# kortex-search
 
 ![version](https://img.shields.io/badge/version-0.2.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 <!-- ci badge placeholder: wire to .github/workflows/ci.yml once the hosted run is validated -->
 
-One server, twenty-two sources, one client-agnostic contract. `search-gateway`
+One server, twenty-two sources, one client-agnostic contract. `kortex-search`
 is an MCP server that fuses the web, code, video, social, forum, academic,
 and Chinese-ecosystem worlds behind a single `search()` tool — then
 de-duplicates, fuses (weighted RRF), re-ranks (cross-encoder), diversifies
@@ -55,7 +55,7 @@ flowchart TD
         C["Any MCP client — stdio or HTTP"]
     end
 
-    subgraph Gateway["search_gateway — 14 tools (FastMCP)"]
+    subgraph Gateway["kortex_search — 14 tools (FastMCP)"]
         S["server.py"]
         Q["(opt) query expansion — DeepSeek v4-flash"]
         S --> Q
@@ -167,7 +167,7 @@ flowchart LR
         B5 & B6 & B7 -.->|"manual reconciliation<br/>per integration"| B8["client-side glue code"]
     end
 
-    subgraph GW["search-gateway"]
+    subgraph GW["kortex-search"]
         G1["client"] -->|"one call_tool"| G2["server.py — 14 tools"]
         G2 --> G3["22 sources, fanned out"]
         G3 --> G4["one Result schema<br/>tests/test_contract.py"]
@@ -178,7 +178,7 @@ flowchart LR
 |----------|----------|--------------------|---------------|-----------------------------|
 | Single search API (e.g. Bing/Google API only) | One index's view of the web | None — you get what it gives you | One shape, but no code/social/academic depth | Not possible — you're locked to the vendor's index |
 | Per-source SDKs, wired ad hoc | As wide as you're willing to integrate | Manual, per-integration | N different shapes, N different clients to write | A new SDK, a new client, a new parser, every time |
-| `search-gateway` | 22 sources across web/code/video/social/forum/academic/CN | Rolling 24h success rate feeds fusion weight automatically (`docs/adrs/0003-weighted-rrf.md`) | One `Result` schema, enforced by `tests/test_contract.py` | Subclass `Source`, emit `Result`, register in `ALL_SOURCES` (`docs/architecture.md`) |
+| `kortex-search` | 22 sources across web/code/video/social/forum/academic/CN | Rolling 24h success rate feeds fusion weight automatically (`docs/adrs/0003-weighted-rrf.md`) | One `Result` schema, enforced by `tests/test_contract.py` | Subclass `Source`, emit `Result`, register in `ALL_SOURCES` (`docs/architecture.md`) |
 
 The bet only pays off if degradation is explicit rather than silent — which is
 why `doctor` reports per-source status and `search`'s response envelope always
@@ -190,9 +190,9 @@ handing back whatever fused successfully and staying quiet about the rest.
 ```bash
 pip install .                              # Python ≥ 3.12; or: pip install -e . for development
 cd infra && docker compose up -d && cd ..  # Redis (AOF) + SearXNG (JSON, :8888)
-search-gateway check                       # verified gate: 22 sources + Redis reachable, exit 0
-search-gateway doctor                      # full health report (22 sources)
-search-gateway serve                       # run the stdio MCP server
+kortex-search check                       # verified gate: 22 sources + Redis reachable, exit 0
+kortex-search doctor                      # full health report (22 sources)
+kortex-search serve                       # run the stdio MCP server
 ```
 
 `check` exits 0 and prints:
@@ -205,11 +205,11 @@ search-gateway serve                       # run the stdio MCP server
 }
 ```
 
-<!-- capture: real `search-gateway check` output -->
+<!-- capture: real `kortex-search check` output -->
 
 Two things to expect on a fresh install. The first `search` takes roughly 30
 seconds cold — the cross-encoder and bi-encoder load lazily on first use, and
-`search-gateway warm` preloads them so the first live query is fast instead of
+`kortex-search warm` preloads them so the first live query is fast instead of
 paying that latency on someone's actual request. And `llm.available` reads
 `false` until `DEEPSEEK_API_KEY` is set: search itself works regardless, since
 only `research_answer` and query expansion touch the key (`docs/faq.md`
@@ -267,7 +267,7 @@ diversified (abridged to one result so the envelope is legible):
 Read the envelope, not just the results: `sources` reports each source as
 `ok (n)` / `error: …` / `pending (timeout)`, and `partial: true` plus
 `pending` names whoever missed the 50-second fan-out budget
-(`SEARCH_GATEWAY_TIMEOUT`) — a timed-out source never fails the whole request,
+(`KORTEX_SEARCH_TIMEOUT`) — a timed-out source never fails the whole request,
 it's just absent, and the envelope tells you which one and why. That's the
 alt-branch from the "Request lifecycle" diagram above, made concrete.
 
@@ -314,7 +314,7 @@ rather than letting the model guess.
 Full argument/return schemas — plus a worked JSON example per tool and the
 per-tool error semantics — live in `docs/api/tools.md`. The surface is a
 SemVer-major contract, asserted against the live `tools/list` by
-`tests/test_contract.py` and served over stdio by the bare `search-gateway`
+`tests/test_contract.py` and served over stdio by the bare `kortex-search`
 command (`tests/test_mcp_handshake.py`) — so "does the client actually see 14
 tools" is a testable claim here, not a hope.
 
@@ -328,34 +328,34 @@ tools" is a testable claim here, not a hope.
 | social | twitter, reddit, facebook, instagram, xiaohongshu, linkedin |
 | forum | v2ex |
 | academic | arxiv, openalex, crossref, semantic_scholar |
-| CN tier (opt-in) | zhihu, zhihu_hot, weibo, baidu, toutiao — enabled with `SEARCH_GATEWAY_CN_SOURCES=1` |
+| CN tier (opt-in) | zhihu, zhihu_hot, weibo, baidu, toutiao — enabled with `KORTEX_SEARCH_CN_SOURCES=1` |
 
-Sources degrade explicitly by capability tier (23 registered) — `search-gateway doctor`
+Sources degrade explicitly by capability tier (23 registered) — `kortex-search doctor`
 doubles as the tier report, and `docs/deployment.md` maps each tier to the
 binaries and env vars it needs. Adding source #23 is a bounded, four-step
 change documented in `docs/architecture.md`'s source-adapter contract.
-The v0.4 extraction layer (`search_gateway/extract/`) adds tiered routing,
+The v0.4 extraction layer (`kortex_search/extract/`) adds tiered routing,
 block detection, a browser profile farm, an env-gated proxy subsystem, and
 multi-stage `read_url` — see `docs/extraction/PLAN.md`. Since 0.4.1 it also
 carries the containment floor: an L1 egress filter (private/link-local/
 metadata ranges, checked pre-nav and post-redirect), a per-persona secrets
-vault (`search-gateway vault migrate|status`), and block-event telemetry in
+vault (`kortex-search vault migrate|status`), and block-event telemetry in
 `doctor`/`stats_report`. Since 0.4.2: an L2 forced-proxy for the anonymous
-browser tier and a mandatory L3 kernel egress filter (`search-gateway harden
+browser tier and a mandatory L3 kernel egress filter (`kortex-search harden
 --install --sudo` — browser ops refuse to launch without it, D7.1).
 
 ## CLI
 
 | Command | Behavior |
 |---------|----------|
-| `search-gateway serve` | run the MCP server (default; `--transport stdio\|http\|sse`) |
-| `search-gateway doctor` | health report as JSON, exit 0/1 |
-| `search-gateway check` | strict gate (22 sources + Redis), for `ExecStartPre`/CI |
-| `search-gateway version` | print `__version__` |
-| `search-gateway warm` | preload rerank + embed models |
-| `search-gateway vault migrate [--dry-run]` | move legacy flat secrets into the per-persona vault |
-| `search-gateway vault status` | vault layout + hygiene findings |
-| `search-gateway harden --install\|--status\|--uninstall\|--check [--sudo]` | L3 kernel egress filter (nftables cgroupv2, mandatory D7.1) |
+| `kortex-search serve` | run the MCP server (default; `--transport stdio\|http\|sse`) |
+| `kortex-search doctor` | health report as JSON, exit 0/1 |
+| `kortex-search check` | strict gate (22 sources + Redis), for `ExecStartPre`/CI |
+| `kortex-search version` | print `__version__` |
+| `kortex-search warm` | preload rerank + embed models |
+| `kortex-search vault migrate [--dry-run]` | move legacy flat secrets into the per-persona vault |
+| `kortex-search vault status` | vault layout + hygiene findings |
+| `kortex-search harden --install\|--status\|--uninstall\|--check [--sudo]` | L3 kernel egress filter (nftables cgroupv2, mandatory D7.1) |
 
 ## Configuration
 
@@ -370,7 +370,7 @@ writes to it corrupts the stdio transport.
 
 ## Versioning
 
-SemVer, read from `search_gateway/__init__.py` (currently `0.2.0`). Adding a
+SemVer, read from `kortex_search/__init__.py` (currently `0.2.0`). Adding a
 tool is a **minor** bump. Removing or renaming a tool, or changing a `Result`
 or return-field shape, is a **major** bump with a deprecation cycle — because
 `docs/api/tools.md` and `docs/meta-schema.md` are the contract, and
