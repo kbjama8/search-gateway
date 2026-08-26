@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from search_gateway.extract import (
+from kortex_search.extract import (
     canonicalize_results,
     detectors,
     fingerprints,
     router,
     scheduler,
 )
-from search_gateway.extract import parse as ext_parse
-from search_gateway.extract import profiles as profiles_mod
-from search_gateway.extract import proxies as proxies_mod
+from kortex_search.extract import parse as ext_parse
+from kortex_search.extract import profiles as profiles_mod
+from kortex_search.extract import proxies as proxies_mod
 
 # --- parse.py -----------------------------------------------------------
 
@@ -344,19 +344,19 @@ class TestProxies:
 
 class TestHttp:
     def test_should_impersonate_off_by_default(self):
-        from search_gateway.extract import http
+        from kortex_search.extract import http
         assert not http._should_impersonate("bilibili")
 
     @pytest.mark.asyncio
     async def test_get_json_httpx_path(self, respx_mock):
-        from search_gateway.extract import http
+        from kortex_search.extract import http
         respx_mock.get("https://example.test/x").respond(
             200, json={"ok": True})
         data = await http.get_json("https://example.test/x", source="searxng")
         assert data == {"ok": True}
 
     def test_response_raise_for_status(self):
-        from search_gateway.extract.http import HTTPStatusError, Response
+        from kortex_search.extract.http import HTTPStatusError, Response
         with pytest.raises(HTTPStatusError):
             Response(404, {}, "").raise_for_status()
 
@@ -365,7 +365,7 @@ class TestHttp:
 
 class TestEnvelopeSignals:
     def test_blocked_parsing(self):
-        import search_gateway.orchestrator as orch
+        import kortex_search.orchestrator as orch
         blocked, auth = orch._extract_signals({
             "twitter": "blocked (cloudflare/transient): cf-mitigated: challenge",
             "youtube": "ok (5)",
@@ -375,7 +375,7 @@ class TestEnvelopeSignals:
         assert auth == {}
 
     def test_auth_missing_and_ok(self):
-        import search_gateway.orchestrator as orch
+        import kortex_search.orchestrator as orch
         blocked, auth = orch._extract_signals({
             "zhihu": "auth: ZHIHU_COOKIE not set (zhihu blocks anonymous "
                      "API access with HTTP 401)",
@@ -386,7 +386,7 @@ class TestEnvelopeSignals:
         assert blocked == []
 
     def test_list_outcomes_are_ok(self):
-        import search_gateway.orchestrator as orch
+        import kortex_search.orchestrator as orch
         _, auth = orch._extract_signals({
             "twitter": [{"title": "t", "url": "u"}],
             "zhihu": "error: SourceError: boom",
@@ -394,7 +394,7 @@ class TestEnvelopeSignals:
         assert auth == {"twitter": "ok", "zhihu": "unknown"}
 
     def test_extract_tiers_declared(self):
-        import search_gateway.orchestrator as orch
+        import kortex_search.orchestrator as orch
         tiers = orch._extract_tiers(["searxng", "reddit", "zhihu"])
         assert tiers == {"searxng": {"tier": "api"},
                          "reddit": {"tier": "browser"},
@@ -405,7 +405,7 @@ class TestEnvelopeSignals:
 
 class TestCamoufox:
     def test_disabled_by_default(self, monkeypatch):
-        import search_gateway.extract.camoufox as cf
+        import kortex_search.extract.camoufox as cf
         monkeypatch.setattr(cf, "STEALTH_ENABLED", False)
         ok, reason = cf.available()
         assert not ok and "disabled" in reason
@@ -414,7 +414,7 @@ class TestCamoufox:
         assert browser is None and "disabled" in why
 
     def test_missing_package(self, monkeypatch):
-        import search_gateway.extract.camoufox as cf
+        import kortex_search.extract.camoufox as cf
         monkeypatch.setattr(cf, "STEALTH_ENABLED", True)
         monkeypatch.setitem(__import__("sys").modules, "camoufox", None)
         ok, reason = cf.available()
@@ -422,8 +422,8 @@ class TestCamoufox:
 
     @pytest.mark.asyncio
     async def test_launch_failure_degrades(self, monkeypatch):
-        import search_gateway.extract.camoufox as cf
-        from search_gateway.extract import harden
+        import kortex_search.extract.camoufox as cf
+        from kortex_search.extract import harden
         monkeypatch.setattr(cf, "STEALTH_ENABLED", True)
         # 0.4.2: enforcement gates the launch — simulate a hardened env so the
         # test exercises the launch path itself
@@ -444,7 +444,7 @@ class TestCamoufox:
 
     @pytest.mark.asyncio
     async def test_html_returns_none_without_browser(self):
-        import search_gateway.extract.camoufox as cf
+        import kortex_search.extract.camoufox as cf
         assert await cf.html(None, "https://x") is None
 
     @pytest.mark.asyncio
@@ -453,8 +453,8 @@ class TestCamoufox:
         # live-verified API contract (2026-08-25): AsyncCamoufox.start()
         # RETURNS the Playwright Browser — the adapter must return that, and
         # the L2 forced-proxy args must be attached when the proxy is on
-        import search_gateway.extract.camoufox as cf
-        from search_gateway.extract import harden
+        import kortex_search.extract.camoufox as cf
+        from kortex_search.extract import harden
         monkeypatch.setattr(cf, "STEALTH_ENABLED", True)
         monkeypatch.setattr(harden, "HARDEN", "permissive")
         monkeypatch.setattr(cf, "EGRESS_PROXY", True)
@@ -499,8 +499,8 @@ class TestCamoufox:
     @pytest.mark.asyncio
     async def test_default_headless_is_native(self, monkeypatch):
         # live-verified: headless=True needs no Xvfb; "virtual" does
-        import search_gateway.extract.camoufox as cf
-        from search_gateway.extract import harden
+        import kortex_search.extract.camoufox as cf
+        from kortex_search.extract import harden
         monkeypatch.setattr(cf, "STEALTH_ENABLED", True)
         monkeypatch.setattr(harden, "HARDEN", "permissive")
 
@@ -526,22 +526,22 @@ class TestCamoufox:
 class TestParseShapesLadder:
     @pytest.mark.asyncio
     async def test_llm_assist_gated(self, monkeypatch):
-        from search_gateway.extract import parse as ext_parse
+        from kortex_search.extract import parse as ext_parse
         monkeypatch.setattr(ext_parse, "LLM_PARSE", False)
         assert await ext_parse.llm_assist("x", "hint") == []
 
     @pytest.mark.asyncio
     async def test_llm_assist_no_llm(self, monkeypatch):
-        from search_gateway import llm
-        from search_gateway.extract import parse as ext_parse
+        from kortex_search import llm
+        from kortex_search.extract import parse as ext_parse
         monkeypatch.setattr(ext_parse, "LLM_PARSE", True)
         monkeypatch.setattr(llm, "available", lambda: False)
         assert await ext_parse.llm_assist("x", "hint") == []
 
     @pytest.mark.asyncio
     async def test_llm_assist_validates_schema(self, monkeypatch):
-        from search_gateway import llm
-        from search_gateway.extract import parse as ext_parse
+        from kortex_search import llm
+        from kortex_search.extract import parse as ext_parse
         monkeypatch.setattr(ext_parse, "LLM_PARSE", True)
         monkeypatch.setattr(llm, "available", lambda: True)
 
@@ -556,8 +556,8 @@ class TestParseShapesLadder:
 
     @pytest.mark.asyncio
     async def test_llm_assist_bad_json(self, monkeypatch):
-        from search_gateway import llm
-        from search_gateway.extract import parse as ext_parse
+        from kortex_search import llm
+        from kortex_search.extract import parse as ext_parse
         monkeypatch.setattr(ext_parse, "LLM_PARSE", True)
         monkeypatch.setattr(llm, "available", lambda: True)
 
@@ -569,7 +569,7 @@ class TestParseShapesLadder:
 
     @pytest.mark.asyncio
     async def test_jsonld_fallback(self):
-        from search_gateway.extract import parse as ext_parse
+        from kortex_search.extract import parse as ext_parse
         html = ('<script type="application/ld+json">'
                 '{"headline": "H", "url": "https://h", "description": "d"}'
                 '</script>')
@@ -578,7 +578,7 @@ class TestParseShapesLadder:
 
     @pytest.mark.asyncio
     async def test_css_fallback(self):
-        from search_gateway.extract import parse as ext_parse
+        from kortex_search.extract import parse as ext_parse
         html = '<a class="t" href="/1">One</a><a class="t" href="/2">Two</a>'
         out = await ext_parse.parse_shapes(
             html, source="s", css_rules=[("a.t", "title", ""),
@@ -587,7 +587,7 @@ class TestParseShapesLadder:
 
     @pytest.mark.asyncio
     async def test_regex_fallback(self):
-        from search_gateway.extract import parse as ext_parse
+        from kortex_search.extract import parse as ext_parse
         out = await ext_parse.parse_shapes(
             "A: apple\nB: banana", source="s",
             regex_patterns=[(r"^A: (.+)$", "title", "1"),
@@ -601,7 +601,7 @@ class TestProfilesDisk:
     def test_loads_json_list_from_dir(self, monkeypatch, tmp_path):
         import json as _json
 
-        import search_gateway.extract.profiles as pf
+        import kortex_search.extract.profiles as pf
         (tmp_path / "defs.json").write_text(_json.dumps([
             {"name": "tw-1", "platform": "twitter",
              "user_data_dir": "~/.agent-reach/profiles/tw1"},
@@ -613,20 +613,20 @@ class TestProfilesDisk:
         assert "rd-1" in [p.name for p in st.profiles_for("reddit")]
 
     def test_skips_malformed_json(self, monkeypatch, tmp_path):
-        import search_gateway.extract.profiles as pf
+        import kortex_search.extract.profiles as pf
         (tmp_path / "bad.json").write_text("{broken", encoding="utf-8")
         monkeypatch.setattr(pf, "PROFILE_DIR", str(tmp_path))
         st = pf.ProfileStore()
         assert st.profiles_for("anything") == []
 
     def test_from_dict_defaults(self):
-        from search_gateway.extract.profiles import Profile
+        from kortex_search.extract.profiles import Profile
         p = Profile.from_dict({"name": "n", "platform": "x"})
         assert p.persona == "kaiser" and p.user_data_dir == ""
         assert p.fingerprint == {} and p.proxy == {}
 
     def test_status_and_available(self, rds):
-        import search_gateway.extract.profiles as pf
+        import kortex_search.extract.profiles as pf
         st = pf.ProfileStore([pf.Profile(name="p1", platform="x")])
         assert st.available("p1") is True
         st.report_failure("p1", "cf")

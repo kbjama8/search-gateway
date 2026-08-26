@@ -151,13 +151,13 @@ def rds(monkeypatch):
     def bind(module):
         monkeypatch.setattr(module, "_get_client", lambda: stub)
 
-    from search_gateway import cache, ratelimit, stats
+    from kortex_search import cache, ratelimit, stats
     bind(cache)
     bind(ratelimit)
     bind(stats)
-    from search_gateway import saved_queries
+    from kortex_search import saved_queries
     bind(saved_queries)
-    from search_gateway.extract import profiles, proxies
+    from kortex_search.extract import profiles, proxies
     bind(profiles)
     bind(proxies)
     return stub

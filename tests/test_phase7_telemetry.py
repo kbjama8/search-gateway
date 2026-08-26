@@ -7,7 +7,7 @@ import pytest
 
 class TestBlockReservoir:
     def test_record_and_snapshot(self, rds):
-        from search_gateway import stats
+        from kortex_search import stats
 
         stats.record_block("twitter", "cloudflare", "transient")
         stats.record_block("twitter", "cloudflare", "transient")
@@ -19,7 +19,7 @@ class TestBlockReservoir:
                                     "level": "ip", "ts": bl["recent"][-1]["ts"]}
 
     def test_reservoir_bounded(self, rds, monkeypatch):
-        from search_gateway import stats
+        from kortex_search import stats
 
         monkeypatch.setattr(stats, "BLOCK_RESERVOIR", 3)
         for _i in range(10):
@@ -31,7 +31,7 @@ class TestBlockReservoir:
     def test_snapshot_never_raises(self, monkeypatch):
         import redis as redis_mod
 
-        from search_gateway import stats
+        from kortex_search import stats
 
         class Boom:
             def pipeline(self):
@@ -52,8 +52,8 @@ class TestBlockedErrorTelemetry:
     pytestmark = pytest.mark.asyncio
 
     async def test_run_cmd_records_raise_site(self, rds, monkeypatch):
-        from search_gateway import stats
-        from search_gateway.sources import base as sb
+        from kortex_search import stats
+        from kortex_search.sources import base as sb
 
         sig = sb.classify(403, {"cf-mitigated": "challenge"}, None)
         assert sig is not None
@@ -66,8 +66,8 @@ class TestBlockedErrorTelemetry:
 
 class TestEnvelopeWiring:
     def test_non_raising_blocked_string_recorded(self, rds, monkeypatch):
-        from search_gateway import stats
-        from search_gateway.orchestrator import _extract_signals
+        from kortex_search import stats
+        from kortex_search.orchestrator import _extract_signals
 
         statuses = {
             "reddit": "blocked (datadome/ip): challenge page",  # non-raising
@@ -81,8 +81,8 @@ class TestEnvelopeWiring:
         assert bl["counters"] == {"reddit:datadome": 1}
 
     def test_error_prefixed_not_recorded_again(self, rds):
-        from search_gateway import stats
-        from search_gateway.orchestrator import _extract_signals
+        from kortex_search import stats
+        from kortex_search.orchestrator import _extract_signals
 
         _extract_signals({"twitter": "error: blocked (cf/ip): x"})
         assert stats.blocks_snapshot()["counters"] == {}
@@ -91,7 +91,7 @@ class TestEnvelopeWiring:
 class TestDoctorSections:
     pytestmark = pytest.mark.asyncio
     async def test_four_new_sections_present(self, rds, monkeypatch):
-        from search_gateway import health
+        from kortex_search import health
 
         monkeypatch.setattr(health, "DOCTOR_TIMEOUT", 1)
         monkeypatch.setattr(health, "DOCTOR_PROBE_TIMEOUT", 0.2)
@@ -112,7 +112,7 @@ class TestDoctorSections:
         assert set(out) >= {"egress", "vault", "blocks", "profiles"}
 
     async def test_egress_denials_reflected_in_doctor(self, rds, monkeypatch):
-        from search_gateway import health, stats
+        from kortex_search import health, stats
 
         stats.record_block("egress", "floor", "169.254.0.0/16")
         monkeypatch.setattr(health, "DOCTOR_TIMEOUT", 1)
@@ -138,7 +138,7 @@ class TestDoctorSections:
 class TestStatsReportTool:
     pytestmark = pytest.mark.asyncio
     async def test_stats_report_gains_blocks(self, rds, monkeypatch):
-        from search_gateway import server, stats
+        from kortex_search import server, stats
 
         monkeypatch.setattr(stats, "ledger_health", dict)
         stats.record_block("v2ex", "generic", "ip")

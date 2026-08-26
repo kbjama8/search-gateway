@@ -6,8 +6,8 @@ deterministic in CI.
 
 import json
 
-from search_gateway import saved_queries, stats
-from search_gateway.embeddings import cjk_dominant
+from kortex_search import saved_queries, stats
+from kortex_search.embeddings import cjk_dominant
 
 
 def test_cjk_dominant_detection():

@@ -16,7 +16,7 @@ jobs:
       - name: Install ruff
         run: pip install ruff
       - name: Ruff check
-        run: ruff check search_gateway/ tests/
+        run: ruff check kortex_search/ tests/
 
   test:
     runs-on: ubuntu-latest
@@ -45,11 +45,11 @@ jobs:
       - name: Test (fast)
         run: python -m pytest -m "not slow" -q
       - name: Coverage gate (≥85% package)
-        run: python -m pytest --cov=search_gateway --cov-report=term-missing -m "not slow" -q --cov-fail-under=85
+        run: python -m pytest --cov=kortex_search --cov-report=term-missing -m "not slow" -q --cov-fail-under=85
 
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build headless image
-        run: docker build -f infra/Dockerfile -t search-gateway .
+        run: docker build -f infra/Dockerfile -t kortex-search .

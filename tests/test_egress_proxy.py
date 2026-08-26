@@ -11,7 +11,7 @@ import threading
 
 import pytest
 
-from search_gateway.extract import egress
+from kortex_search.extract import egress
 
 
 class EchoServer:
@@ -176,7 +176,7 @@ class TestResidentialChain:
     pytestmark = pytest.mark.asyncio
     async def test_chain_through_residential_when_enabled(self, proxy, echo,
                                                           monkeypatch):
-        from search_gateway.extract import proxies
+        from kortex_search.extract import proxies
         monkeypatch.setattr(proxies, "PROXY_ENABLED", True)
         monkeypatch.setattr(proxies, "PROXY_GATEWAY", "127.0.0.1:9999")
         monkeypatch.setattr(proxies, "PROXY_PROTOCOL", "http")
@@ -197,7 +197,7 @@ class TestResidentialChain:
         writer.close()
 
     async def test_direct_when_proxy_disabled(self, proxy, echo, monkeypatch):
-        from search_gateway.extract import proxies
+        from kortex_search.extract import proxies
         monkeypatch.setattr(proxies, "PROXY_ENABLED", False)
         reader, writer = await asyncio.open_connection("127.0.0.1", proxy.port)
         writer.write(f"CONNECT 127.0.0.1:{echo.port} HTTP/1.1\r\n\r\n".encode())
@@ -278,10 +278,10 @@ class TestResidentialGateway:
     async def test_connect_via_gateway_happy_path(self, echo, connect_server,
                                                     monkeypatch):
         connect_server.target("127.0.0.1", echo.port)
-        from search_gateway.extract import proxies
+        from kortex_search.extract import proxies
         monkeypatch.setattr(proxies, "PROXY_GATEWAY",
                             f"127.0.0.1:{connect_server.port}")
-        from search_gateway.extract.egress import _connect_via_gateway
+        from kortex_search.extract.egress import _connect_via_gateway
         reader, writer = await _connect_via_gateway("8.8.8.8", 443)
         writer.write(b"ping\n")
         await writer.drain()
@@ -293,29 +293,29 @@ class TestResidentialGateway:
     async def test_connect_via_gateway_rejected(self, connect_server,
                                                   monkeypatch):
         connect_server._status = b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n"
-        from search_gateway.extract import proxies
+        from kortex_search.extract import proxies
         monkeypatch.setattr(proxies, "PROXY_GATEWAY",
                             f"127.0.0.1:{connect_server.port}")
-        from search_gateway.extract.egress import _connect_via_gateway
+        from kortex_search.extract.egress import _connect_via_gateway
         with pytest.raises(OSError, match="rejected"):
             await _connect_via_gateway("8.8.8.8", 443)
 
     async def test_connect_via_gateway_has_auth_header(self, echo, connect_server,
                                                        monkeypatch):
         connect_server.target("127.0.0.1", echo.port)
-        from search_gateway.extract import proxies
+        from kortex_search.extract import proxies
         monkeypatch.setattr(proxies, "PROXY_GATEWAY",
                             f"127.0.0.1:{connect_server.port}")
         monkeypatch.setattr(proxies, "PROXY_USERNAME", "user-any-sid-x-ttl-30m")
         monkeypatch.setattr(proxies, "PROXY_PASSWORD", "pw")
-        from search_gateway.extract.egress import _connect_via_gateway
+        from kortex_search.extract.egress import _connect_via_gateway
         await _connect_via_gateway("8.8.8.8", 443)
         # the CONNECT request carried Proxy-Authorization (basic, uri-encoded)
         assert any(b"Proxy-Authorization: Basic" in line
                    for line in connect_server.requests)
 
     async def test_socks5_protocol_falls_back_direct(self, echo, monkeypatch):
-        from search_gateway.extract import egress, proxies
+        from kortex_search.extract import egress, proxies
         monkeypatch.setattr(proxies, "PROXY_ENABLED", True)
         monkeypatch.setattr(proxies, "PROXY_PROTOCOL", "socks5")
         monkeypatch.setattr(proxies, "PROXY_GATEWAY", "127.0.0.1:9999")
@@ -392,7 +392,7 @@ class TestSingleton:
 class TestStatusSection:
     pytestmark = pytest.mark.asyncio
     async def test_doctor_egress_section_extended(self, monkeypatch, rds):
-        from search_gateway.extract import harden
+        from kortex_search.extract import harden
         monkeypatch.setattr(harden, "table_installed", lambda: False)
         monkeypatch.setattr(harden, "_nft", lambda: None)
         monkeypatch.setattr(egress, "EGRESS_PROXY", True)

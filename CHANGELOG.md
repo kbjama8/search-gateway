@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-26
+
+"Rename to Kortex Search" — product rebrand from Search Gateway.
+
+### Changed (breaking)
+- **Package** `search_gateway` → `kortex_search` (imports, loggers, module paths).
+- **Console script / binary** `search-gateway` → `kortex-search`
+  (`[project.scripts]` entry, CLI `prog`, FastMCP server name).
+- **Env prefix** `SEARCH_GATEWAY_*` → `KORTEX_SEARCH_*`. The old prefix is
+  still read as a deprecated fallback (warns once per variable; removal in
+  0.6.0). Unprefixed vars (`SEARXNG_*`, `GITHUB_TOKEN`, `DEEPSEEK_*`,
+  `ZHIHU_COOKIE`, `WEIBO_SUB`, `TWITTER_AUTH_FILE`, `DEEPSEEK_AUTH_FILE`)
+  are unchanged.
+- **Redis key prefix** `sg:` → `ks:` (cache, rate-limit, stats, saved
+  queries). `sg:sq:*` saved queries are migrated on upgrade; TTL-bound
+  caches/stats expire naturally.
+- **Systemd units** `search-gateway@.service` → `kortex-search@.service`,
+  `search-gateway-harden.service` → `kortex-search-harden.service`; config
+  dir `~/.config/search-gateway/` → `~/.config/kortex-search/`.
+- **Egress filter** nft table/scope `sg_egress`/`sg-egress` →
+  `ks_egress`/`ks-egress`; ruleset file `sg-egress.nft` → `ks-egress.nft`.
+- Repo renamed (local + GitHub `kbjama8/kortex-search`); opencode MCP key
+  `mcp.kortex-search` (tool prefix `kortex-search_*`).
+
 ## [0.4.3] - 2026-08-23
 
 "CN truth + vault finalization" (PHASE8 Plan 1/2/3/5 + D7.3).

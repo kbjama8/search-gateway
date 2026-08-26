@@ -30,10 +30,10 @@ import time
 
 import pytest
 
-from search_gateway import cache, ratelimit, stats
-from search_gateway.config import RETRYABLE_EXIT_CODES
-from search_gateway.models import Result
-from search_gateway.orchestrator import _filter_fresh, _parse_date
+from kortex_search import cache, ratelimit, stats
+from kortex_search.config import RETRYABLE_EXIT_CODES
+from kortex_search.models import Result
+from kortex_search.orchestrator import _filter_fresh, _parse_date
 
 # --------------------------------------------------------------------------
 # Minimal in-memory Redis stub (implements the surface the gateway touches)
@@ -123,7 +123,7 @@ async def test_ratelimit_local_gate_blocks(rds):
 @pytest.mark.asyncio
 async def test_ratelimit_redis_gate_blocks(rds):
     # simulate another process having queried 50ms ago: remaining ≈ 0.05s
-    rds.set("sg:rl:reddit", str(time.monotonic() - 0.05))
+    rds.set("ks:rl:reddit", str(time.monotonic() - 0.05))
     t0 = time.monotonic()
     await ratelimit.wait_if_needed("reddit", 0.1)
     assert time.monotonic() - t0 >= 0.04
@@ -132,7 +132,7 @@ async def test_ratelimit_redis_gate_blocks(rds):
 @pytest.mark.asyncio
 async def test_ratelimit_redis_gate_records_timestamp(rds):
     await ratelimit.wait_if_needed("facebook", 0.0)
-    raw = rds.get("sg:rl:facebook")
+    raw = rds.get("ks:rl:facebook")
     assert raw is not None
     assert abs(float(raw) - time.monotonic()) < 2.0
 
@@ -143,7 +143,7 @@ async def test_ratelimit_redis_gate_records_timestamp(rds):
 
 @pytest.mark.asyncio
 async def test_run_cmd_does_not_retry_non_transient(monkeypatch, tmp_path):
-    from search_gateway.sources import base as sb
+    from kortex_search.sources import base as sb
     monkeypatch.setattr(sb, "RETRY_COUNT", 2)
     counter = tmp_path / "calls.txt"
     cmd = ["sh", "-c", f"echo x >> {counter}; exit 3"]
@@ -154,7 +154,7 @@ async def test_run_cmd_does_not_retry_non_transient(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_run_cmd_retries_transient(monkeypatch, tmp_path):
-    from search_gateway.sources import base as sb
+    from kortex_search.sources import base as sb
     monkeypatch.setattr(sb, "RETRY_COUNT", 1)
     counter = tmp_path / "calls.txt"
     code = RETRYABLE_EXIT_CODES[0]  # 1
@@ -170,7 +170,7 @@ async def test_run_cmd_retries_transient(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_doctor_bounded(monkeypatch):
-    from search_gateway import health
+    from kortex_search import health
     monkeypatch.setattr(health, "DOCTOR_TIMEOUT", 0.3)
     monkeypatch.setattr(health, "DOCTOR_PROBE_TIMEOUT", 0.2)
     monkeypatch.setattr(health, "_probe_cache", {})
@@ -198,7 +198,7 @@ async def test_doctor_bounded(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_doctor_probe_cache_makes_second_call_instant(monkeypatch):
-    from search_gateway import health
+    from kortex_search import health
     monkeypatch.setattr(health, "DOCTOR_TIMEOUT", 2)
     monkeypatch.setattr(health, "DOCTOR_PROBE_TIMEOUT", 2)
     monkeypatch.setattr(health, "_probe_cache", {})
@@ -232,13 +232,13 @@ async def test_doctor_probe_cache_makes_second_call_instant(monkeypatch):
 
 def test_search_invalid_source_raises():
     import pytest as _pytest  # noqa
-    from search_gateway import server
+    from kortex_search import server
     with _pytest.raises(ValueError, match="bogus"):
         server._resolve_sources(["bogus"])
 
 
 def test_search_valid_sources_pass():
-    from search_gateway import server
+    from kortex_search import server
     assert server._resolve_sources(["searxng", "exa"]) == ["searxng", "exa"]
     assert server._resolve_sources(None) is not None
 
@@ -248,7 +248,7 @@ def test_search_valid_sources_pass():
 # --------------------------------------------------------------------------
 
 def test_clamp_limit():
-    from search_gateway import server
+    from kortex_search import server
     assert server._clamp_limit(500) == 30
     assert server._clamp_limit(0) == 1
     assert server._clamp_limit(-3) == 1
@@ -260,7 +260,7 @@ def test_clamp_limit():
 # --------------------------------------------------------------------------
 
 def test_llm_available_respects_enabled(monkeypatch):
-    from search_gateway import llm
+    from kortex_search import llm
     monkeypatch.setattr(llm, "get_api_key", lambda: "k")
     monkeypatch.setattr(llm, "LLM_ENABLED", False)
     assert llm.available() is False
@@ -276,7 +276,7 @@ def test_llm_available_respects_enabled(monkeypatch):
 
 def test_openalex_to_result_called_once(monkeypatch):
     """OpenAlex search maps each result through _to_result exactly once."""
-    import search_gateway.sources.openalex as oa
+    import kortex_search.sources.openalex as oa
 
     payload = {"results": [{"title": "A", "id": "https://openalex.org/W1",
                             "doi": "https://doi.org/10.1/a",
@@ -310,16 +310,16 @@ def test_openalex_to_result_called_once(monkeypatch):
 
 
 def test_semantic_rerank_prefixed_env(monkeypatch):
-    import search_gateway.config as cfg
-    monkeypatch.setitem(os.environ, "SEARCH_GATEWAY_SEMANTIC_RERANK", "1")
+    import kortex_search.config as cfg
+    monkeypatch.setitem(os.environ, "KORTEX_SEARCH_SEMANTIC_RERANK", "1")
     monkeypatch.setitem(os.environ, "SEMANTIC_RERANK", "0")  # legacy should lose
     mod = importlib.reload(cfg)
     assert mod.SEMANTIC_RERANK is True
 
 
 def test_semantic_rerank_legacy_env(monkeypatch):
-    import search_gateway.config as cfg
-    monkeypatch.delenv("SEARCH_GATEWAY_SEMANTIC_RERANK", raising=False)
+    import kortex_search.config as cfg
+    monkeypatch.delenv("KORTEX_SEARCH_SEMANTIC_RERANK", raising=False)
     monkeypatch.setitem(os.environ, "SEMANTIC_RERANK", "0")
     mod = importlib.reload(cfg)
     assert mod.SEMANTIC_RERANK is False
@@ -331,7 +331,7 @@ def test_semantic_rerank_legacy_env(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_diff_no_baseline_returns_delta_shape(rds, monkeypatch):
-    from search_gateway import saved_queries as sq
+    from kortex_search import saved_queries as sq
     monkeypatch.setattr(sq.orchestrator, "search",
                         _fake_orchestrator_search)
     sq.save("monitor", "some query")
@@ -368,7 +368,7 @@ def test_stats_error_does_not_dilute_latency(rds):
 # --------------------------------------------------------------------------
 
 def test_stackoverflow_epoch_to_published():
-    from search_gateway.sources.stackoverflow import epoch_to_published
+    from kortex_search.sources.stackoverflow import epoch_to_published
     out = epoch_to_published(1760000000)
     assert out is not None
     assert out.startswith("2025-")
@@ -380,7 +380,7 @@ def test_stackoverflow_epoch_to_published():
 # --------------------------------------------------------------------------
 
 def test_fusion_reliability_fetched_once_per_source(monkeypatch):
-    from search_gateway import fusion
+    from kortex_search import fusion
     calls = {"n": 0}
     orig = fusion.stats.reliability
 
@@ -405,7 +405,7 @@ def test_fusion_reliability_fetched_once_per_source(monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_dedup_still_collapses_near_duplicates():
-    from search_gateway.dedup import dedup
+    from kortex_search.dedup import dedup
     a = Result(title="Breaking News Story", url="https://a.com/x", snippet="same text")
     b = Result(title="Breaking News Story", url="https://b.com/x", snippet="same text")
     out = dedup([a, b])
@@ -438,14 +438,14 @@ def _call_mw(mw, scope_headers):
 
 
 def test_bearer_middleware_accepts_token():
-    from search_gateway.server import BearerAuthMiddleware
+    from kortex_search.server import BearerAuthMiddleware
     mw = BearerAuthMiddleware(app=None, token="sekret")
     _, captured = _call_mw(mw, [(b"authorization", b"Bearer sekret")])
     assert captured.get("reached") is True
 
 
 def test_bearer_middleware_rejects_wrong_token():
-    from search_gateway.server import BearerAuthMiddleware
+    from kortex_search.server import BearerAuthMiddleware
     async def app(scope, receive, send):
         raise AssertionError("app must not be reached")
     mw = BearerAuthMiddleware(app=app, token="sekret")
@@ -454,7 +454,7 @@ def test_bearer_middleware_rejects_wrong_token():
 
 
 def test_bearer_middleware_rejects_missing_token():
-    from search_gateway.server import BearerAuthMiddleware
+    from kortex_search.server import BearerAuthMiddleware
     async def app(scope, receive, send):
         raise AssertionError("app must not be reached")
     mw = BearerAuthMiddleware(app=app, token="sekret")
@@ -463,14 +463,14 @@ def test_bearer_middleware_rejects_missing_token():
 
 
 def test_main_refuses_http_without_token(monkeypatch):
-    from search_gateway import server
+    from kortex_search import server
     monkeypatch.setattr(server, "HTTP_TOKEN", "")
-    with pytest.raises(SystemExit, match="SEARCH_GATEWAY_HTTP_TOKEN"):
+    with pytest.raises(SystemExit, match="KORTEX_SEARCH_HTTP_TOKEN"):
         server.main(transport="http")
 
 
 def test_research_answer_prompt_injection_hardened(monkeypatch):
-    from search_gateway import server
+    from kortex_search import server
     captured = {}
 
     async def fake_search(query, sources=None, **kw):
@@ -502,14 +502,14 @@ def test_research_answer_prompt_injection_hardened(monkeypatch):
 
 
 def test_scrub_strips_control_chars():
-    from search_gateway.server import _scrub
+    from kortex_search.server import _scrub
     assert _scrub("ok\x1b[31mred\x07\x00") == "ok[31mred"
     assert _scrub("a\nb\tc") == "a\nb\tc"
     assert len(_scrub("x" * 5000, 100)) == 100
 
 
 def test_subprocess_env_allowlist(monkeypatch):
-    from search_gateway.sources.base import _subprocess_env
+    from kortex_search.sources.base import _subprocess_env
     monkeypatch.setenv("DEEPSEEK_API_KEY", "super-secret")
     monkeypatch.setenv("GITHUB_TOKEN", "ghp-secret")
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
@@ -524,20 +524,20 @@ def test_subprocess_env_allowlist(monkeypatch):
 
 
 def test_sanitize_text_strips_control_chars():
-    from search_gateway.sources.base import _sanitize_text
+    from kortex_search.sources.base import _sanitize_text
     assert _sanitize_text("err\x1b[2J\x07boom") == "err[2Jboom"
     assert len(_sanitize_text("z" * 500, 120)) == 120
 
 
 def test_guard_query_rejects_leading_dash():
-    from search_gateway.sources.base import SourceError, guard_query
+    from kortex_search.sources.base import SourceError, guard_query
     assert guard_query("openai agents") == "openai agents"
     with pytest.raises(SourceError, match="flag-injection"):
         guard_query("-l user")
 
 
 def test_daily_budget_enforced(rds, monkeypatch):
-    from search_gateway import ratelimit
+    from kortex_search import ratelimit
     monkeypatch.setattr(ratelimit, "DAILY_QUERY_LIMIT", 2)
 
     async def run():
@@ -550,7 +550,7 @@ def test_daily_budget_enforced(rds, monkeypatch):
 
 
 def test_daily_budget_disabled_when_zero(rds, monkeypatch):
-    from search_gateway import ratelimit
+    from kortex_search import ratelimit
     monkeypatch.setattr(ratelimit, "DAILY_QUERY_LIMIT", 0)
 
     async def run():
@@ -560,7 +560,7 @@ def test_daily_budget_disabled_when_zero(rds, monkeypatch):
 
 
 def test_daily_budget_counts_per_source(rds, monkeypatch):
-    from search_gateway import ratelimit
+    from kortex_search import ratelimit
     monkeypatch.setattr(ratelimit, "DAILY_QUERY_LIMIT", 1)
 
     async def run():
@@ -575,7 +575,7 @@ def test_daily_budget_counts_per_source(rds, monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_normalize_published_variants():
-    from search_gateway.sources.base import normalize_published
+    from kortex_search.sources.base import normalize_published
     assert normalize_published(None) is None
     assert normalize_published("") is None
     assert normalize_published("2026") == "2026-01-01"          # bare year
@@ -587,7 +587,7 @@ def test_normalize_published_variants():
 
 
 def test_freshness_works_on_normalized_dates():
-    from search_gateway.sources.base import normalize_published
+    from kortex_search.sources.base import normalize_published
     # v2ex epoch (created) — previously unparseable; recent → kept once
     v2ex_date = normalize_published(1774000000)  # 2026-03
     r = _res("v2ex-post", published=v2ex_date)
@@ -605,13 +605,13 @@ def test_freshness_works_on_normalized_dates():
 
 
 def test_v2ex_source_uses_normalized_published():
-    import search_gateway.sources.v2ex as mod
+    import kortex_search.sources.v2ex as mod
     assert "normalize_published" in dir(mod)
 
 
 def test_epoch_to_published_alias_matches_contract():
-    from search_gateway.sources.base import normalize_published
-    from search_gateway.sources.stackoverflow import epoch_to_published
+    from kortex_search.sources.base import normalize_published
+    from kortex_search.sources.stackoverflow import epoch_to_published
     assert epoch_to_published(1760000000) == normalize_published(1760000000)
     assert epoch_to_published(None) is None
 
@@ -634,7 +634,7 @@ def test_stats_percentiles(rds):
 
 
 def test_adaptive_timeout_uses_p95(monkeypatch, rds):
-    from search_gateway import orchestrator as orch
+    from kortex_search import orchestrator as orch
     stats.record("searxng", True, 1.0)  # p95 = 1.0 → timeout = 1.5
     monkeypatch.setattr(orch, "ADAPTIVE_TIMEOUT", True)
     monkeypatch.setattr(orch, "ADAPTIVE_TIMEOUT_FACTOR", 1.5)
@@ -647,13 +647,13 @@ def test_adaptive_timeout_uses_p95(monkeypatch, rds):
 
 
 def test_adaptive_timeout_unknown_source_uses_fallback(monkeypatch, rds):
-    from search_gateway import orchestrator as orch
+    from kortex_search import orchestrator as orch
     monkeypatch.setattr(orch, "ADAPTIVE_TIMEOUT", True)
     assert orch._adaptive_timeout("never-seen", fallback=18) == 18
 
 
 def test_negative_cache_skip(monkeypatch, rds):
-    from search_gateway import cache
+    from kortex_search import cache
     cache.mark_source_failed("reddit", "some query", "general")
     assert cache.source_recently_failed("reddit", "some query", "general") is True
     assert cache.source_recently_failed("reddit", "other query", "general") is False
@@ -662,16 +662,16 @@ def test_negative_cache_skip(monkeypatch, rds):
 
 
 def test_cache_key_normalization(rds):
-    from search_gateway import cache
+    from kortex_search import cache
     k1 = cache._key("  Hello   World  ", ["s1"], "general", 5)
     k2 = cache._key("hello world", ["s1"], "general", 5)
     assert k1 == k2
     k3 = cache._key("hello\x00world", ["s1"], "general", 5)
-    assert k3 == "sg:general:s1:5:helloworld"  # control char scrubbed
+    assert k3 == "ks:general:s1:5:helloworld"  # control char scrubbed
 
 
 def test_cache_payload_validation(rds):
-    from search_gateway import cache
+    from kortex_search import cache
     good = [{"title": "t", "url": "https://t.com/"}]
     cache.set("q", ["s1"], "general", 5, good)
     assert cache.get("q", ["s1"], "general", 5) == good
@@ -684,7 +684,7 @@ def test_cache_payload_validation(rds):
 
 
 def test_expansion_gated_on_weak_base(monkeypatch, rds):
-    from search_gateway.orchestrator import _expansion_needed
+    from kortex_search.orchestrator import _expansion_needed
     assert _expansion_needed(0, gate=6) is True
     assert _expansion_needed(5, gate=6) is True
     assert _expansion_needed(6, gate=6) is False
@@ -692,7 +692,7 @@ def test_expansion_gated_on_weak_base(monkeypatch, rds):
 
 
 def test_mmr_per_category_lambda(monkeypatch, rds):
-    from search_gateway import orchestrator as orch
+    from kortex_search import orchestrator as orch
     monkeypatch.setattr(orch, "MMR_LAMBDA", 0.75)
     monkeypatch.setattr(orch, "MMR_LAMBDA_BY_CATEGORY",
                         {"general": 0.75, "news": 0.7, "science": 0.8})
@@ -707,8 +707,8 @@ def test_mmr_per_category_lambda(monkeypatch, rds):
 # --------------------------------------------------------------------------
 
 def _expansion_probe(monkeypatch, rds):
-    from search_gateway import orchestrator as orch
-    from search_gateway.sources.base import Source
+    from kortex_search import orchestrator as orch
+    from kortex_search.sources.base import Source
 
     class EmptySource(Source):
         name = "reddit"
@@ -768,9 +768,9 @@ def test_expansion_runs_for_default_fanout(monkeypatch, rds):
 # --------------------------------------------------------------------------
 
 def test_parse_json_tolerates_banners():
-    from search_gateway.sources.base import _extract_json, parse_json_or_yaml
+    from kortex_search.sources.base import _extract_json, parse_json_or_yaml
 
-    noisy = ('Running as unit: sg-egress.scope; invocation ID: 123\n'
+    noisy = ('Running as unit: ks-egress.scope; invocation ID: 123\n'
              '[{"title": "a", "url": "https://x/1"}, {"title": "b", "url": "https://x/2"}]\n'
              '\n  Update available: v1.8.6 \u2192 v1.8.7\n  Run: npm install -g @x\n')
     data = parse_json_or_yaml(noisy)
@@ -779,15 +779,15 @@ def test_parse_json_tolerates_banners():
     assert _extract_json('prefix {"k": "v"} suffix') == '{"k": "v"}'
 
 def test_parse_json_banner_inside_string_not_confused():
-    from search_gateway.sources.base import _extract_json
+    from kortex_search.sources.base import _extract_json
     tricky = '[{"snippet": "say \\"hi\\" then {x}", "url": "u"}]'
     assert _extract_json(tricky) == tricky
     import json
     assert json.loads(_extract_json(tricky))[0]["snippet"] == 'say "hi" then {x}'
 
 def test_run_opencli_wrapper_is_quiet(monkeypatch):
-    from search_gateway.extract import harden
-    from search_gateway.sources import base as sb
+    from kortex_search.extract import harden
+    from kortex_search.sources import base as sb
     monkeypatch.setattr(harden, "HARDEN", "required")
     monkeypatch.setattr(harden, "table_installed", lambda: True)
     monkeypatch.setattr(harden, "systemd_run_available", lambda: True)
@@ -817,14 +817,14 @@ def test_run_opencli_wrapper_is_quiet(monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_fusion_tolerates_none_snippet(monkeypatch, rds):
-    from search_gateway import orchestrator as orch
-    from search_gateway.sources.base import Source
+    from kortex_search import orchestrator as orch
+    from kortex_search.sources.base import Source
 
     class NoneSnippetSource(Source):
         name = "toutiao"
 
         async def search(self, query, limit=10):
-            from search_gateway.models import Result
+            from kortex_search.models import Result
             return [Result(title="no label", url="https://t/1",
                            snippet=None, source="toutiao")]
 
@@ -847,7 +847,7 @@ def test_fusion_tolerates_none_snippet(monkeypatch, rds):
 
 
 def test_toutiao_empty_label_is_empty_string(monkeypatch):
-    import search_gateway.sources.toutiao as tt
+    import kortex_search.sources.toutiao as tt
     payload = {"data": [{"Title": "无标签", "Url": "https://t/1",
                          "Label": "", "HotValue": 1, "Index": 1}]}
 
@@ -869,7 +869,7 @@ def test_toutiao_empty_label_is_empty_string(monkeypatch):
 def test_ratelimit_atomic_claim_serializes_concurrent_callers(monkeypatch, rds):
     """Concurrent callers must not both fire immediately — the old read-then-
     set let two racers read the old timestamp and fire together."""
-    from search_gateway import ratelimit as rl
+    from kortex_search import ratelimit as rl
 
     monkeypatch.setattr(rl, "_local", {})
     fired: list[float] = []
@@ -895,8 +895,8 @@ def test_ratelimit_atomic_claim_serializes_concurrent_callers(monkeypatch, rds):
 def test_singleflight_key_covers_limit_and_category(monkeypatch, rds):
     """Concurrent same-query requests with different limits must NOT share a
     task (the old (source, query) key returned the wrong result count)."""
-    from search_gateway import orchestrator as orch
-    from search_gateway.sources.base import Source
+    from kortex_search import orchestrator as orch
+    from kortex_search.sources.base import Source
 
     class LimitedSource(Source):
         name = "searxng"
@@ -908,7 +908,7 @@ def test_singleflight_key_covers_limit_and_category(monkeypatch, rds):
             import asyncio
             self.seen_limits.append(limit)
             await asyncio.sleep(0.2)  # force overlap
-            from search_gateway.models import Result
+            from kortex_search.models import Result
             return [Result(title=f"r{i}", url=f"https://x/{i}", source="searxng")
                     for i in range(limit)]
 
@@ -944,7 +944,7 @@ def test_run_cmd_kills_child_on_cancellation():
     import asyncio
     import os
 
-    from search_gateway.sources import base as sb
+    from kortex_search.sources import base as sb
 
     async def main():
         import tempfile
@@ -971,7 +971,7 @@ def test_run_cmd_kills_child_on_cancellation():
 
 def test_identifier_path_quoting():
     """User-supplied identifiers must not corrupt the fetch URL path."""
-    from search_gateway.sources import crossref, openalex, semantic_scholar
+    from kortex_search.sources import crossref, openalex, semantic_scholar
 
     assert crossref._quote_doi("10.1/../../admin?x=1#frag") == (
         "10.1%2F..%2F..%2Fadmin%3Fx%3D1%23frag")
@@ -983,8 +983,8 @@ def test_identifier_path_quoting():
 
 def test_mmr_never_returns_empty_with_candidates(monkeypatch):
     """All-below-floor candidates must fall back to top-k, never []."""
-    from search_gateway import diversity
-    from search_gateway.models import Result
+    from kortex_search import diversity
+    from kortex_search.models import Result
 
     rs = [Result(title=f"t{i}", url=f"https://d{i}.example/", score=0.0)
           for i in range(5)]
@@ -997,7 +997,7 @@ def test_auth_middleware_rejects_wrong_token():
     constant-time comparison)."""
     import asyncio
 
-    from search_gateway.server import BearerAuthMiddleware
+    from kortex_search.server import BearerAuthMiddleware
 
     sent: list[tuple[int, bytes]] = []
 
@@ -1024,7 +1024,7 @@ def test_auth_middleware_rejects_wrong_token():
 def test_facade_lazy_parse_handles_xml(monkeypatch):
     """The facade must not eagerly JSON-parse — XML/text endpoints (arxiv)
     broke under the eager path (live-verified 2026-08-26)."""
-    from search_gateway.extract import http as eh
+    from kortex_search.extract import http as eh
 
     class FakeRaw:
         status_code = 200
@@ -1048,8 +1048,8 @@ def test_facade_lazy_parse_handles_xml(monkeypatch):
 def test_facade_transport_error_single_surface(monkeypatch):
     import httpx as _httpx
 
-    from search_gateway.sources import crossref as cr
-    from search_gateway.sources.base import SourceError
+    from kortex_search.sources import crossref as cr
+    from kortex_search.sources.base import SourceError
 
     class BoomTransport:
         async def __aenter__(self):
@@ -1070,9 +1070,9 @@ def test_facade_transport_error_single_surface(monkeypatch):
         assert "ConnectError" in str(exc)  # wrapped, not leaked raw
 
 def test_github_403_rate_limit_surface(monkeypatch):
-    from search_gateway.extract import http as eh
-    from search_gateway.sources import github as gh
-    from search_gateway.sources.base import SourceError
+    from kortex_search.extract import http as eh
+    from kortex_search.sources import github as gh
+    from kortex_search.sources.base import SourceError
 
     async def fake_request(method, url, **kw):
         return eh.Response(403, {}, "")
@@ -1088,7 +1088,7 @@ def test_github_403_rate_limit_surface(monkeypatch):
 def test_facade_remaining_branches(monkeypatch):
     """Cover the facade's degrade + wrap branches: impersonate fallback,
     JSON-decode wrap, and get_json HTTPStatusError passthrough."""
-    from search_gateway.extract import http as eh
+    from kortex_search.extract import http as eh
 
     # impersonate requested but curl_cffi fails -> degrades to httpx
     monkeypatch.setattr(eh, "IMPERSONATE", True)
@@ -1133,13 +1133,13 @@ def test_migrated_sources_http_error_branches(monkeypatch):
     """Every migrated source wraps facade HttpError into SourceError."""
     import sys
 
-    from search_gateway.extract import http as eh
-    from search_gateway.sources.arxiv import ArxivSource
-    from search_gateway.sources.base import SourceError
-    from search_gateway.sources.openalex import OpenAlexSource
-    from search_gateway.sources.semantic_scholar import SemanticScholarSource
-    from search_gateway.sources.stackoverflow import StackOverflowSource
-    from search_gateway.sources.v2ex import V2EXSource
+    from kortex_search.extract import http as eh
+    from kortex_search.sources.arxiv import ArxivSource
+    from kortex_search.sources.base import SourceError
+    from kortex_search.sources.openalex import OpenAlexSource
+    from kortex_search.sources.semantic_scholar import SemanticScholarSource
+    from kortex_search.sources.stackoverflow import StackOverflowSource
+    from kortex_search.sources.v2ex import V2EXSource
 
     async def boom(*a, **k):
         raise eh.HttpError("ConnectError: network down")

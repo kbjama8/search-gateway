@@ -5,17 +5,17 @@ from __future__ import annotations
 
 import asyncio
 
-from search_gateway import saved_queries as sq
-from search_gateway.models import Result
-from search_gateway.server import (
+from kortex_search import saved_queries as sq
+from kortex_search.models import Result
+from kortex_search.server import (
     _normalize_identifier,
     _pick_fields,
     get_citations,
     get_paper,
     get_references,
 )
-from search_gateway.sources import ALL_SOURCES
-from search_gateway.sources.base import SourceError
+from kortex_search.sources import ALL_SOURCES
+from kortex_search.sources.base import SourceError
 
 
 class FakeResp:
@@ -58,7 +58,7 @@ def _mock_http(monkeypatch, module, responses):
     client = FakeClient(responses)
 
     async def _checked(resp):
-        from search_gateway.extract.http import HTTPStatusError
+        from kortex_search.extract.http import HTTPStatusError
         if getattr(resp, "status_code", 200) >= 400:
             raise HTTPStatusError(resp.status_code)
         return resp
@@ -117,8 +117,8 @@ def test_pick_fields():
 
 
 def test_get_paper_doi(monkeypatch):
-    import search_gateway.sources.crossref as cr
-    import search_gateway.sources.openalex as oa
+    import kortex_search.sources.crossref as cr
+    import kortex_search.sources.openalex as oa
     _mock_http(monkeypatch, oa, [FakeResp(PAPER)])
     _mock_http(monkeypatch, cr, [FakeResp({"message": {
         "title": ["Paper X"], "URL": "https://doi.org/10.1/x", "DOI": "10.1/x"}})])
@@ -132,8 +132,8 @@ def test_get_paper_doi(monkeypatch):
 
 
 def test_get_paper_arxiv(monkeypatch):
-    import search_gateway.sources.arxiv as arx
-    import search_gateway.sources.openalex as oa
+    import kortex_search.sources.arxiv as arx
+    import kortex_search.sources.openalex as oa
 
     async def fake_get_text(url, **kw):
         return "<feed/>"
@@ -149,7 +149,7 @@ def test_get_paper_arxiv(monkeypatch):
 
 
 def test_get_paper_title_search(monkeypatch):
-    import search_gateway.sources.openalex as oa
+    import kortex_search.sources.openalex as oa
     _mock_http(monkeypatch, oa, [FakeResp({"results": [PAPER]})])
 
     async def run():
@@ -202,7 +202,7 @@ def test_get_citations_fallback(monkeypatch):
 
 
 def test_get_references_doi_and_unknown(monkeypatch):
-    import search_gateway.sources.crossref as cr
+    import kortex_search.sources.crossref as cr
     _mock_http(monkeypatch, cr, [FakeResp({"message": {"reference": [
         {"DOI": "10.9/r1", "article-title": "Ref1"},
     ]}})])
@@ -217,7 +217,7 @@ def test_get_references_doi_and_unknown(monkeypatch):
 
 
 def test_research_answer_no_results(monkeypatch):
-    from search_gateway import server
+    from kortex_search import server
 
     async def fake_search(query, sources=None, **kw):
         return {"query": query, "count": 0, "results": [], "sources": {}}
@@ -256,7 +256,7 @@ def test_saved_queries_actions(rds, monkeypatch):
 
 
 def test_expand_query_uses_llm_variants(monkeypatch):
-    from search_gateway import orchestrator as orch
+    from kortex_search import orchestrator as orch
 
     async def fake_complete(messages, **kw):
         return "alternative phrasing one\n- second alternative query here"
@@ -273,7 +273,7 @@ def test_expand_query_uses_llm_variants(monkeypatch):
 
 
 def test_expand_query_disabled_or_fails(monkeypatch):
-    from search_gateway import orchestrator as orch
+    from kortex_search import orchestrator as orch
     monkeypatch.setattr(orch, "QUERY_EXPANSION", False)
 
     async def run():
@@ -291,21 +291,21 @@ def test_expand_query_disabled_or_fails(monkeypatch):
 
 
 def test_diversity_domain_edge():
-    from search_gateway.diversity import _domain
+    from kortex_search.diversity import _domain
     assert _domain("https://www.worldwide.com/x") == "worldwide.com"
     assert _domain("") == ""
     assert _domain("not a url") == ""
 
 
 def test_fusion_unweighted():
-    from search_gateway.fusion import rrf_fuse
+    from kortex_search.fusion import rrf_fuse
     lists = [[Result(title="a", url="https://a.com/1", source="s1")]]
     fused = rrf_fuse(lists, weighted=False)
     assert len(fused) == 1 and fused[0].meta["score_raw"] > 0
 
 
 def test_rerank_disabled_passthrough(monkeypatch):
-    from search_gateway import rerank
+    from kortex_search import rerank
     monkeypatch.setattr(rerank, "SEMANTIC_RERANK", False)
     res = [Result(title="a", url="https://a.com/1")]
     out = rerank.rerank("q", res, top_k=1)
@@ -313,7 +313,7 @@ def test_rerank_disabled_passthrough(monkeypatch):
 
 
 def test_rerank_model_missing_passthrough(monkeypatch):
-    from search_gateway import rerank
+    from kortex_search import rerank
     monkeypatch.setattr(rerank, "SEMANTIC_RERANK", True)
     monkeypatch.setattr(rerank, "_model", None)
     monkeypatch.setattr(rerank, "_model_error", "load failed")
@@ -322,14 +322,14 @@ def test_rerank_model_missing_passthrough(monkeypatch):
 
 
 def test_cli_version_and_check(monkeypatch):
-    from search_gateway.cli import _cmd_check, _cmd_version
+    from kortex_search.cli import _cmd_check, _cmd_version
 
     class A:
         pass
 
     assert _cmd_version(A()) == 0
 
-    import search_gateway.health as health
+    import kortex_search.health as health
     async def fake_check():
         return (True, {"sources": 18, "redis": {"ok": True},
                        "llm": {"available": True}})

@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "search-gateway": {
-      "command": "search-gateway",
+    "kortex-search": {
+      "command": "kortex-search",
       "env": {
-        "SEARCH_GATEWAY_REDIS_URL": "redis://127.0.0.1:6379/0"
+        "KORTEX_SEARCH_REDIS_URL": "redis://127.0.0.1:6379/0"
       }
     }
   }

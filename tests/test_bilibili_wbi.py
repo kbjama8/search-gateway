@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from search_gateway.sources.bilibili import (
+from kortex_search.sources.bilibili import (
     _encode,
     mixin_key,
     sign_params,
@@ -66,8 +66,8 @@ async def test_search_uses_signed_request(monkeypatch):
     """
     import httpx as _httpx
 
-    import search_gateway.sources.bilibili as mod
-    from search_gateway.sources import ALL_SOURCES
+    import kortex_search.sources.bilibili as mod
+    from kortex_search.sources import ALL_SOURCES
 
     class StubRedis:
         def get(self, k):

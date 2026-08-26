@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "search-gateway"
+name = "kortex-search"
 dynamic = ["version"]
 description = "Bespoke unified web-search & research MCP server: SearXNG + Exa + agent-reach platform channels, fused and re-ranked."
 readme = "README.md"
@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.scripts]
-search-gateway = "search_gateway.cli:main"
+kortex-search = "kortex_search.cli:main"
 
 [project.optional-dependencies]
 report = [
@@ -42,10 +42,10 @@ test = [
 ]
 
 [tool.setuptools]
-packages = ["search_gateway", "search_gateway.sources"]
+packages = ["kortex_search", "kortex_search.sources"]
 
 [tool.setuptools.dynamic]
-version = { attr = "search_gateway.__version__" }
+version = { attr = "kortex_search.__version__" }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

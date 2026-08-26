@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from search_gateway.extract import egress
+from kortex_search.extract import egress
 
 
 class TestFloorPure:
@@ -117,7 +117,7 @@ class TestCheckAndRaise:
 
 class TestStatusSection:
     def test_status_shape(self, monkeypatch, rds):
-        from search_gateway.extract import harden
+        from kortex_search.extract import harden
         monkeypatch.setattr(egress, "EGRESS_FLOOR", True)
         monkeypatch.setattr(harden, "table_installed", lambda: False)
         monkeypatch.setattr(harden, "_nft", lambda: None)
@@ -134,7 +134,7 @@ class TestStatusSection:
 class TestHooks:
     pytestmark = pytest.mark.asyncio
     async def test_http_request_denied(self, monkeypatch, rds):
-        from search_gateway.extract.http import get_json, request
+        from kortex_search.extract.http import get_json, request
         monkeypatch.setattr(egress, "EGRESS_FLOOR", True)
         with pytest.raises(egress.EgressBlocked):
             await request("GET", "http://169.254.169.254/", source="bilibili")
@@ -142,18 +142,18 @@ class TestHooks:
             await get_json("http://192.168.1.1/status")
 
     async def test_web_read_denied(self, monkeypatch, rds):
-        from search_gateway.sources.web import WebSource
+        from kortex_search.sources.web import WebSource
         monkeypatch.setattr(egress, "EGRESS_FLOOR", True)
         with pytest.raises(egress.EgressBlocked):
             await WebSource().read("http://169.254.169.254/latest/meta-data")
 
     async def test_camoufox_html_denied(self, monkeypatch, rds):
-        from search_gateway.extract import camoufox
+        from kortex_search.extract import camoufox
         monkeypatch.setattr(egress, "EGRESS_FLOOR", True)
         assert await camoufox.html(None, "http://169.254.169.254/") is None
 
     async def test_server_read_url_names_egress(self, monkeypatch, rds):
-        from search_gateway import server
+        from kortex_search import server
         monkeypatch.setattr(egress, "EGRESS_FLOOR", True)
         out = await server.read_url("http://169.254.169.254/latest/meta-data")
         assert "egress-floor" in out["error"]

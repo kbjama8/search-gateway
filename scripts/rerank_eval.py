@@ -131,8 +131,8 @@ def run_mmr_sweep(queries, candidates_n) -> dict:
     retention (mean term-overlap of selected docs)."""
     import numpy as np
 
-    from search_gateway.diversity import mmr_select
-    from search_gateway.models import Result
+    from kortex_search.diversity import mmr_select
+    from kortex_search.models import Result
 
     out = {}
     for lam in (0.6, 0.7, 0.75, 0.8, 0.9):
@@ -163,7 +163,7 @@ def run_mmr_sweep(queries, candidates_n) -> dict:
 
 def run_dedup_sweep(queries, candidates_n) -> dict:
     """Near-dup collapse at 0.90/0.93/0.95 on a synthetic corpus."""
-    from search_gateway.dedup import _norm_title, _similar
+    from kortex_search.dedup import _norm_title, _similar
     corpus = [f"{q} analysis report" for q, _, _ in queries[:10]]
     corpus += [c[:-1] + "x" for c in corpus]  # near-dups (1-char diff)
     out = {}
@@ -196,7 +196,7 @@ def main() -> int:
     queries = QUERIES[: args.queries]
     results: dict = {"queries": len(queries), "candidates": args.candidates}
 
-    import search_gateway.rerank as rr
+    import kortex_search.rerank as rr
     if args.only in (None, "latency", "quality"):
         if args.model:
             from sentence_transformers import CrossEncoder

@@ -27,11 +27,11 @@ import random
 import pytest
 import redis as redis_mod
 
-from search_gateway import orchestrator as orch
-from search_gateway.config import AUTH_GATED_SOURCES
-from search_gateway.extract import egress
-from search_gateway.models import Result
-from search_gateway.sources.base import Source, SourceError
+from kortex_search import orchestrator as orch
+from kortex_search.config import AUTH_GATED_SOURCES
+from kortex_search.extract import egress
+from kortex_search.models import Result
+from kortex_search.sources.base import Source, SourceError
 
 
 class ChaosSource(Source):
@@ -110,8 +110,8 @@ class FlakyRedis:
 
 
 def _bind(monkeypatch, flaky):
-    from search_gateway import cache, ratelimit, saved_queries, stats
-    from search_gateway.extract import profiles, proxies
+    from kortex_search import cache, ratelimit, saved_queries, stats
+    from kortex_search.extract import profiles, proxies
 
     for mod in (cache, ratelimit, stats, saved_queries, profiles, proxies):
         monkeypatch.setattr(mod, "_get_client", lambda: flaky)
@@ -203,7 +203,7 @@ class TestDegradationWorlds:
             urls = [r["url"] for r in out["results"]]
             assert any("169.254.169.254" in u for u in urls)
             # but read_url refuses it at the floor
-            from search_gateway.sources.web import WebSource
+            from kortex_search.sources.web import WebSource
             try:
                 await WebSource().read("http://169.254.169.254/latest/meta-data")
                 raise AssertionError("floor must refuse the bait URL")
@@ -248,7 +248,7 @@ class TestFlakyRedis:
         assert out["count"] == 3  # sources ran; only cache/stats degraded
 
     def test_health_gate_degrades_when_redis_down(self, monkeypatch, rds):
-        from search_gateway import health
+        from kortex_search import health
 
         flaky = FlakyRedis(rds)
         _bind(monkeypatch, flaky)
@@ -263,7 +263,7 @@ class TestFlakyRedis:
         assert report["redis"]["ok"] is False
 
     def test_stats_ops_never_raise_when_redis_down(self, monkeypatch, rds):
-        from search_gateway import stats
+        from kortex_search import stats
 
         flaky = FlakyRedis(rds)
         _bind(monkeypatch, flaky)
@@ -331,7 +331,7 @@ class TestConcurrency:
         import subprocess
         import tempfile
 
-        from search_gateway.sources import base as sb
+        from kortex_search.sources import base as sb
 
         async def one(i):
             marker = os.path.join(tempfile.gettempdir(),
@@ -408,7 +408,7 @@ class TestLifecycleUnderChaos:
 
     def test_saved_queries_round_trip_after_chaos(self, harness, rds,
                                                   monkeypatch):
-        from search_gateway import saved_queries as sq
+        from kortex_search import saved_queries as sq
 
         harness(ChaosSource())
         sq.save("chaos-q", "probe query", sources=["chaos"])

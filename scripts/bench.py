@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""search-gateway benchmark harness.
+"""kortex-search benchmark harness.
 
 Measures the performance levers that matter, with one consistent methodology:
 
@@ -55,7 +55,7 @@ import sys
 import time
 from pathlib import Path
 
-# Make `search_gateway` importable even if run straight from a clone without
+# Make `kortex_search` importable even if run straight from a clone without
 # an editable install.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -134,7 +134,7 @@ def _subprocess_script(script: str) -> str:
 # --------------------------------------------------------------------------- #
 
 def _synthetic_results(n: int, seed: int = 0):
-    from search_gateway.models import Result
+    from kortex_search.models import Result
 
     # Cluster results so ~1/4 share a domain (exact-dup-ish) and titles are
     # near-identical variants — a realistic shape for dedup to chew on.
@@ -165,8 +165,8 @@ def _random_embeddings(n: int, dim: int = 384, seed: int = 1):
 # --------------------------------------------------------------------------- #
 
 def cmd_micro(args) -> dict:
-    from search_gateway.dedup import dedup
-    from search_gateway.diversity import mmr_select
+    from kortex_search.dedup import dedup
+    from kortex_search.diversity import mmr_select
 
     results: dict = {}
     for n in args.sizes:
@@ -218,7 +218,7 @@ def rss():
     except Exception:
         pass
     return 0
-from search_gateway import embeddings, rerank
+from kortex_search import embeddings, rerank
 out = {}
 out["rss_before_kib"] = rss()
 t0 = time.perf_counter()
@@ -236,8 +236,8 @@ print(json.dumps(out))
 
 
 def cmd_model(args) -> dict:
-    from search_gateway import embeddings, rerank
-    from search_gateway.models import Result
+    from kortex_search import embeddings, rerank
+    from kortex_search.models import Result
 
     out: dict = {"model": {}}
 
@@ -281,7 +281,7 @@ def cmd_model(args) -> dict:
 def _cold_search_script(query: str) -> str:
     return f'''
 import asyncio, time, json
-from search_gateway import orchestrator
+from kortex_search import orchestrator
 async def main():
     t0 = time.perf_counter()
     res = await orchestrator.search({query!r}, None, category="general", limit=10)
@@ -317,9 +317,9 @@ _REAL_SNIPPET = (
 
 
 def cmd_search(args) -> dict:
-    from search_gateway import orchestrator
-    from search_gateway.config import DEFAULT_SOURCES
-    from search_gateway.sources import ALL_SOURCES
+    from kortex_search import orchestrator
+    from kortex_search.config import DEFAULT_SOURCES
+    from kortex_search.sources import ALL_SOURCES
 
     out: dict = {"search": {}}
 
@@ -398,7 +398,7 @@ _FLOOR_CORPUS = [
 
 
 def _floor_cost() -> dict:
-    from search_gateway.extract import egress
+    from kortex_search.extract import egress
 
     baseline = _measure(
         lambda: [egress._host_of_url(u) for u in _FLOOR_CORPUS], 1)
@@ -416,7 +416,7 @@ def _proxy_roundtrip() -> dict:
     the per-op cost of the L2 forced-proxy path."""
     import asyncio
 
-    from search_gateway.extract import egress
+    from kortex_search.extract import egress
 
     async def _measure_roundtrips(iterations: int) -> tuple[list[float], list[float]]:
         srv = await asyncio.start_server(
@@ -486,7 +486,7 @@ def _camoufox_measurements(url: str) -> dict:
     gateway would refuse)."""
     import asyncio
 
-    from search_gateway.extract import camoufox, harden
+    from kortex_search.extract import camoufox, harden
 
     out: dict = {}
 
@@ -496,10 +496,10 @@ def _camoufox_measurements(url: str) -> dict:
             return reason
         st = harden.status()
         if not st["installed"]:
-            return "L3 filter not installed (D7.1) — run 'search-gateway harden --install --sudo'"
+            return "L3 filter not installed (D7.1) — run 'kortex-search harden --install --sudo'"
         if not st["covered"]:
             return ("gateway not inside the scoped cgroup — run under "
-                    "'systemd-run --user --scope --unit=sg-egress'")
+                    "'systemd-run --user --scope --unit=ks-egress'")
         return None
 
     reason = _skip_if_unusable()
@@ -591,7 +591,7 @@ def _report(data: dict) -> None:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="search-gateway benchmark harness")
+    parser = argparse.ArgumentParser(description="kortex-search benchmark harness")
     sub = parser.add_subparsers(dest="command")
 
     p = sub.add_parser("micro")

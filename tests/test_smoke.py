@@ -1,4 +1,4 @@
-"""Regression guard for the search-gateway.
+"""Regression guard for the kortex-search.
 
 Asserts the package imports, all 18 sources register, and a smoke search
 returns fused results. Run after any Phase 4 gateway change:
@@ -14,14 +14,14 @@ import os
 # Disable the slow/semantic paths for the smoke search (models load lazily and
 # are not needed to prove the pipeline fuses results).
 os.environ.setdefault("SEMANTIC_RERANK", "0")
-os.environ.setdefault("SEARCH_GATEWAY_MMR", "0")
-os.environ.setdefault("SEARCH_GATEWAY_QUERY_EXPANSION", "0")
-os.environ.setdefault("SEARCH_GATEWAY_EMBEDDING_DEDUP", "0")
+os.environ.setdefault("KORTEX_SEARCH_MMR", "0")
+os.environ.setdefault("KORTEX_SEARCH_QUERY_EXPANSION", "0")
+os.environ.setdefault("KORTEX_SEARCH_EMBEDDING_DEDUP", "0")
 
 import asyncio
 
-from search_gateway import orchestrator
-from search_gateway.sources import ALL_SOURCES
+from kortex_search import orchestrator
+from kortex_search.sources import ALL_SOURCES
 
 EXPECTED_SOURCES = {
     "arxiv", "bilibili", "crossref", "exa", "facebook", "github",
@@ -34,12 +34,12 @@ EXPECTED_SOURCES = {
 
 
 def test_package_imports():
-    import search_gateway.cache
-    import search_gateway.embeddings
-    import search_gateway.llm
-    import search_gateway.rerank
-    import search_gateway.server
-    import search_gateway.stats  # noqa: F401
+    import kortex_search.cache
+    import kortex_search.embeddings
+    import kortex_search.llm
+    import kortex_search.rerank
+    import kortex_search.server
+    import kortex_search.stats  # noqa: F401
 
 
 def test_all_23_sources_registered():

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from search_gateway.extract.detectors import classify
+from kortex_search.extract.detectors import classify
 
 _FIXTURES = Path(__file__).parent / "fixtures" / "challenges"
 

@@ -3,15 +3,15 @@
 Any change to a tool name, the source registry, or the `Result` shape is a
 SemVer-major event (see docs/api/tools.md + docs/meta-schema.md). These tests
 fail loudly to catch that. The CN tier (zhihu/weibo/baidu/toutiao) is
-registered but gated by SEARCH_GATEWAY_CN_SOURCES — presence in the registry
+registered but gated by KORTEX_SEARCH_CN_SOURCES — presence in the registry
 is the contract; availability is runtime state.
 """
 
 import asyncio
 
-from search_gateway.models import Result
-from search_gateway.server import mcp
-from search_gateway.sources import ALL_SOURCES
+from kortex_search.models import Result
+from kortex_search.server import mcp
+from kortex_search.sources import ALL_SOURCES
 
 EXPECTED_SOURCES = {
     "arxiv", "bilibili", "crossref", "exa", "facebook", "github",

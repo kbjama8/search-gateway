@@ -2,19 +2,19 @@
 
 `doctor` is intentionally not exercised here: it probes all 22 sources over
 the network. Its structure is asserted by `test_contract.py` via the shared
-`health.report()`; run `search-gateway doctor` by hand for a live report.
+`health.report()`; run `kortex-search doctor` by hand for a live report.
 """
 
 import json
 import subprocess
 import sys
 
-from search_gateway import __version__
+from kortex_search import __version__
 
 
 def _run(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "search_gateway.cli", *args],
+        [sys.executable, "-m", "kortex_search.cli", *args],
         capture_output=True, text=True, timeout=60,
     )
 

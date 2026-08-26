@@ -8,8 +8,8 @@ import asyncio
 
 import pytest
 
-from search_gateway.models import Result
-from search_gateway.sources.base import Source
+from kortex_search.models import Result
+from kortex_search.sources.base import Source
 
 
 class FakeSource(Source):
@@ -34,8 +34,8 @@ def _mk(title, url, published=None):
 # --------------------------------------------------------------------------
 
 def test_orchestrator_search_pipeline(monkeypatch, rds):
-    import search_gateway.orchestrator as omod
-    from search_gateway import orchestrator as orch
+    import kortex_search.orchestrator as omod
+    from kortex_search import orchestrator as orch
 
     monkeypatch.setattr(omod, "SEMANTIC_RERANK", False)
     monkeypatch.setattr(omod, "EMBEDDING_DEDUP", False)
@@ -97,7 +97,7 @@ def test_orchestrator_search_pipeline(monkeypatch, rds):
 
 
 def test_filter_year_and_oa():
-    from search_gateway.orchestrator import _filter_oa, _filter_year
+    from kortex_search.orchestrator import _filter_oa, _filter_year
     r1 = Result(title="a", url="https://a.com/", meta={"year": 2026, "is_oa": True})
     r2 = Result(title="b", url="https://b.com/", meta={"year": 2020, "is_oa": False})
     r3 = Result(title="c", url="https://c.com/", meta={})
@@ -106,7 +106,7 @@ def test_filter_year_and_oa():
 
 
 def test_filter_key_parts():
-    from search_gateway.orchestrator import _filter_key
+    from kortex_search.orchestrator import _filter_key
     assert _filter_key("week", None, False) == "fr:week"
     assert _filter_key(None, 2025, True) == "yr:2025|oa"
     assert _filter_key(None, None, False) == ""
@@ -129,7 +129,7 @@ class FakeResp:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            from search_gateway.extract.http import HTTPStatusError
+            from kortex_search.extract.http import HTTPStatusError
             raise HTTPStatusError(self.status_code)
 
     def json(self):
@@ -176,7 +176,7 @@ def _patch_oa(monkeypatch, responses):
 
 
 def test_openalex_get_doi(monkeypatch):
-    from search_gateway.sources import ALL_SOURCES
+    from kortex_search.sources import ALL_SOURCES
     _patch_oa(monkeypatch, [FakeResp(OA_PAPER)])
 
     async def run():
@@ -187,7 +187,7 @@ def test_openalex_get_doi(monkeypatch):
 
 
 def test_openalex_citations_and_references(monkeypatch):
-    from search_gateway.sources import ALL_SOURCES
+    from kortex_search.sources import ALL_SOURCES
     # citations: resolve (W already an ID → short-circuit, no call) + cite list
     client = _patch_oa(monkeypatch, [FakeResp({"results": [OA_PAPER]})])
     async def run():
@@ -222,7 +222,7 @@ def test_openalex_citations_and_references(monkeypatch):
 def test_rerank_torch_load_success(monkeypatch):
     import sentence_transformers as st
 
-    from search_gateway import rerank
+    from kortex_search import rerank
     monkeypatch.setattr(rerank, "_model", None)
     monkeypatch.setattr(rerank, "_model_error", None)
     monkeypatch.setattr(rerank, "INFERENCE_BACKEND", "torch")
@@ -240,7 +240,7 @@ def test_rerank_torch_load_success(monkeypatch):
 
 
 def test_rerank_onnx_fallback_to_torch(monkeypatch):
-    from search_gateway import rerank
+    from kortex_search import rerank
     monkeypatch.setattr(rerank, "_model", None)
     monkeypatch.setattr(rerank, "_model_error", None)
     monkeypatch.setattr(rerank, "INFERENCE_BACKEND", "onnx_int8")
@@ -262,7 +262,7 @@ def test_rerank_onnx_fallback_to_torch(monkeypatch):
 
 
 def test_rerank_total_failure_caches_error(monkeypatch):
-    from search_gateway import rerank
+    from kortex_search import rerank
     monkeypatch.setattr(rerank, "_model", None)
     monkeypatch.setattr(rerank, "_model_error", None)
     monkeypatch.setattr(rerank, "INFERENCE_BACKEND", "torch")
@@ -279,7 +279,7 @@ def test_rerank_total_failure_caches_error(monkeypatch):
 # --------------------------------------------------------------------------
 
 def _mock_orchestrator_search(monkeypatch, results=None):
-    from search_gateway import server
+    from kortex_search import server
 
     async def fake_search(query, sources=None, **kw):
         return {"query": query, "results": results or [], "count": len(results or []),
@@ -315,7 +315,7 @@ def test_server_search_tool_dispatch(monkeypatch):
 
 
 def test_server_stats_and_doctor_tools(monkeypatch):
-    from search_gateway import server
+    from kortex_search import server
 
     async def run():
         assert isinstance(await server.stats_report(), dict)
@@ -326,8 +326,8 @@ def test_server_stats_and_doctor_tools(monkeypatch):
 
 
 def test_read_url_error(monkeypatch):
-    from search_gateway import server
-    from search_gateway.sources import ALL_SOURCES
+    from kortex_search import server
+    from kortex_search.sources import ALL_SOURCES
 
     async def boom(url):
         raise RuntimeError("jina down")
@@ -374,7 +374,7 @@ class FakeLLMClient:
 
 
 def test_llm_complete_success(monkeypatch):
-    from search_gateway import llm
+    from kortex_search import llm
     monkeypatch.setattr(llm, "get_api_key", lambda: "k")
     monkeypatch.setattr(llm.httpx, "AsyncClient",
                         lambda **kw: FakeLLMClient([FakePostResp(
@@ -388,7 +388,7 @@ def test_llm_complete_success(monkeypatch):
 
 
 def test_llm_complete_error_paths(monkeypatch):
-    from search_gateway import llm
+    from kortex_search import llm
     monkeypatch.setattr(llm, "get_api_key", lambda: "")
 
     async def run():
@@ -415,7 +415,7 @@ def test_llm_complete_error_paths(monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_cache_get_set_ping(rds):
-    from search_gateway import cache
+    from kortex_search import cache
     payload = [{"title": "t", "url": "https://t.com/"}]
     cache.set("q", ["s1"], "general", 5, payload)
     assert cache.get("q", ["s1"], "general", 5) == payload
@@ -424,13 +424,13 @@ def test_cache_get_set_ping(rds):
 
 
 def test_cache_bad_json(rds):
-    from search_gateway import cache
+    from kortex_search import cache
     rds.set(cache._key("q", ["s1"], "general", 5), "not-json")
     assert cache.get("q", ["s1"], "general", 5) is None
 
 
 def test_dedup_canonical_url():
-    from search_gateway.dedup import canonical_url
+    from kortex_search.dedup import canonical_url
     assert canonical_url("https://WWW.Example.com/a?utm_source=x&b=2") == \
         "https://example.com/a?b=2"
     assert canonical_url("") == ""
@@ -438,7 +438,7 @@ def test_dedup_canonical_url():
 
 
 def test_dedup_near_duplicate_and_merge():
-    from search_gateway.dedup import dedup
+    from kortex_search.dedup import dedup
     a = Result(title="Same Story", url="https://a.com/1", snippet="short")
     b = Result(title="Same Story!", url="https://b.com/1", snippet="much longer snippet",
                source="s2")
@@ -451,7 +451,7 @@ def test_dedup_near_duplicate_and_merge():
 def test_mmr_select_full_path():
     import numpy as np
 
-    from search_gateway.diversity import mmr_select
+    from kortex_search.diversity import mmr_select
     res = [Result(title=f"r{i}", url=f"https://{i}.com/", score=0.9 - i * 0.01)
            for i in range(6)]
     emb = np.eye(6)
@@ -475,7 +475,7 @@ def test_embeddings_load_and_encode(monkeypatch):
     import numpy as np
     import sentence_transformers as st
 
-    from search_gateway import embeddings as emb
+    from kortex_search import embeddings as emb
 
     class FakeST:
         def __init__(self, *a, **kw):
@@ -502,7 +502,7 @@ def test_embeddings_load_and_encode(monkeypatch):
 def test_embeddings_cache_miss_download_path(monkeypatch):
     import sentence_transformers as st
 
-    from search_gateway import embeddings as emb
+    from kortex_search import embeddings as emb
 
     class FlakyST:
         def __init__(self, *a, **kw):
@@ -530,7 +530,7 @@ def test_embeddings_cache_miss_download_path(monkeypatch):
 def test_embeddings_load_failure_and_empty(monkeypatch):
     import sentence_transformers as st
 
-    from search_gateway import embeddings as emb
+    from kortex_search import embeddings as emb
     monkeypatch.setattr(emb, "_model", None)
     monkeypatch.setattr(emb, "_model_error", None)
     monkeypatch.setattr(emb, "_cjk_model", None)
@@ -547,7 +547,7 @@ def test_embeddings_load_failure_and_empty(monkeypatch):
 
 
 def test_embeddings_cjk_dominant_details():
-    from search_gateway.embeddings import cjk_dominant
+    from kortex_search.embeddings import cjk_dominant
     assert cjk_dominant([]) is False
     assert cjk_dominant(["", ""]) is False
     assert cjk_dominant(["ひらがな", "한국어"]) is True  # kana + hangul counted
@@ -562,7 +562,7 @@ def test_embeddings_cjk_dominant_details():
 def test_dedup_embedding_path():
     import numpy as np
 
-    from search_gateway.dedup import dedup
+    from kortex_search.dedup import dedup
     a = Result(title="Alpha", url="https://a.com/1", snippet="long english snippet here")
     b = Result(title="Alfa", url="https://b.com/1", snippet="long english snippet here")
     emb = np.array([[1.0, 0.0], [0.99, 0.01]])  # near-cosine 0.99 ≥ 0.93
@@ -576,7 +576,7 @@ def test_dedup_embedding_path():
 
 
 def test_dedup_similar_edges():
-    from search_gateway.dedup import _similar
+    from kortex_search.dedup import _similar
     assert _similar("", "", 0.92) is False
     assert _similar("short", "short2", 0.92) is False  # min len 8
     assert _similar("exact match", "exact match", 0.92) is True
@@ -585,7 +585,7 @@ def test_dedup_similar_edges():
 
 
 def test_rerank_predict_path(monkeypatch):
-    from search_gateway import rerank
+    from kortex_search import rerank
 
     class FakeModel:
         def predict(self, pairs):
@@ -601,7 +601,7 @@ def test_rerank_predict_path(monkeypatch):
 
 
 def test_rerank_predict_error_falls_back(monkeypatch):
-    from search_gateway import rerank
+    from kortex_search import rerank
 
     class BadModel:
         def predict(self, pairs):
@@ -614,7 +614,7 @@ def test_rerank_predict_error_falls_back(monkeypatch):
 
 
 def test_server_saved_queries_dispatch_and_stats(monkeypatch, rds):
-    from search_gateway import server
+    from kortex_search import server
 
     async def run():
         out = await server.saved_queries(action="bogus")

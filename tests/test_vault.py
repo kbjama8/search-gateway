@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from search_gateway.extract import vault
+from kortex_search.extract import vault
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def vault_env(tmp_path, monkeypatch):
     """Point the vault at a tmp tree and reset module state."""
     monkeypatch.setattr(vault, "VAULT_DIR", str(tmp_path))
     monkeypatch.setattr(vault, "PERSONA", "kaiser")
-    monkeypatch.setattr("search_gateway.config.CREDENTIALS_DIR", "")
+    monkeypatch.setattr("kortex_search.config.CREDENTIALS_DIR", "")
     vault._CONFIG_PATHS["twitter"] = str(tmp_path / "kaiser" / "twitter.env")
     vault._CONFIG_PATHS["deepseek"] = str(tmp_path / "kaiser" / "deepseek.env")
     vault._CONFIG_PATHS["proxy"] = str(tmp_path / "kaiser" / "proxy.env")
@@ -97,12 +97,12 @@ class TestEnvFileResolution:
     def test_credentials_dir_bridge_wins(self, vault_env, monkeypatch):
         _write(vault_env / "cred" / "deepseek.env", "DEEPSEEK_API_KEY=sk-cred\n")
         _write(vault_env / "kaiser" / "deepseek.env", "DEEPSEEK_API_KEY=sk-vault\n")
-        monkeypatch.setattr("search_gateway.config.CREDENTIALS_DIR",
+        monkeypatch.setattr("kortex_search.config.CREDENTIALS_DIR",
                             str(vault_env / "cred"))
         assert vault.load_secrets("deepseek", {"DEEPSEEK_API_KEY"}) == {
             "DEEPSEEK_API_KEY": "sk-cred"}
         # bridge off → vault file
-        monkeypatch.setattr("search_gateway.config.CREDENTIALS_DIR", "")
+        monkeypatch.setattr("kortex_search.config.CREDENTIALS_DIR", "")
         assert vault.load_secrets("deepseek", {"DEEPSEEK_API_KEY"}) == {
             "DEEPSEEK_API_KEY": "sk-vault"}
 

@@ -5,12 +5,12 @@ CI runs `-m "not slow"`; these are for a machine with the models downloaded.
 
 import pytest
 
-from search_gateway.models import Result
+from kortex_search.models import Result
 
 
 @pytest.mark.slow
 def test_embed_path_if_cached():
-    from search_gateway import embeddings
+    from kortex_search import embeddings
 
     model = embeddings._get_model()
     if model is None:
@@ -21,7 +21,7 @@ def test_embed_path_if_cached():
 
 @pytest.mark.slow
 def test_rerank_path_if_cached():
-    from search_gateway import rerank
+    from kortex_search import rerank
 
     model = rerank._get_model()
     if model is None:
@@ -40,10 +40,10 @@ def test_onnx_rerank_backend():
 
     script = (
         "import os\n"
-        "os.environ['SEARCH_GATEWAY_INFERENCE_BACKEND'] = 'onnx_int8'\n"
+        "os.environ['KORTEX_SEARCH_INFERENCE_BACKEND'] = 'onnx_int8'\n"
         "os.environ['SEMANTIC_RERANK'] = '1'\n"  # test_smoke leaks SEMANTIC_RERANK=0
-        "from search_gateway import rerank\n"
-        "from search_gateway.models import Result\n"
+        "from kortex_search import rerank\n"
+        "from kortex_search.models import Result\n"
         "rs = [Result(title=f't{i}', url=f'u{i}', snippet=f's{i}') for i in range(5)]\n"
         "assert len(rerank.rerank('query', rs)) == 5\n"
         "assert rerank.status()['loaded'] is True\n"

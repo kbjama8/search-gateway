@@ -13,8 +13,8 @@ import json
 import httpx
 import pytest
 
-from search_gateway.sources import ALL_SOURCES
-from search_gateway.sources.base import SourceError
+from kortex_search.sources import ALL_SOURCES
+from kortex_search.sources.base import SourceError
 
 
 class FakeResp:
@@ -80,7 +80,7 @@ def _mock_http(monkeypatch, module, responses):
     client = FakeClient(responses)
 
     async def _checked(resp):
-        from search_gateway.extract.http import HTTPStatusError
+        from kortex_search.extract.http import HTTPStatusError
         if getattr(resp, "status_code", 200) >= 400:
             raise HTTPStatusError(resp.status_code)
         return resp
@@ -131,7 +131,7 @@ def _r(src_name):
 # --------------------------------------------------------------------------
 
 def test_searxng_parses_results(monkeypatch):
-    import search_gateway.sources.searxng as mod
+    import kortex_search.sources.searxng as mod
     _mock_http(monkeypatch, mod, [FakeResp({"results": [
         {"title": "Alpha Go", "url": "https://a.com/", "content": "snippet",
          "engine": "google", "publishedDate": "2026-08-20", "category": "general",
@@ -149,7 +149,7 @@ def test_searxng_parses_results(monkeypatch):
 
 
 def test_searxng_error_raises(monkeypatch):
-    import search_gateway.sources.searxng as mod
+    import kortex_search.sources.searxng as mod
     _mock_http(monkeypatch, mod, [FakeResp({}, status_code=500)])
 
     async def run():
@@ -159,7 +159,7 @@ def test_searxng_error_raises(monkeypatch):
 
 
 def test_github_parses_and_rate_limit(monkeypatch):
-    import search_gateway.sources.github as mod
+    import kortex_search.sources.github as mod
     _mock_http(monkeypatch, mod, [FakeResp({"items": [
         {"full_name": "kbj/Aionos", "html_url": "https://github.com/kbj/Aionos",
          "description": "astrology engine", "created_at": "2026-01-01T00:00:00Z",
@@ -179,7 +179,7 @@ def test_github_parses_and_rate_limit(monkeypatch):
 
 
 def test_v2ex_parses_and_normalizes_epoch(monkeypatch):
-    import search_gateway.sources.v2ex as mod
+    import kortex_search.sources.v2ex as mod
     _mock_http(monkeypatch, mod, [FakeResp({"hits": [
         {"_source": {"id": 123, "title": "Rust 异步编程", "content": "正文",
                      "created": 1774000000, "member": "k", "replies": 5}},
@@ -217,7 +217,7 @@ ARXIV_XML = """<?xml version="1.0"?>
 
 
 def test_arxiv_search_and_parse(monkeypatch):
-    import search_gateway.sources.arxiv as mod
+    import kortex_search.sources.arxiv as mod
     _mock_http(monkeypatch, mod, [FakeResp(text=ARXIV_XML)])
 
     async def run():
@@ -242,7 +242,7 @@ def test_arxiv_search_and_parse(monkeypatch):
 
 
 def test_arxiv_malformed_xml(monkeypatch):
-    import search_gateway.sources.arxiv as mod
+    import kortex_search.sources.arxiv as mod
     _mock_http(monkeypatch, mod, [FakeResp(text="<not-xml")])
 
     async def run():
@@ -254,7 +254,7 @@ def test_arxiv_malformed_xml(monkeypatch):
 
 def test_bilibili_parses_blocks(monkeypatch):
 
-    import search_gateway.sources.bilibili as mod
+    import kortex_search.sources.bilibili as mod
     monkeypatch.setattr(mod, "BILIBILI_WBI", False)  # parser test, not signing
     payload = {"code": 0, "data": {"result": [
         {"result_type": "video", "data": [
@@ -279,7 +279,7 @@ def test_bilibili_parses_blocks(monkeypatch):
 
 
 def test_bilibili_api_error(monkeypatch):
-    import search_gateway.sources.bilibili as mod
+    import kortex_search.sources.bilibili as mod
     monkeypatch.setattr(mod, "BILIBILI_WBI", False)
     _mock_http(monkeypatch, mod,
                [FakeResp({"code": -412, "message": "risk control"})])
@@ -291,7 +291,7 @@ def test_bilibili_api_error(monkeypatch):
     asyncio.run(run())
 
 def test_openalex_search_filters(monkeypatch):
-    import search_gateway.sources.openalex as mod
+    import kortex_search.sources.openalex as mod
     _mock_http(monkeypatch, mod, [FakeResp({"results": [
         {"title": "Graph Fusion", "id": "https://openalex.org/W9",
          "doi": "https://doi.org/10.1/9", "publication_date": "2026-05-01",
@@ -313,7 +313,7 @@ def test_openalex_search_filters(monkeypatch):
 
 
 def test_crossref_year_published_normalized(monkeypatch):
-    import search_gateway.sources.crossref as mod
+    import kortex_search.sources.crossref as mod
     _mock_http(monkeypatch, mod, [FakeResp({"message": {"items": [
         {"title": ["Fusion Survey"], "URL": "https://doi.org/10.2/x",
          "abstract": "<jats:p>Abstract text</jats:p>",
@@ -331,7 +331,7 @@ def test_crossref_year_published_normalized(monkeypatch):
 
 
 def test_semantic_scholar_year_published_normalized(monkeypatch):
-    import search_gateway.sources.semantic_scholar as mod
+    import kortex_search.sources.semantic_scholar as mod
     _mock_http(monkeypatch, mod, [FakeResp({"data": [
         {"title": "S2 Paper", "url": "https://s2.example/1", "abstract": "abs",
          "year": 2026, "paperId": "p1",
@@ -359,7 +359,7 @@ def test_semantic_scholar_year_published_normalized(monkeypatch):
 
 
 def test_stackoverflow_parses_epoch(monkeypatch):
-    import search_gateway.sources.stackoverflow as mod
+    import kortex_search.sources.stackoverflow as mod
     _mock_http(monkeypatch, mod, [FakeResp({"items": [
         {"title": "How to fuse?", "link": "https://so.com/q/1",
          "body": "<p>body</p>", "creation_date": 1760000000,
@@ -380,7 +380,7 @@ def test_stackoverflow_parses_epoch(monkeypatch):
 
 
 def test_web_read_and_search(monkeypatch):
-    import search_gateway.sources.web as mod
+    import kortex_search.sources.web as mod
     _mock_http(monkeypatch, mod, [FakeResp(text="x" * 30000)])
 
     async def run():
@@ -399,7 +399,7 @@ def test_web_read_and_search(monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_youtube_parses_json_lines(monkeypatch):
-    import search_gateway.sources.youtube as mod
+    import kortex_search.sources.youtube as mod
     payload = "\n".join([
         json.dumps({"title": "V1", "webpage_url": "https://youtu.be/1",
                     "description": "d1", "upload_date": "20260820",
@@ -423,7 +423,7 @@ def test_youtube_parses_json_lines(monkeypatch):
 
 
 def test_exa_parses_blocks(monkeypatch):
-    import search_gateway.sources.exa as mod
+    import kortex_search.sources.exa as mod
     payload = "\n---\nTitle: Neural Search\nURL: https://exa.example/1\n" \
               "Published: 2026-08-01T00:00:00.000Z\nAuthor: A\nHighlights: hl\n" \
               "\n---\nTitle: Only URL\nURL: https://exa.example/2\n" \
@@ -451,8 +451,8 @@ TWITTER_CLI_JSON = json.dumps({"ok": True, "data": [
 
 
 def test_twitter_backend1_success(monkeypatch, tmp_path):
-    import search_gateway.sources.twitter as mod
-    from search_gateway.extract import vault as vault_mod
+    import kortex_search.sources.twitter as mod
+    from kortex_search.extract import vault as vault_mod
     envfile = tmp_path / "twitter.env"
     envfile.write_text('TWITTER_AUTH_TOKEN="t"\nTWITTER_CT0="c"\n')
     monkeypatch.setitem(vault_mod._CONFIG_PATHS, "twitter", str(envfile))
@@ -473,8 +473,8 @@ def test_twitter_backend1_success(monkeypatch, tmp_path):
 
 
 def test_twitter_backend2_opencli_fallback(monkeypatch):
-    import search_gateway.sources.twitter as mod
-    from search_gateway.extract import vault as vault_mod
+    import kortex_search.sources.twitter as mod
+    from kortex_search.extract import vault as vault_mod
     monkeypatch.setitem(vault_mod._CONFIG_PATHS, "twitter", "/nonexistent.env")
     monkeypatch.setitem(vault_mod.LEGACY_PATHS, "twitter", "/nonexistent.env")  # no auth
 
@@ -496,8 +496,8 @@ def test_twitter_backend2_opencli_fallback(monkeypatch):
 
 
 def test_twitter_both_backends_fail(monkeypatch):
-    import search_gateway.sources.twitter as mod
-    from search_gateway.extract import vault as vault_mod
+    import kortex_search.sources.twitter as mod
+    from kortex_search.extract import vault as vault_mod
     monkeypatch.setitem(vault_mod._CONFIG_PATHS, "twitter", "/nonexistent.env")
     monkeypatch.setitem(vault_mod.LEGACY_PATHS, "twitter", "/nonexistent.env")
 
@@ -518,7 +518,7 @@ def test_twitter_both_backends_fail(monkeypatch):
 
 
 def test_reddit_parses_list_and_dict(monkeypatch):
-    import search_gateway.sources.reddit as mod
+    import kortex_search.sources.reddit as mod
     _mock_cmd(monkeypatch, mod, code=0, out=json.dumps([
         {"title": "R post", "url": "https://reddit.com/r/x/1", "selftext": "body",
          "subreddit": "x", "author": "u", "score": 9, "comments": 2},
@@ -543,9 +543,9 @@ def test_reddit_parses_list_and_dict(monkeypatch):
 
 
 def test_facebook_instagram_xiaohongshu_parse(monkeypatch):
-    import search_gateway.sources.facebook as fb
-    import search_gateway.sources.instagram as ig
-    import search_gateway.sources.xiaohongshu as xhs
+    import kortex_search.sources.facebook as fb
+    import kortex_search.sources.instagram as ig
+    import kortex_search.sources.xiaohongshu as xhs
 
     async def run():
         # facebook
@@ -581,7 +581,7 @@ def test_facebook_instagram_xiaohongshu_parse(monkeypatch):
 
 
 def test_linkedin_parses_text_blocks(monkeypatch):
-    import search_gateway.sources.linkedin as mod
+    import kortex_search.sources.linkedin as mod
     payload = (
         "Name: Ada Lovelace\n"
         "Headline: Engineer\n"
@@ -612,8 +612,8 @@ def test_linkedin_parses_text_blocks(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cli_sources_reject_leading_dash(monkeypatch):
-    import search_gateway.sources.reddit as rd
-    import search_gateway.sources.youtube as yt
+    import kortex_search.sources.reddit as rd
+    import kortex_search.sources.youtube as yt
 
     async def fake_run_cmd(cmd, **kwargs):
         raise AssertionError("must not reach the CLI")
@@ -653,7 +653,7 @@ _ZHIHU_PAYLOAD = {
 @pytest.mark.asyncio
 async def test_zhihu_parses_answer_article_question(monkeypatch):
 
-    import search_gateway.sources.zhihu as zh
+    import kortex_search.sources.zhihu as zh
     monkeypatch.setattr(zh, "CN_SOURCES", True)
     monkeypatch.setattr(zh, "ZHIHU_COOKIE", "d_c0=abc; z_c0=def")
     _mock_http(monkeypatch, zh, [FakeResp(_ZHIHU_PAYLOAD)])
@@ -672,7 +672,7 @@ async def test_zhihu_parses_answer_article_question(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_zhihu_requires_cookie(monkeypatch):
-    import search_gateway.sources.zhihu as zh
+    import kortex_search.sources.zhihu as zh
     monkeypatch.setattr(zh, "CN_SOURCES", True)
     monkeypatch.setattr(zh, "ZHIHU_COOKIE", "")
     with pytest.raises(SourceError, match="auth:"):
@@ -681,7 +681,7 @@ async def test_zhihu_requires_cookie(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_zhihu_disabled_without_flag(monkeypatch):
-    import search_gateway.sources.zhihu as zh
+    import kortex_search.sources.zhihu as zh
     monkeypatch.setattr(zh, "CN_SOURCES", False)
     with pytest.raises(SourceError, match="disabled"):
         await zh.ZhihuSource().search("x")
@@ -697,7 +697,7 @@ _WEIBO_HOT = {"data": {"realtime": [
 @pytest.mark.asyncio
 async def test_weibo_hot_list_fallback(monkeypatch):
 
-    import search_gateway.sources.weibo as wb
+    import kortex_search.sources.weibo as wb
     monkeypatch.setattr(wb, "CN_SOURCES", True)
     monkeypatch.setattr(wb, "WEIBO_SUB", "")  # no SUB → hot list
     _mock_http(monkeypatch, wb, [FakeResp(_WEIBO_HOT)])
@@ -725,7 +725,7 @@ _WEIBO_SUB_SEARCH = {"data": {"cards": [
 @pytest.mark.asyncio
 async def test_weibo_keyword_search_with_sub(monkeypatch):
 
-    import search_gateway.sources.weibo as wb
+    import kortex_search.sources.weibo as wb
     monkeypatch.setattr(wb, "CN_SOURCES", True)
     monkeypatch.setattr(wb, "WEIBO_SUB", "SUB=abc")
     _mock_http(monkeypatch, wb, [FakeResp(_WEIBO_SUB_SEARCH)])
@@ -746,7 +746,7 @@ _BAIDU_BOARD = {"data": {"cards": [
 @pytest.mark.asyncio
 async def test_baidu_board(monkeypatch):
 
-    import search_gateway.sources.baidu as bd
+    import kortex_search.sources.baidu as bd
     monkeypatch.setattr(bd, "CN_SOURCES", True)
     _mock_http(monkeypatch, bd, [FakeResp(_BAIDU_BOARD)])
 
@@ -769,7 +769,7 @@ _TOUTIAO_BOARD = {"data": [
 @pytest.mark.asyncio
 async def test_toutiao_board(monkeypatch):
 
-    import search_gateway.sources.toutiao as tt
+    import kortex_search.sources.toutiao as tt
     monkeypatch.setattr(tt, "CN_SOURCES", True)
     _mock_http(monkeypatch, tt, [FakeResp(_TOUTIAO_BOARD)])
 
@@ -803,7 +803,7 @@ def _baidu_fixture() -> dict:
 
 @pytest.mark.asyncio
 async def test_baidu_board_current_shape(monkeypatch):
-    import search_gateway.sources.baidu as bd
+    import kortex_search.sources.baidu as bd
     monkeypatch.setattr(bd, "CN_SOURCES", True)
     async def _fake(*_a, **_k):
         return _baidu_fixture()
@@ -823,7 +823,7 @@ async def test_baidu_board_current_shape(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_baidu_board_legacy_shape(monkeypatch):
-    import search_gateway.sources.baidu as bd
+    import kortex_search.sources.baidu as bd
     monkeypatch.setattr(bd, "CN_SOURCES", True)
     async def _fake(*_a, **_k):
         return _BAIDU_LEGACY
@@ -837,7 +837,7 @@ async def test_baidu_board_legacy_shape(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_baidu_board_shape_drift_raises(monkeypatch):
-    import search_gateway.sources.baidu as bd
+    import kortex_search.sources.baidu as bd
     monkeypatch.setattr(bd, "CN_SOURCES", True)
     # cards present but structurally unrecognized → loud drift, never [].
     async def _fake(*_a, **_k):
@@ -849,7 +849,7 @@ async def test_baidu_board_shape_drift_raises(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_baidu_board_empty_cards_is_empty_board(monkeypatch):
-    import search_gateway.sources.baidu as bd
+    import kortex_search.sources.baidu as bd
     monkeypatch.setattr(bd, "CN_SOURCES", True)
     async def _fake(*_a, **_k):
         return {"data": {"cards": []}}
@@ -872,7 +872,7 @@ def _zhihu_hot_fixture() -> dict:
 
 @pytest.mark.asyncio
 async def test_zhihu_hot_parses_fixture(monkeypatch):
-    import search_gateway.sources.zhihu_hot as zh
+    import kortex_search.sources.zhihu_hot as zh
     monkeypatch.setattr(zh, "CN_SOURCES", True)
     async def _fake(*_a, **_k):
         return _zhihu_hot_fixture()
@@ -895,7 +895,7 @@ async def test_zhihu_hot_parses_fixture(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_zhihu_hot_limit_capped_at_30(monkeypatch):
-    import search_gateway.sources.zhihu_hot as zh
+    import kortex_search.sources.zhihu_hot as zh
     monkeypatch.setattr(zh, "CN_SOURCES", True)
     async def _fake(*_a, **_k):
         return _zhihu_hot_fixture()
@@ -906,7 +906,7 @@ async def test_zhihu_hot_limit_capped_at_30(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_zhihu_hot_shape_drift_raises(monkeypatch):
-    import search_gateway.sources.zhihu_hot as zh
+    import kortex_search.sources.zhihu_hot as zh
     monkeypatch.setattr(zh, "CN_SOURCES", True)
     async def _fake(*_a, **_k):
         return {"data": "junk"}
@@ -917,7 +917,7 @@ async def test_zhihu_hot_shape_drift_raises(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_zhihu_hot_cn_gated(monkeypatch):
-    import search_gateway.sources.zhihu_hot as zh
+    import kortex_search.sources.zhihu_hot as zh
     monkeypatch.setattr(zh, "CN_SOURCES", False)
     with pytest.raises(SourceError, match="disabled"):
         await zh.ZhihuHotSource().search("x")
@@ -925,9 +925,9 @@ async def test_zhihu_hot_cn_gated(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cn_sources_disabled_by_default():
-    import search_gateway.sources.baidu as bd
-    import search_gateway.sources.toutiao as tt
-    import search_gateway.sources.zhihu_hot as zh
+    import kortex_search.sources.baidu as bd
+    import kortex_search.sources.toutiao as tt
+    import kortex_search.sources.zhihu_hot as zh
     for src in (bd.BaiduSource(), zh.ZhihuHotSource(), tt.ToutiaoSource()):
         with pytest.raises(SourceError, match="disabled"):
             await src.search("x")

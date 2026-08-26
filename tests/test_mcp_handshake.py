@@ -1,6 +1,6 @@
 """stdio JSON-RPC handshake + tool-call tests.
 
-Covers both the bare `search-gateway` invocation (what OpenCode's MCP config
+Covers both the bare `kortex-search` invocation (what OpenCode's MCP config
 uses — no subcommand) and the explicit `serve` subcommand, plus a regression
 guard for the `saved_queries` module/function shadowing bug.
 """
@@ -16,7 +16,7 @@ from mcp.client.stdio import stdio_client
 def _handshake(args: list[str]) -> list[str]:
     async def _run() -> list[str]:
         params = StdioServerParameters(
-            command=sys.executable, args=["-m", "search_gateway.cli", *args],
+            command=sys.executable, args=["-m", "kortex_search.cli", *args],
         )
         async with (stdio_client(params) as (read, write),
                      ClientSession(read, write) as session):
@@ -30,7 +30,7 @@ def _handshake(args: list[str]) -> list[str]:
 def _call_tool(args: list[str], tool: str, arguments: dict) -> dict:
     async def _run() -> dict:
         params = StdioServerParameters(
-            command=sys.executable, args=["-m", "search_gateway.cli", *args],
+            command=sys.executable, args=["-m", "kortex_search.cli", *args],
         )
         async with (stdio_client(params) as (read, write),
                      ClientSession(read, write) as session):
@@ -51,7 +51,7 @@ def _assert_surface(names: list[str]) -> None:
 
 
 def test_bare_command_lists_14_tools():
-    # The bare command is what `"command": ["search-gateway"]` runs — it must
+    # The bare command is what `"command": ["kortex-search"]` runs — it must
     # not require the `serve` subcommand to be present (regression guard).
     _assert_surface(_handshake([]))
 
