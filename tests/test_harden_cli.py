@@ -60,6 +60,7 @@ class TestVaultCli:
     def test_harden_install_for_unit(self, monkeypatch, capsys, tmp_path):
         from kortex_search.extract import harden
         monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
+        monkeypatch.setattr(harden, "RULES_PATH", tmp_path / "ks-egress.nft")
         monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
         monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))

@@ -139,6 +139,7 @@ class TestInstalledProbe:
         monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
         monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
         monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
+        monkeypatch.setattr(harden, "RULES_PATH", tmp_path / "ks-egress.nft")
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))
         monkeypatch.setattr(harden, "_unit_cgroup_path",
                            lambda unit: f"/u.slice/{unit}")
@@ -218,18 +219,21 @@ class TestInstallUninstall:
         monkeypatch.setattr(harden, "_scope_cgroup_path",
                            lambda: "/user.slice/user-1000.slice/ks-egress.scope")
         monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
+        monkeypatch.setattr(harden, "RULES_PATH", tmp_path / "ks-egress.nft")
         monkeypatch.setattr(harden, "_run_nft", lambda *a, **k: (0, ""))
         out = harden.install(sudo=True)
         assert out["ok"] is True
         state = harden._load_state()
         assert state["cgroup_path"] == "/user.slice/user-1000.slice/ks-egress.scope"
-        assert (tmp_path / "ks-egress.nft").exists() is False or True  # rules file elsewhere
+        assert out["rules_file"] == str(tmp_path / "ks-egress.nft")
+        assert (tmp_path / "ks-egress.nft").exists()
 
     def test_install_pending_without_sudo(self, monkeypatch, tmp_path):
         monkeypatch.setattr(harden, "_nft", lambda: "/usr/bin/nft")
         monkeypatch.setattr(harden, "cgroupv2_mounted", lambda: True)
         monkeypatch.setattr(harden, "_scope_cgroup_path", lambda: "/u.scope")
         monkeypatch.setattr(harden, "STATE_PATH", tmp_path / "harden.json")
+        monkeypatch.setattr(harden, "RULES_PATH", tmp_path / "ks-egress.nft")
         monkeypatch.setattr(harden, "HARDEN_SUDO", False)
         monkeypatch.setattr(harden, "os", __import__("os"))
         out = harden.install(sudo=False)

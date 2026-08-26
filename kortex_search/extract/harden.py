@@ -39,6 +39,7 @@ logger = logging.getLogger("kortex_search.extract.harden")
 
 NFT_TABLE = "inet ks_egress"
 STATE_PATH = Path(os.path.expanduser("~/.config/kortex-search/harden.json"))
+RULES_PATH = Path(os.path.expanduser("~/.config/kortex-search/ks-egress.nft"))
 
 # Everything the floor blocks, expressed for the kernel. No exemptions here —
 # this is the absolute egress floor for scoped browser children.
@@ -343,7 +344,7 @@ def install(*, sudo: bool = False, dry_run: bool = False,
     rules = build_rules(cg)
     if dry_run:
         return {"ok": True, "dry_run": True, "cgroup_path": cg, "rules": rules}
-    rules_path = Path(os.path.expanduser("~/.config/kortex-search/ks-egress.nft"))
+    rules_path = RULES_PATH
     try:
         rules_path.parent.mkdir(parents=True, exist_ok=True)
         rules_path.write_text(rules, encoding="utf-8")
