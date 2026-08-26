@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import httpx
-
 from ..config import GITHUB_TOKEN
+from ..extract.http import HttpError, request
 from ..models import Result
 from .base import Source, SourceError
 
@@ -20,14 +19,14 @@ class GitHubSource(Source):
         if GITHUB_TOKEN:
             headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(
-                    url, params={"q": query, "per_page": limit}, headers=headers)
-                if resp.status_code == 403:
-                    raise SourceError("github rate-limited (set GITHUB_TOKEN to raise limit)")
-                resp.raise_for_status()
-                items = resp.json().get("items", [])
-        except httpx.HTTPError as exc:
+            resp = await request("GET", url, source="github",
+                                 params={"q": query, "per_page": limit},
+                                 headers=headers, timeout=15.0)
+            if resp.status_code == 403:
+                raise SourceError("github rate-limited (set GITHUB_TOKEN to raise limit)")
+            resp.raise_for_status()
+            items = resp.json().get("items", [])
+        except HttpError as exc:
             raise SourceError(f"github request failed: {exc}") from exc
 
         results = []
@@ -51,8 +50,8 @@ class GitHubSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                r = await client.get("https://api.github.com/rate_limit")
-                return r.status_code == 200, f"http {r.status_code}"
-        except httpx.HTTPError as exc:
+            r = await request("GET", "https://api.github.com/rate_limit",
+                              source="github", timeout=8.0)
+            return r.status_code == 200, f"http {r.status_code}"
+        except HttpError as exc:
             return False, str(exc)

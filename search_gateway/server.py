@@ -7,6 +7,7 @@ Run:  search-gateway serve      (console script)
 from __future__ import annotations
 
 import asyncio
+import hmac
 
 from fastmcp import FastMCP
 from starlette.middleware import Middleware
@@ -72,7 +73,10 @@ class BearerAuthMiddleware:
             await self.app(scope, receive, send)
             return
         headers = dict(scope.get("headers") or [])
-        if headers.get(b"authorization") == self._expected:
+        # constant-time comparison — the LAN-exposed transport must not leak
+        # token bytes via a timing side-channel (bug-sweep discovery 2026-08-26)
+        if hmac.compare_digest(headers.get(b"authorization", b""),
+                               self._expected):
             await self.app(scope, receive, send)
             return
         body = b'{"error":"unauthorized"}'
@@ -96,8 +100,9 @@ async def search(
 
     `sources`: subset of [arxiv, bilibili, crossref, exa, facebook, github,
     instagram, linkedin, openalex, reddit, searxng, semantic_scholar,
-    stackoverflow, twitter, v2ex, web, xiaohongshu, youtube]
-    (default = fast set). Unknown names raise.
+    stackoverflow, twitter, v2ex, web, xiaohongshu, youtube, zhihu,
+    zhihu_hot, weibo, baidu, toutiao] (default = fast set; CN tier opt-in
+    via SEARCH_GATEWAY_CN_SOURCES). Unknown names raise.
     `category`: general | news | science | social media.
     `freshness`: day | week | month | year (recency filter).
     """

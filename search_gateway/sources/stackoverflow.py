@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
-
+from ..extract.http import HttpError, get_json, request
 from ..models import Result
 from .base import Source, SourceError, normalize_published
 
@@ -28,11 +27,9 @@ class StackOverflowSource(Source):
             "filter": "withbody",
         }
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params=params)
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="stackoverflow", params=params,
+                                  timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"stackoverflow request failed: {exc}") from exc
 
         results = []
@@ -63,9 +60,9 @@ class StackOverflowSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                r = await client.get("https://api.stackexchange.com/2.3/info",
-                                     params={"site": "stackoverflow"})
-                return r.status_code == 200, f"http {r.status_code}"
-        except httpx.HTTPError as exc:
+            r = await request("GET", "https://api.stackexchange.com/2.3/info",
+                              source="stackoverflow",
+                              params={"site": "stackoverflow"}, timeout=10.0)
+            return r.status_code == 200, f"http {r.status_code}"
+        except HttpError as exc:
             return False, str(exc)

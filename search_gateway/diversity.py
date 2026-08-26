@@ -74,4 +74,9 @@ def mmr_select(candidates: list[Result], embeddings, limit: int,
         selected_idx.append(best_i)
         remaining.remove(best_i)
 
+    if not selected_idx:
+        # everything fell below the relevance floor (or all scores were 0) —
+        # never return [] while candidates exist; fall back to top-scored
+        # (bug-sweep discovery 2026-08-26)
+        return candidates[:limit]
     return [candidates[i] for i in selected_idx]

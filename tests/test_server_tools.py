@@ -49,7 +49,43 @@ class FakeClient:
 
 
 def _mock_http(monkeypatch, module, responses):
-    monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kw: FakeClient(responses, **kw))
+    """Patch a source module's extract.http primitives with a scripted queue.
+
+    Each module gets its OWN client — responses stay deterministic per
+    source (the global-httpx patch collides when two sources are patched in
+    one test). Migrated sources call get_json/get_text/request by name.
+    """
+    client = FakeClient(responses)
+
+    async def _checked(resp):
+        from search_gateway.extract.http import HTTPStatusError
+        if getattr(resp, "status_code", 200) >= 400:
+            raise HTTPStatusError(resp.status_code)
+        return resp
+
+    async def fake_get_json(url, *, source=None, headers=None, params=None,
+                            timeout=20.0):
+        r = await client.get(url, params=params)
+        return (await _checked(r)).json()
+
+    async def fake_get_text(url, *, source=None, headers=None, params=None,
+                            timeout=20.0):
+        r = await client.get(url, params=params)
+        return (await _checked(r)).text
+
+    async def fake_request(method, url, *, source=None, headers=None,
+                           params=None, timeout=20.0):
+        return await client.get(url, params=params)
+
+    for _name, _fn in (("get_json", fake_get_json),
+                       ("get_text", fake_get_text),
+                       ("request", fake_request)):
+        if hasattr(module, _name):
+            monkeypatch.setattr(module, _name, _fn)
+    # raw-httpx modules (web.py reader stages) still resolve their own client
+    if hasattr(module, "httpx"):
+        monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kw: client)
+    return client
 
 
 PAPER = {"title": "Paper X", "doi": "https://doi.org/10.1/x",
@@ -99,13 +135,11 @@ def test_get_paper_arxiv(monkeypatch):
     import search_gateway.sources.arxiv as arx
     import search_gateway.sources.openalex as oa
 
-    class FakeArxivClient(FakeClient):
-        @property
-        def text(self):
-            return "<feed/>"
+    async def fake_get_text(url, **kw):
+        return "<feed/>"
 
     _mock_http(monkeypatch, oa, [FakeResp(PAPER)])
-    monkeypatch.setattr(arx.httpx, "AsyncClient", lambda **kw: FakeArxivClient([]))
+    monkeypatch.setattr(arx, "get_text", fake_get_text)
 
     async def run():
         out = await get_paper("2603.12345")

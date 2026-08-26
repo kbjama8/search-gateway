@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
-import httpx
-
 from ..config import MAILTO
+from ..extract.http import HttpError, get_json, request
 from ..models import Result
 from .base import Source, SourceError, normalize_published
+
+_DOI_QUOTE_SAFE = ""  # a DOI path segment is opaque — quote everything
+
+
+def _quote_doi(doi: str) -> str:
+    """Sanitize a user-supplied DOI for use as a URL path segment.
+
+    A DOI like `10.1/../../admin` or one carrying `?`/`#`/spaces would
+    otherwise corrupt the request (bug-sweep discovery 2026-08-26)."""
+    import urllib.parse
+    return urllib.parse.quote(doi.replace("https://doi.org/", "").strip(),
+                              safe=_DOI_QUOTE_SAFE)
 
 
 class CrossrefSource(Source):
@@ -21,38 +32,32 @@ class CrossrefSource(Source):
         if year_from:
             params["filter"] = f"from-pub-date:{year_from}-01-01"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params=params)
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="crossref", params=params,
+                                  timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"crossref request failed: {exc}") from exc
 
         return [self._to_result(it) for it in data.get("message", {}).get("items", [])
                 if (it.get("title") or [""])[0]]
 
     async def get(self, doi: str) -> Result:
-        doi = doi.replace("https://doi.org/", "").strip()
+        doi = _quote_doi(doi)
         url = f"https://api.crossref.org/works/{doi}"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params={"mailto": MAILTO})
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="crossref",
+                                  params={"mailto": MAILTO}, timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"crossref get failed: {exc}") from exc
         return self._to_result(data.get("message", {}))
 
     async def references(self, doi: str, limit: int = 20) -> list[Result]:
         """Full reference list for a DOI (Crossref returns structured refs)."""
-        doi = doi.replace("https://doi.org/", "").strip()
+        doi = _quote_doi(doi)
         url = f"https://api.crossref.org/works/{doi}"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params={"mailto": MAILTO})
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="crossref",
+                                  params={"mailto": MAILTO}, timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"crossref references failed: {exc}") from exc
 
         out: list[Result] = []
@@ -116,9 +121,10 @@ class CrossrefSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                r = await client.get("https://api.crossref.org/works",
-                                     params={"query": "test", "rows": 1, "mailto": MAILTO})
-                return r.status_code == 200, f"http {r.status_code}"
-        except httpx.HTTPError as exc:
+            r = await request("GET", "https://api.crossref.org/works",
+                              source="crossref",
+                              params={"query": "test", "rows": 1, "mailto": MAILTO},
+                              timeout=10.0)
+            return r.status_code == 200, f"http {r.status_code}"
+        except HttpError as exc:
             return False, str(exc)

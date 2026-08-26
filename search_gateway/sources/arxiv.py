@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-import httpx
-
+from ..extract.http import HttpError, get_text, request
 from ..models import Result
 from .base import Source, SourceError
 
@@ -24,12 +23,11 @@ class ArxivSource(Source):
         url = "https://export.arxiv.org/api/query"
         params = {"search_query": f"all:{query}", "start": 0, "max_results": limit}
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(
-                    url, params=params, headers={"User-Agent": "search-gateway/0.1"})
-                resp.raise_for_status()
-                root = ET.fromstring(resp.text)  # noqa: S314 — ET does not resolve external entities; arxiv.org is a fixed trusted host
-        except (httpx.HTTPError, ET.ParseError) as exc:
+            text = await get_text(
+                url, source="arxiv", params=params,
+                headers={"User-Agent": "search-gateway/0.1"})
+            root = ET.fromstring(text)  # noqa: S314 — ET does not resolve external entities; arxiv.org is a fixed trusted host
+        except (HttpError, ET.ParseError) as exc:
             raise SourceError(f"arxiv request failed: {exc}") from exc
 
         return self._parse_entries(root, limit)
@@ -38,12 +36,11 @@ class ArxivSource(Source):
         """Fetch a single paper by arXiv ID (e.g. '2312.10997')."""
         url = "https://export.arxiv.org/api/query"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params={"id_list": arxiv_id},
-                                        headers={"User-Agent": "search-gateway/0.1"})
-                resp.raise_for_status()
-                root = ET.fromstring(resp.text)  # noqa: S314 — ET does not resolve external entities; arxiv.org is a fixed trusted host
-        except (httpx.HTTPError, ET.ParseError) as exc:
+            text = await get_text(
+                url, source="arxiv", params={"id_list": arxiv_id},
+                headers={"User-Agent": "search-gateway/0.1"})
+            root = ET.fromstring(text)  # noqa: S314 — ET does not resolve external entities; arxiv.org is a fixed trusted host
+        except (HttpError, ET.ParseError) as exc:
             raise SourceError(f"arxiv get failed: {exc}") from exc
         results = self._parse_entries(root, 1)
         if not results:
@@ -90,10 +87,11 @@ class ArxivSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                r = await client.get("https://export.arxiv.org/api/query",
-                                     params={"search_query": "all:test", "max_results": 1},
-                                     headers={"User-Agent": "search-gateway/0.1"})
-                return r.status_code == 200, f"http {r.status_code}"
-        except httpx.HTTPError as exc:
+            r = await request("GET", "https://export.arxiv.org/api/query",
+                              source="arxiv",
+                              params={"search_query": "all:test", "max_results": 1},
+                              headers={"User-Agent": "search-gateway/0.1"},
+                              timeout=10.0)
+            return r.status_code == 200, f"http {r.status_code}"
+        except HttpError as exc:
             return False, str(exc)

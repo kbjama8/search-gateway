@@ -28,6 +28,7 @@ import importlib
 import os
 import time
 
+import httpx
 import pytest
 
 from search_gateway import cache, ratelimit, stats
@@ -278,6 +279,10 @@ def test_openalex_to_result_called_once(monkeypatch):
     from search_gateway.sources import openalex as oa
 
     class FakeResp:
+        status_code = 200
+        text = ""
+        headers: dict = {}  # noqa: RUF012 — fixture class
+
         def raise_for_status(self):
             pass
 
@@ -303,7 +308,10 @@ def test_openalex_to_result_called_once(monkeypatch):
         async def get(self, *a, **k):
             return FakeResp()
 
-    monkeypatch.setattr(oa.httpx, "AsyncClient", FakeClient)
+        async def request(self, method, *a, **k):
+            return FakeResp()
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
     calls = {"n": 0}
     orig = oa.OpenAlexSource._to_result
 
@@ -877,3 +885,303 @@ def test_toutiao_empty_label_is_empty_string(monkeypatch):
     import asyncio
     out = asyncio.run(tt.ToutiaoSource().search(""))
     assert out[0].snippet == ""  # never None
+
+
+# --------------------------------------------------------------------------
+# I12 — bug-sweep regressions (2026-08-26)
+# --------------------------------------------------------------------------
+
+def test_ratelimit_atomic_claim_serializes_concurrent_callers(monkeypatch, rds):
+    """Concurrent callers must not both fire immediately — the old read-then-
+    set let two racers read the old timestamp and fire together."""
+    from search_gateway import ratelimit as rl
+
+    monkeypatch.setattr(rl, "_local", {})
+    fired: list[float] = []
+
+    async def main():
+        async def caller():
+            await rl.wait_if_needed("tw", 0.3)
+            fired.append(asyncio.get_running_loop().time())
+
+        # first claim is free; the second must wait for the pacing slot
+        await rl.wait_if_needed("tw", 0.3)
+        t0 = asyncio.get_running_loop().time()
+        await asyncio.gather(*(caller() for _ in range(3)))
+        return t0
+
+    import asyncio
+    t0 = asyncio.run(main())
+    # the 3 concurrent callers spread across at least 2 pacing windows
+    assert fired[0] - t0 < 0.5
+    assert fired[-1] - fired[0] >= 0.28
+
+
+def test_singleflight_key_covers_limit_and_category(monkeypatch, rds):
+    """Concurrent same-query requests with different limits must NOT share a
+    task (the old (source, query) key returned the wrong result count)."""
+    from search_gateway import orchestrator as orch
+    from search_gateway.sources.base import Source
+
+    class LimitedSource(Source):
+        name = "searxng"
+
+        def __init__(self):
+            self.seen_limits: list[int] = []
+
+        async def search(self, query, limit=10, category=None, freshness=None):
+            import asyncio
+            self.seen_limits.append(limit)
+            await asyncio.sleep(0.2)  # force overlap
+            from search_gateway.models import Result
+            return [Result(title=f"r{i}", url=f"https://x/{i}", source="searxng")
+                    for i in range(limit)]
+
+    src = LimitedSource()
+
+    def fake_get_sources(names):
+        return [src]
+
+    monkeypatch.setattr(orch, "get_sources", fake_get_sources)
+    monkeypatch.setattr(orch, "SEMANTIC_RERANK", False)
+    monkeypatch.setattr(orch, "MMR_ENABLED", False)
+    monkeypatch.setattr(orch, "EMBEDDING_DEDUP", False)
+    monkeypatch.setattr(orch, "QUERY_EXPANSION", False)
+    monkeypatch.setattr(orch, "EXPANSION_GATE_RESULTS", 6)
+
+    async def run():
+        r3, r10 = await asyncio.gather(
+            orch.search("same query", ["searxng"], category="general", limit=3),
+            orch.search("same query", ["searxng"], category="general", limit=10),
+        )
+        return r3, r10
+
+    import asyncio
+    r3, r10 = asyncio.run(run())
+    assert len(r3["results"]) == 3
+    assert len(r10["results"]) == 10
+    assert sorted(src.seen_limits) == [3, 10]  # two independent tasks
+
+
+def test_run_cmd_kills_child_on_cancellation():
+    """A cancelled outer task must kill the subprocess — the old code
+    orphaned it (GLOBAL_TIMEOUT / client disconnect)."""
+    import asyncio
+    import os
+
+    from search_gateway.sources import base as sb
+
+    async def main():
+        import tempfile
+        marker = os.path.join(tempfile.gettempdir(), f"sg-cancel-{os.getpid()}")
+        cmd = ["sh", "-c", f"sleep 30; touch {marker}"]
+        task = asyncio.ensure_future(sb.run_cmd(cmd, timeout=60, retries=0))
+        import contextlib
+        await asyncio.sleep(0.5)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        await asyncio.sleep(0.3)
+        import subprocess
+        left = subprocess.run(["/usr/bin/pgrep", "-f", "sleep 30"],
+                               capture_output=True,
+                              text=True)
+        return left.stdout.strip(), os.path.exists(marker)
+
+    import asyncio as _a
+    left, marker_touched = _a.run(main())
+    assert not marker_touched
+    assert "sleep 30" not in left  # no orphaned child
+
+
+def test_identifier_path_quoting():
+    """User-supplied identifiers must not corrupt the fetch URL path."""
+    from search_gateway.sources import crossref, openalex, semantic_scholar
+
+    assert crossref._quote_doi("10.1/../../admin?x=1#frag") == (
+        "10.1%2F..%2F..%2Fadmin%3Fx%3D1%23frag")
+    assert openalex._quote_id("doi:10.1/../../admin") == (
+        "doi:10.1%2F..%2F..%2Fadmin")
+    assert semantic_scholar.SemanticScholarSource._paper_url(
+        "10.1/../../admin") == "DOI:10.1%2F..%2F..%2Fadmin"
+
+
+def test_mmr_never_returns_empty_with_candidates(monkeypatch):
+    """All-below-floor candidates must fall back to top-k, never []."""
+    from search_gateway import diversity
+    from search_gateway.models import Result
+
+    rs = [Result(title=f"t{i}", url=f"https://d{i}.example/", score=0.0)
+          for i in range(5)]
+    out = diversity.mmr_select(rs, None, limit=3)
+    assert len(out) == 3  # zero scores → fallback, not []
+
+
+def test_auth_middleware_rejects_wrong_token():
+    """The LAN transport must reject missing/wrong tokens (and use a
+    constant-time comparison)."""
+    import asyncio
+
+    from search_gateway.server import BearerAuthMiddleware
+
+    sent: list[tuple[int, bytes]] = []
+
+    async def send(msg):
+        if msg["type"] == "http.response.start":
+            sent.append((msg["status"], b""))
+        elif msg["type"] == "http.response.body" and sent:
+            status, _ = sent.pop()
+            sent.append((status, msg["body"]))
+
+    async def app(scope, receive, send):
+        raise AssertionError("app must not be reached without a token")
+
+    mw = BearerAuthMiddleware(app, token="sekrit")
+    scope = {"type": "http", "headers": [(b"authorization", b"Bearer wrong")]}
+
+    async def run():
+        await mw(scope, None, send)
+
+    asyncio.run(run())
+    assert sent and sent[0][0] == 401
+
+
+def test_facade_lazy_parse_handles_xml(monkeypatch):
+    """The facade must not eagerly JSON-parse — XML/text endpoints (arxiv)
+    broke under the eager path (live-verified 2026-08-26)."""
+    from search_gateway.extract import http as eh
+
+    class FakeRaw:
+        status_code = 200
+        headers: dict = {}  # noqa: RUF012 — fixture class
+        text = "<feed><entry>xml</entry></feed>"
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            raise AssertionError("json() must not be called eagerly")
+
+    async def fake_transport(method, url, **kw):
+        return FakeRaw()
+
+    monkeypatch.setattr(eh, "_httpx_request", fake_transport)
+    out = asyncio.run(eh.get_text("https://export.arxiv.org/api/query"))
+    assert out.startswith("<feed>")
+
+
+def test_facade_transport_error_single_surface(monkeypatch):
+    import httpx as _httpx
+
+    from search_gateway.sources import crossref as cr
+    from search_gateway.sources.base import SourceError
+
+    class BoomTransport:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, *a, **k):
+            raise _httpx.ConnectError("network down")
+
+    monkeypatch.setattr(_httpx, "AsyncClient", lambda **kw: BoomTransport())
+    try:
+        asyncio.run(cr.CrossrefSource().search("rust", limit=2))
+        raise AssertionError("must raise")
+    except SourceError as exc:
+        assert "crossref request failed" in str(exc)
+        assert "ConnectError" in str(exc)  # wrapped, not leaked raw
+
+def test_github_403_rate_limit_surface(monkeypatch):
+    from search_gateway.extract import http as eh
+    from search_gateway.sources import github as gh
+    from search_gateway.sources.base import SourceError
+
+    async def fake_request(method, url, **kw):
+        return eh.Response(403, {}, "")
+
+    monkeypatch.setattr(gh, "request", fake_request)
+    try:
+        asyncio.run(gh.GitHubSource().search("x"))
+        raise AssertionError("must raise")
+    except SourceError as exc:
+        assert "rate-limited" in str(exc)
+
+
+def test_facade_remaining_branches(monkeypatch):
+    """Cover the facade's degrade + wrap branches: impersonate fallback,
+    JSON-decode wrap, and get_json HTTPStatusError passthrough."""
+    from search_gateway.extract import http as eh
+
+    # impersonate requested but curl_cffi fails -> degrades to httpx
+    monkeypatch.setattr(eh, "IMPERSONATE", True)
+    monkeypatch.setattr(eh, "IMPERSONATE_SOURCES", {"bilibili"})
+
+    async def boom_curl(*a, **k):
+        raise RuntimeError("curl_cffi broken")
+
+    monkeypatch.setattr(eh, "_curl_cffi_request", boom_curl)
+
+    class GoodTransport:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, method, url, **kw):
+            return type("R", (), {"status_code": 200, "headers": {},
+                                  "text": '{"ok": 1}'})()
+
+    import httpx as _httpx
+    monkeypatch.setattr(_httpx, "AsyncClient", lambda **kw: GoodTransport())
+    r = asyncio.run(eh.get_json("https://api.example.com/x", source="bilibili"))
+    assert r == {"ok": 1}
+
+    # garbage JSON body -> wrapped HttpError, not raw JSONDecodeError
+    class GarbageTransport(GoodTransport):
+        async def request(self, method, url, **kw):
+            return type("R", (), {"status_code": 200, "headers": {},
+                                  "text": "not json at all"})()
+
+    monkeypatch.setattr(_httpx, "AsyncClient", lambda **kw: GarbageTransport())
+    try:
+        asyncio.run(eh.get_json("https://api.example.com/x"))
+        raise AssertionError("must raise")
+    except eh.HttpError as exc:
+        assert "JSONDecodeError" in str(exc)
+
+
+def test_migrated_sources_http_error_branches(monkeypatch):
+    """Every migrated source wraps facade HttpError into SourceError."""
+    import sys
+
+    from search_gateway.extract import http as eh
+    from search_gateway.sources.arxiv import ArxivSource
+    from search_gateway.sources.base import SourceError
+    from search_gateway.sources.openalex import OpenAlexSource
+    from search_gateway.sources.semantic_scholar import SemanticScholarSource
+    from search_gateway.sources.stackoverflow import StackOverflowSource
+    from search_gateway.sources.v2ex import V2EXSource
+
+    async def boom(*a, **k):
+        raise eh.HttpError("ConnectError: network down")
+
+    for cls, name in (
+        (ArxivSource, "get_text"),
+        (OpenAlexSource, "get_json"),
+        (SemanticScholarSource, "request"),
+        (StackOverflowSource, "get_json"),
+        (V2EXSource, "get_json"),
+    ):
+        monkeypatch.setattr(sys.modules[cls.__module__], name, boom)
+        try:
+            asyncio.run(cls().search("x"))
+            raise AssertionError(f"{cls.__name__} must raise SourceError")
+        except SourceError as exc:
+            assert "failed" in str(exc)
+        except Exception as exc:
+            raise AssertionError(f"{cls.__name__} leaked "
+                                 f"{type(exc).__name__}: {exc}") from exc

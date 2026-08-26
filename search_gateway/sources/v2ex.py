@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
-
+from ..extract.http import HttpError, get_json, request
 from ..models import Result
 from .base import Source, SourceError, normalize_published
 
@@ -16,12 +15,10 @@ class V2EXSource(Source):
     async def search(self, query: str, limit: int = 10) -> list[Result]:
         url = "https://www.sov2ex.com/api/search"
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(url, params={"q": query, "size": limit},
-                                        headers={"User-Agent": "search-gateway/0.1"})
-                resp.raise_for_status()
-                payload = resp.json()
-        except httpx.HTTPError as exc:
+            payload = await get_json(
+                url, source="v2ex", params={"q": query, "size": limit},
+                headers={"User-Agent": "search-gateway/0.1"}, timeout=15.0)
+        except HttpError as exc:
             raise SourceError(f"v2ex request failed: {exc}") from exc
 
         results: list[Result] = []
@@ -47,10 +44,9 @@ class V2EXSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                r = await client.get("https://www.sov2ex.com/api/search",
-                    params={"q": "test", "size": 1},
-                    headers={"User-Agent": "Mozilla/5.0"})
-                return r.status_code == 200, f"http {r.status_code}"
-        except httpx.HTTPError as exc:
+            r = await request("GET", "https://www.sov2ex.com/api/search",
+                              source="v2ex", params={"q": "test", "size": 1},
+                              headers={"User-Agent": "Mozilla/5.0"}, timeout=8.0)
+            return r.status_code == 200, f"http {r.status_code}"
+        except HttpError as exc:
             return False, str(exc)

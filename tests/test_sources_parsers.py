@@ -45,6 +45,7 @@ class FakeClient:
     def __init__(self, responses=None, **kwargs):
         self.responses = list(responses or [])
         self.calls = []
+        self._last = None
 
     async def __aenter__(self):
         return self
@@ -52,22 +53,61 @@ class FakeClient:
     async def __aexit__(self, *a):
         return False
 
+    async def _next(self):
+        if self.responses:
+            self._last = self.responses.pop(0)
+        if self._last is not None:
+            return self._last
+        return FakeResp({})
+
     async def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
-        if self.responses:
-            return self.responses.pop(0)
-        return FakeResp({})
+        return await self._next()
 
     async def request(self, method, url, **kwargs):
         # extract.http uses client.request(); route to the scripted queue.
         self.calls.append((url, kwargs))
-        if self.responses:
-            return self.responses.pop(0)
-        return FakeResp({})
+        return await self._next()
 
 
 def _mock_http(monkeypatch, module, responses):
-    monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kw: FakeClient(responses, **kw))
+    """Patch a source module's extract.http primitives with a scripted queue.
+
+    Each module gets its OWN client — responses stay deterministic per
+    source (the global-httpx patch collides when two sources are patched in
+    one test). Migrated sources call get_json/get_text/request by name.
+    """
+    client = FakeClient(responses)
+
+    async def _checked(resp):
+        from search_gateway.extract.http import HTTPStatusError
+        if getattr(resp, "status_code", 200) >= 400:
+            raise HTTPStatusError(resp.status_code)
+        return resp
+
+    async def fake_get_json(url, *, source=None, headers=None, params=None,
+                            timeout=20.0):
+        r = await client.get(url, params=params)
+        return (await _checked(r)).json()
+
+    async def fake_get_text(url, *, source=None, headers=None, params=None,
+                            timeout=20.0):
+        r = await client.get(url, params=params)
+        return (await _checked(r)).text
+
+    async def fake_request(method, url, *, source=None, headers=None,
+                           params=None, timeout=20.0):
+        return await client.get(url, params=params)
+
+    for _name, _fn in (("get_json", fake_get_json),
+                       ("get_text", fake_get_text),
+                       ("request", fake_request)):
+        if hasattr(module, _name):
+            monkeypatch.setattr(module, _name, _fn)
+    # raw-httpx modules (web.py reader stages) still resolve their own client
+    if hasattr(module, "httpx"):
+        monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kw: client)
+    return client
 
 
 def _mock_cmd(monkeypatch, module, code=0, out=""):
@@ -213,7 +253,6 @@ def test_arxiv_malformed_xml(monkeypatch):
 
 
 def test_bilibili_parses_blocks(monkeypatch):
-    import httpx as _httpx
 
     import search_gateway.sources.bilibili as mod
     monkeypatch.setattr(mod, "BILIBILI_WBI", False)  # parser test, not signing
@@ -227,8 +266,7 @@ def test_bilibili_parses_blocks(monkeypatch):
             {"title": "某人", "url": "https://space.bilibili.com/2", "description": "x"},
         ]},
     ]}}
-    monkeypatch.setattr(_httpx, "AsyncClient",
-                        lambda **kw: FakeClient([FakeResp(payload)], **kw))
+    _mock_http(monkeypatch, mod, [FakeResp(payload)])
 
     async def run():
         out = await _r("bilibili").search("异步")
@@ -241,14 +279,10 @@ def test_bilibili_parses_blocks(monkeypatch):
 
 
 def test_bilibili_api_error(monkeypatch):
-    import httpx as _httpx
-
     import search_gateway.sources.bilibili as mod
     monkeypatch.setattr(mod, "BILIBILI_WBI", False)
-    monkeypatch.setattr(_httpx, "AsyncClient",
-                        lambda **kw: FakeClient(
-                            [FakeResp({"code": -412, "message": "risk control"})],
-                            **kw))
+    _mock_http(monkeypatch, mod,
+               [FakeResp({"code": -412, "message": "risk control"})])
 
     async def run():
         with pytest.raises(SourceError, match="risk control"):
@@ -618,13 +652,11 @@ _ZHIHU_PAYLOAD = {
 
 @pytest.mark.asyncio
 async def test_zhihu_parses_answer_article_question(monkeypatch):
-    import httpx as _httpx
 
     import search_gateway.sources.zhihu as zh
     monkeypatch.setattr(zh, "CN_SOURCES", True)
     monkeypatch.setattr(zh, "ZHIHU_COOKIE", "d_c0=abc; z_c0=def")
-    monkeypatch.setattr(_httpx, "AsyncClient",
-                        lambda **kw: FakeClient([FakeResp(_ZHIHU_PAYLOAD)], **kw))
+    _mock_http(monkeypatch, zh, [FakeResp(_ZHIHU_PAYLOAD)])
 
     out = await zh.ZhihuSource().search("异步")
     assert len(out) == 3  # zvideo filtered
@@ -664,13 +696,11 @@ _WEIBO_HOT = {"data": {"realtime": [
 
 @pytest.mark.asyncio
 async def test_weibo_hot_list_fallback(monkeypatch):
-    import httpx as _httpx
 
     import search_gateway.sources.weibo as wb
     monkeypatch.setattr(wb, "CN_SOURCES", True)
     monkeypatch.setattr(wb, "WEIBO_SUB", "")  # no SUB → hot list
-    monkeypatch.setattr(_httpx, "AsyncClient",
-                        lambda **kw: FakeClient([FakeResp(_WEIBO_HOT)], **kw))
+    _mock_http(monkeypatch, wb, [FakeResp(_WEIBO_HOT)])
 
     out = await wb.WeiboSource().search("")
     assert len(out) == 3
@@ -694,14 +724,11 @@ _WEIBO_SUB_SEARCH = {"data": {"cards": [
 
 @pytest.mark.asyncio
 async def test_weibo_keyword_search_with_sub(monkeypatch):
-    import httpx as _httpx
 
     import search_gateway.sources.weibo as wb
     monkeypatch.setattr(wb, "CN_SOURCES", True)
     monkeypatch.setattr(wb, "WEIBO_SUB", "SUB=abc")
-    monkeypatch.setattr(_httpx, "AsyncClient",
-                        lambda **kw: FakeClient([FakeResp(_WEIBO_SUB_SEARCH)],
-                                                **kw))
+    _mock_http(monkeypatch, wb, [FakeResp(_WEIBO_SUB_SEARCH)])
 
     out = await wb.WeiboSource().search("天气")
     assert len(out) == 1
@@ -718,12 +745,10 @@ _BAIDU_BOARD = {"data": {"cards": [
 
 @pytest.mark.asyncio
 async def test_baidu_board(monkeypatch):
-    import httpx as _httpx
 
     import search_gateway.sources.baidu as bd
     monkeypatch.setattr(bd, "CN_SOURCES", True)
-    monkeypatch.setattr(_httpx, "AsyncClient",
-                        lambda **kw: FakeClient([FakeResp(_BAIDU_BOARD)], **kw))
+    _mock_http(monkeypatch, bd, [FakeResp(_BAIDU_BOARD)])
 
     out = await bd.BaiduSource().search("")
     assert len(out) == 2
@@ -743,13 +768,10 @@ _TOUTIAO_BOARD = {"data": [
 
 @pytest.mark.asyncio
 async def test_toutiao_board(monkeypatch):
-    import httpx as _httpx
 
     import search_gateway.sources.toutiao as tt
     monkeypatch.setattr(tt, "CN_SOURCES", True)
-    monkeypatch.setattr(_httpx, "AsyncClient",
-                        lambda **kw: FakeClient([FakeResp(_TOUTIAO_BOARD)],
-                                                **kw))
+    _mock_http(monkeypatch, tt, [FakeResp(_TOUTIAO_BOARD)])
 
     out = await tt.ToutiaoSource().search("")
     assert len(out) == 2

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-import httpx
-
+from ..extract.http import HttpError, request
 from ..models import Result
 from .base import Source, SourceError, normalize_published
 
@@ -25,14 +24,16 @@ class SemanticScholarSource(Source):
         return [self._to_result(p) for p in data.get("data", []) if p.get("title")]
 
     async def citations(self, identifier: str, limit: int = 20) -> list[Result]:
-        url = f"https://api.semanticscholar.org/graph/v1/paper/{self._paper_id(identifier)}/citations"
+        url = (f"https://api.semanticscholar.org/graph/v1/paper/"
+               f"{self._paper_url(identifier)}/citations")
         params = {"limit": limit, "fields": _FIELDS}
         data = await self._get_json(url, params)
         return [self._to_result(c.get("citingPaper", {})) for c in data.get("data", [])
                 if c.get("citingPaper", {}).get("title")]
 
     async def references(self, identifier: str, limit: int = 20) -> list[Result]:
-        url = f"https://api.semanticscholar.org/graph/v1/paper/{self._paper_id(identifier)}/references"
+        url = (f"https://api.semanticscholar.org/graph/v1/paper/"
+               f"{self._paper_url(identifier)}/references")
         params = {"limit": limit, "fields": _FIELDS}
         data = await self._get_json(url, params)
         return [self._to_result(c.get("citedPaper", {})) for c in data.get("data", [])
@@ -47,20 +48,29 @@ class SemanticScholarSource(Source):
             return "arXiv:" + s.split(":", 1)[1].strip()
         return "arXiv:" + s
 
+    @staticmethod
+    def _paper_url(identifier: str) -> str:
+        """Quote the paper-id path segment — a user-supplied identifier with
+        `/`, `?`, `#` or spaces would otherwise corrupt the request
+        (bug-sweep discovery 2026-08-26)."""
+        import urllib.parse
+        return urllib.parse.quote(SemanticScholarSource._paper_id(identifier),
+                                  safe=":")
+
     async def _get_json(self, url: str, params: dict, retries: int = 3) -> dict:
         """GET with retry/backoff — S2 is 429-prone without a key."""
         last: Exception | None = None
         for attempt in range(retries):
             try:
-                async with httpx.AsyncClient(timeout=20.0) as client:
-                    resp = await client.get(url, params=params)
-                    if resp.status_code == 429:
-                        last = SourceError("semantic scholar rate-limited (429)")
-                        await asyncio.sleep(2 * (attempt + 1))
-                        continue
-                    resp.raise_for_status()
-                    return resp.json()
-            except httpx.HTTPError as exc:
+                resp = await request("GET", url, source="semantic_scholar",
+                                     params=params, timeout=20.0)
+                if resp.status_code == 429:
+                    last = SourceError("semantic scholar rate-limited (429)")
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except HttpError as exc:
                 last = exc
                 await asyncio.sleep(1 + attempt)
         raise SourceError(f"semantic scholar failed: {last}") from last
@@ -93,9 +103,11 @@ class SemanticScholarSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                r = await client.get("https://api.semanticscholar.org/graph/v1/paper/search",
-                                     params={"query": "test", "limit": 1, "fields": "title"})
-                return r.status_code == 200, f"http {r.status_code}"
-        except httpx.HTTPError as exc:
+            r = await request("GET",
+                              "https://api.semanticscholar.org/graph/v1/paper/search",
+                              source="semantic_scholar",
+                              params={"query": "test", "limit": 1, "fields": "title"},
+                              timeout=10.0)
+            return r.status_code == 200, f"http {r.status_code}"
+        except HttpError as exc:
             return False, str(exc)

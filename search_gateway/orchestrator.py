@@ -62,8 +62,15 @@ _inflight: dict[tuple[str, str], asyncio.Task] = {}
 async def _singleflight(source, query: str, limit: int, category: str,
                         freshness: str | None, year_from: int | None,
                         open_access_only: bool) -> tuple[str, Any]:
-    """Run `_run_one` under a per-(source, query) in-flight dedup."""
-    key = (source.name, query.lower().strip())
+    """Run `_run_one` under a per-(source, query, params) in-flight dedup.
+
+    The key covers EVERY input that shapes the outcome — the old
+    (source, query) key let concurrent requests with different limits/
+    categories share one task and return the wrong result count
+    (bug-sweep discovery 2026-08-26).
+    """
+    key = (source.name, query.lower().strip(), limit, category, freshness,
+           year_from, open_access_only)
     task = _inflight.get(key)
     if task is not None and not task.done():
         with contextlib.suppress(Exception):  # fall through to a fresh run

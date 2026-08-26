@@ -174,6 +174,13 @@ async def run_cmd(
             with contextlib.suppress(Exception):  # best-effort kill
                 proc.kill()
             last_err = SourceError(f"timeout ({timeout}s): {' '.join(cmd)}")
+        except asyncio.CancelledError:
+            # the outer task was cancelled (GLOBAL_TIMEOUT fired, client
+            # disconnected) — kill the child or it ORPHANS and keeps running
+            # (bug-sweep discovery 2026-08-26)
+            with contextlib.suppress(Exception):
+                proc.kill()
+            raise
         except FileNotFoundError:
             raise SourceError(f"command not found: {cmd[0]}") from None
     raise last_err  # type: ignore[misc]

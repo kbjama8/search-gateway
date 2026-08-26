@@ -57,8 +57,12 @@ async def wait_if_needed(source: str, min_interval: float) -> None:
     """Block until `min_interval` seconds have elapsed since the last query
     to `source` (across processes via Redis; local fallback in-memory).
 
-    The Redis gate stores the monotonic timestamp of the last query, so every
-    caller — regardless of process — waits out the remainder of the window.
+    The Redis gate is an ATOMIC claim: `SET key ts NX EX ttl` — exactly one
+    concurrent caller claims the pacing slot; the others read the holder's
+    timestamp and sleep the remainder, then re-claim (a stale slot is
+    deleted and reclaimed). The old read-then-set pattern let concurrent
+    callers both read the old timestamp and fire together, defeating the
+    ban-protection pacing (bug-sweep discovery 2026-08-26).
     """
     now = time.monotonic()
     last = _local.get(source, 0.0)
@@ -67,19 +71,25 @@ async def wait_if_needed(source: str, min_interval: float) -> None:
         await asyncio.sleep(wait)
     _local[source] = time.monotonic()
 
+    ttl = max(int(min_interval * 3), 30)
     try:
         c = _get_client()
         key = f"sg:rl:{source}"
-        prev = c.get(key)
-        if prev is not None:
+        while True:
+            if c.set(key, str(time.monotonic()), nx=True, ex=ttl):
+                return  # claimed the pacing slot
+            prev = c.get(key)
             try:
                 remaining = float(prev) + min_interval - time.monotonic()
-            except ValueError:
+            except (TypeError, ValueError):
                 remaining = 0.0
-            if remaining > 0:
-                await asyncio.sleep(remaining)
-        # persist this query's timestamp; TTL = 3x interval so the key
-        # self-cleans when the source goes quiet
-        c.set(key, str(time.monotonic()), ex=max(int(min_interval * 3), 30))
+            if remaining <= 0:
+                # the holder's slot is stale (holder died / interval elapsed):
+                # delete and re-claim — the last claim always wins, so pacing
+                # is measured from the newest timestamp, never shorter
+                c.delete(key)
+                continue
+            # capped sleeps so cancellation/callers stay responsive
+            await asyncio.sleep(min(remaining, 2.0))
     except redis.RedisError as exc:
         logger.debug("ratelimit redis error: %s", exc)

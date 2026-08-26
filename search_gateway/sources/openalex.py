@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
-import httpx
-
 from ..config import MAILTO
+from ..extract.http import HttpError, get_json, request
 from ..models import Result
 from .base import Source, SourceError
+
+_ID_SAFE = ":"  # OpenAlex ids keep the `doi:`/`W`-form colons readable
+
+
+def _quote_id(seg: str) -> str:
+    """Sanitize a user-supplied identifier for use as a URL path segment
+    (bug-sweep discovery 2026-08-26)."""
+    import urllib.parse
+    return urllib.parse.quote(seg.strip(), safe=_ID_SAFE)
 
 
 def _reconstruct_abstract(inv: dict | None) -> str:
@@ -39,11 +47,9 @@ class OpenAlexSource(Source):
         if filters:
             params["filter"] = ",".join(filters)
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params=params)
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="openalex", params=params,
+                                  timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"openalex request failed: {exc}") from exc
 
         return [r for r in map(self._to_result, data.get("results", [])) if r.title]
@@ -54,13 +60,11 @@ class OpenAlexSource(Source):
         if identifier.startswith(("10.", "https://doi.org/")):
             doi = identifier.replace("https://doi.org/", "").strip()
             lookup = f"doi:{doi}"
-        url = f"https://api.openalex.org/works/{lookup}"
+        url = f"https://api.openalex.org/works/{_quote_id(lookup)}"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params={"mailto": MAILTO})
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="openalex",
+                                  params={"mailto": MAILTO}, timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"openalex get failed: {exc}") from exc
         return self._to_result(data)
 
@@ -70,24 +74,22 @@ class OpenAlexSource(Source):
         url = "https://api.openalex.org/works"
         params = {"filter": f"cites:{wid}", "per-page": limit, "mailto": MAILTO}
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params=params)
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="openalex", params=params,
+                                  timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"openalex citations failed: {exc}") from exc
         return [self._to_result(w) for w in data.get("results", [])]
 
     async def references(self, identifier: str, limit: int = 20) -> list[Result]:
         """References for a paper — resolves OpenAlex `referenced_works` IDs."""
         wid = await self._resolve_work_id(identifier)
-        url = f"https://api.openalex.org/works/{wid}"
+        url = f"https://api.openalex.org/works/{_quote_id(wid)}"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params={"mailto": MAILTO})
-                resp.raise_for_status()
-                ref_ids = (resp.json().get("referenced_works") or [])[:limit]
-        except httpx.HTTPError as exc:
+            ref_ids = ((await get_json(url, source="openalex",
+                                       params={"mailto": MAILTO},
+                                       timeout=20.0))
+                       .get("referenced_works") or [])[:limit]
+        except HttpError as exc:
             raise SourceError(f"openalex references failed: {exc}") from exc
         if not ref_ids:
             return []
@@ -95,11 +97,9 @@ class OpenAlexSource(Source):
         url = "https://api.openalex.org/works"
         params = {"filter": f"ids.openalex:{'|'.join(short)}", "per-page": limit, "mailto": MAILTO}
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params=params)
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="openalex", params=params,
+                                  timeout=20.0)
+        except HttpError as exc:
             raise SourceError(f"openalex references batch failed: {exc}") from exc
         return [self._to_result(w) for w in data.get("results", [])]
 
@@ -113,13 +113,12 @@ class OpenAlexSource(Source):
         else:
             arx = s.replace("arXiv:", "").replace("arxiv:", "").strip()
             lookup = f"doi:10.48550/arxiv.{arx}"
-        url = f"https://api.openalex.org/works/{lookup}"
+        url = f"https://api.openalex.org/works/{_quote_id(lookup)}"
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(url, params={"mailto": MAILTO})
-                resp.raise_for_status()
-                return (resp.json().get("id") or "").rsplit("/", 1)[-1]
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="openalex",
+                                  params={"mailto": MAILTO}, timeout=20.0)
+            return (data.get("id") or "").rsplit("/", 1)[-1]
+        except HttpError as exc:
             raise SourceError(f"openalex id resolve failed: {exc}") from exc
 
     @staticmethod
@@ -154,9 +153,10 @@ class OpenAlexSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                r = await client.get("https://api.openalex.org/works",
-                                     params={"search": "test", "per-page": 1, "mailto": MAILTO})
-                return r.status_code == 200, f"http {r.status_code}"
-        except httpx.HTTPError as exc:
+            r = await request("GET", "https://api.openalex.org/works",
+                              source="openalex",
+                              params={"search": "test", "per-page": 1,
+                                      "mailto": MAILTO}, timeout=10.0)
+            return r.status_code == 200, f"http {r.status_code}"
+        except HttpError as exc:
             return False, str(exc)

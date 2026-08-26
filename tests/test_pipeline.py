@@ -117,11 +117,16 @@ def test_filter_key_parts():
 # --------------------------------------------------------------------------
 
 class FakeResp:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self._payload = payload
+        self.status_code = status_code
+        self.text = ""
+        self.headers = {}
 
     def raise_for_status(self):
-        pass
+        if self.status_code >= 400:
+            from search_gateway.extract.http import HTTPStatusError
+            raise HTTPStatusError(self.status_code)
 
     def json(self):
         return self._payload
@@ -131,6 +136,7 @@ class SharedFakeClient:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = []
+        self._last = None
 
     async def __aenter__(self):
         return self
@@ -138,9 +144,18 @@ class SharedFakeClient:
     async def __aexit__(self, *a):
         return False
 
+    async def _next(self):
+        if self.responses:
+            self._last = self.responses.pop(0)
+        return self._last
+
     async def get(self, url, **kwargs):
         self.calls.append(url)
-        return self.responses.pop(0)
+        return await self._next()
+
+    async def request(self, method, url, **kwargs):
+        self.calls.append(url)
+        return await self._next()
 
 
 OA_PAPER = {"title": "P", "id": "https://openalex.org/W1", "doi": "https://doi.org/10.1/p",
@@ -150,9 +165,9 @@ OA_PAPER = {"title": "P", "id": "https://openalex.org/W1", "doi": "https://doi.o
 
 
 def _patch_oa(monkeypatch, responses):
-    import search_gateway.sources.openalex as oa
+    import httpx as _httpx
     client = SharedFakeClient(responses)
-    monkeypatch.setattr(oa.httpx, "AsyncClient", lambda **kw: client)
+    monkeypatch.setattr(_httpx, "AsyncClient", lambda **kw: client)
     return client
 
 
@@ -190,7 +205,8 @@ def test_openalex_citations_and_references(monkeypatch):
             FakeResp({"results": []}),
         ])
         await ALL_SOURCES["openalex"].citations("2603.12345", limit=5)
-        assert "10.48550/arxiv.2603.12345" in client3.calls[0]
+        # the identifier-injection fix quotes the path segment
+        assert "doi:10.48550%2Farxiv.2603.12345" in client3.calls[0]
 
     asyncio.run(run())
 

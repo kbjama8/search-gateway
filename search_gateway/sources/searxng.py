@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import httpx
-
 from ..config import SEARXNG_BASE
+from ..extract.http import HttpError, get_json, request
 from ..models import Result
 from .base import Source, SourceError
 
@@ -21,11 +20,9 @@ class SearXNGSource(Source):
             params["time_range"] = freshness
         headers = {"User-Agent": "search-gateway/0.1"}
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(url, params=params, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-        except httpx.HTTPError as exc:
+            data = await get_json(url, source="searxng", params=params,
+                                  headers=headers, timeout=15.0)
+        except HttpError as exc:
             raise SourceError(f"searxng request failed: {exc}") from exc
 
         results: list[Result] = []
@@ -46,8 +43,9 @@ class SearXNGSource(Source):
 
     async def available(self) -> tuple[bool, str]:
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                r = await client.get(f"{SEARXNG_BASE}/healthz")
-                return r.status_code == 200 and r.text.strip() == "OK", r.text.strip()
-        except httpx.HTTPError as exc:
+            r = await request("GET", f"{SEARXNG_BASE}/healthz",
+                              source="searxng", timeout=5.0)
+            return (r.status_code == 200 and r.text.strip() == "OK",
+                    r.text.strip())
+        except HttpError as exc:
             return False, str(exc)
