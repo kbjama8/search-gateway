@@ -28,7 +28,6 @@ import importlib
 import os
 import time
 
-import httpx
 import pytest
 
 from search_gateway import cache, ratelimit, stats
@@ -276,42 +275,21 @@ def test_llm_available_respects_enabled(monkeypatch):
 # --------------------------------------------------------------------------
 
 def test_openalex_to_result_called_once(monkeypatch):
-    from search_gateway.sources import openalex as oa
+    """OpenAlex search maps each result through _to_result exactly once."""
+    import search_gateway.sources.openalex as oa
 
-    class FakeResp:
-        status_code = 200
-        text = ""
-        headers: dict = {}  # noqa: RUF012 — fixture class
+    payload = {"results": [{"title": "A", "id": "https://openalex.org/W1",
+                            "doi": "https://doi.org/10.1/a",
+                            "abstract_inverted_index": None,
+                            "publication_date": "2026-01-01",
+                            "publication_year": 2026, "authorships": [],
+                            "primary_location": None, "open_access": {},
+                            "cited_by_count": 0}]}
 
-        def raise_for_status(self):
-            pass
+    async def fake_get_json(url, **kw):
+        return payload
 
-        def json(self):
-            return {"results": [{"title": "A", "id": "https://openalex.org/W1",
-                                 "doi": "https://doi.org/10.1/a",
-                                 "abstract_inverted_index": None,
-                                 "publication_date": "2026-01-01",
-                                 "publication_year": 2026, "authorships": [],
-                                 "primary_location": None, "open_access": {},
-                                 "cited_by_count": 0}]}
-
-    class FakeClient:
-        def __init__(self, *a, **k):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, *a, **k):
-            return FakeResp()
-
-        async def request(self, method, *a, **k):
-            return FakeResp()
-
-    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(oa, "get_json", fake_get_json)
     calls = {"n": 0}
     orig = oa.OpenAlexSource._to_result
 
@@ -325,14 +303,11 @@ def test_openalex_to_result_called_once(monkeypatch):
         src = oa.OpenAlexSource()
         return await src.search("test", limit=5)
 
-    results = asyncio.run(run())
-    assert len(results) == 1
+    import asyncio
+    out = asyncio.run(run())
+    assert len(out) == 1
     assert calls["n"] == 1
 
-
-# --------------------------------------------------------------------------
-# I7 — SEMANTIC_RERANK env prefix
-# --------------------------------------------------------------------------
 
 def test_semantic_rerank_prefixed_env(monkeypatch):
     import search_gateway.config as cfg
