@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — symlink the search-gateway orchestration skills into your agent
+# install.sh — symlink the kortex-search orchestration skills into your agent
 # skill directories (OpenCode + Claude Code).
 #
 # Idempotent: existing links are left alone unless you pass --force.

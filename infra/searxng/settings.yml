@@ -1,4 +1,4 @@
-# Minimal SearXNG settings for the search-gateway: JSON format enabled (the
+# Minimal SearXNG settings for the kortex-search: JSON format enabled (the
 # gateway consumes the JSON API), HTML UI kept for debugging. Rotate
 # `server.secret_key` before any non-local exposure.
 use_default_settings: true
@@ -11,7 +11,7 @@ search:
 server:
   # Injected from the compose env (openssl rand -hex 32). Never run with the
   # literal placeholder on anything but loopback.
-  secret_key: "${SEARXNG_SECRET_KEY:-local-search-gateway-change-me}"
+  secret_key: "${SEARXNG_SECRET_KEY:-local-kortex-search-change-me}"
   bind_address: "0.0.0.0"
   port: 8080
   # Limiter on: protects the instance from abuse even when loopback-bound.

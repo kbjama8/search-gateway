@@ -1,40 +1,40 @@
-# Search Gateway MCP server — long-running HTTP host process (hardened, v0.4.2).
+# Kortex Search MCP server — long-running HTTP host process (hardened, v0.4.2).
 #
 # User-level template unit. The instance name is the HTTP port:
 #
-#   mkdir -p ~/.config/search-gateway && touch ~/.config/search-gateway/gateway.env
-#   chmod 600 ~/.config/search-gateway/gateway.env
-#   systemctl --user enable --now search-gateway@8765.service
-#   search-gateway doctor   # or: curl http://127.0.0.1:8765/mcp/
+#   mkdir -p ~/.config/kortex-search && touch ~/.config/kortex-search/gateway.env
+#   chmod 600 ~/.config/kortex-search/gateway.env
+#   systemctl --user enable --now kortex-search@8765.service
+#   kortex-search doctor   # or: curl http://127.0.0.1:8765/mcp/
 #
 # Containment (Phase 7 / decisions D7.1-D7.4):
 #   * Secrets arrive as FILES via LoadCredential= (never env vars — systemd's
 #     own doctrine; $CREDENTIALS_DIRECTORY is exposed to the process as
-#     SEARCH_GATEWAY_CREDENTIALS_DIR).
+#     KORTEX_SEARCH_CREDENTIALS_DIR).
 #   * Service-level egress floor via IPAddressDeny= (loopback stays open for
 #     Redis/SearXNG; 169.254.0.0/16 covers IMDS).
 #   * L3 kernel filter for the browser children: ExecStartPre installs the
 #     ruleset for THIS unit's cgroup (browser children inherit it) and reports
 #     state. Auto-load (option B, PHASE8 Plan 7): the sudoers drop-in
-#     /etc/sudoers.d/search-gateway-nft grants passwordless `nft -f` for
+#     /etc/sudoers.d/kortex-search-nft grants passwordless `nft -f` for
 #     exactly this ruleset, so the load happens on every start (nft rules are
 #     volatile — they do not survive reboot). Without the drop-in, load once
-#     by hand:  sudo nft -f %h/.config/search-gateway/sg-egress.nft
+#     by hand:  sudo nft -f %h/.config/kortex-search/ks-egress.nft
 #     Browser-tier ops refuse with the explicit "egress-unhardened" message
-#     until the table is live (SEARCH_GATEWAY_HARDEN=required, default).
+#     until the table is live (KORTEX_SEARCH_HARDEN=required, default).
 #
 # Assumes the console script is installed at ~/.local/bin (pip install . /
 # pip install --user .). Clients register the URL in mcp.json (see
 # docs/mcp-registration.md).
 [Unit]
-Description=Search Gateway MCP server (HTTP) on port %i
+Description=Kortex Search MCP server (HTTP) on port %i
 After=network.target
 
 [Service]
 Type=simple
 # Non-secret runtime config; keep 0600 (it may reference paths).
-EnvironmentFile=%h/.config/search-gateway/gateway.env
-Environment=SEARCH_GATEWAY_LOG_FMT=json
+EnvironmentFile=%h/.config/kortex-search/gateway.env
+Environment=KORTEX_SEARCH_LOG_FMT=json
 # NOTE: LoadCredential is intentionally NOT used here (live-verified
 # 2026-08-25): in --user units, LoadCredential + any namespace-based sandbox
 # property (ProtectSystem/ProtectHome/ProtectKernel*) forces a user namespace
@@ -45,12 +45,12 @@ Environment=SEARCH_GATEWAY_LOG_FMT=json
 # for manual/system deployments that do not need the in-unit sudo load).
 # Pre-flight gates. The L3 ruleset is NOT loaded here (live-verified
 # 2026-08-25: the namespace sandbox runs this unit in a user namespace where
-# sudo cannot setuid) — the companion unit search-gateway-harden.service owns
+# sudo cannot setuid) — the companion unit kortex-search-harden.service owns
 # the privileged load; this unit only verifies + reports state.
-ExecStartPre=%h/.local/bin/search-gateway check
+ExecStartPre=%h/.local/bin/kortex-search check
 # non-fatal: reports state; the loader unit performs the install
-ExecStartPre=-%h/.local/bin/search-gateway harden --status
-ExecStart=%h/.local/bin/search-gateway serve --transport http --host 127.0.0.1 --port %i
+ExecStartPre=-%h/.local/bin/kortex-search harden --status
+ExecStart=%h/.local/bin/kortex-search serve --transport http --host 127.0.0.1 --port %i
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30
@@ -72,7 +72,7 @@ ProtectSystem=strict
 ProtectHome=read-only
 # The gateway's writable state: the harden ruleset + state, the vault
 # (secrets + profile farm), and the HF model cache (model loads write here).
-ReadWritePaths=%h/.config/search-gateway %h/.agent-reach/profiles %h/.cache/huggingface
+ReadWritePaths=%h/.config/kortex-search %h/.agent-reach/profiles %h/.cache/huggingface
 # Service-level egress floor: loopback stays open (Redis/SearXNG); browser
 # children get the strict per-cgroup nft rules instead.
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK

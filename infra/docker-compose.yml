@@ -1,16 +1,16 @@
-# Redis + SearXNG — the two service dependencies the search-gateway needs.
+# Redis + SearXNG — the two service dependencies the kortex-search needs.
 #
 # The gateway itself runs as a **host process** (it shells out to CLIs +
 # Chromium and uses a warm local model cache), so it is deliberately NOT a
 # container here. See docs/deployment.md for the full tier model.
 #
 #   docker compose up -d      # brings up redis + searxng
-#   search-gateway doctor     # confirm both report ok
+#   kortex-search doctor     # confirm both report ok
 #
 # Security notes (2026-08-21 hardening pass):
 #   - Redis now requires a password (M2): set REDIS_PASSWORD in your env
 #     (e.g. `openssl rand -hex 32`) and point the gateway at it via
-#     SEARCH_GATEWAY_REDIS_URL=redis://:PASSWORD@127.0.0.1:6379/0.
+#     KORTEX_SEARCH_REDIS_URL=redis://:PASSWORD@127.0.0.1:6379/0.
 #     Unauthenticated Redis allowed cache poisoning + rate-limit bypass.
 #   - SearXNG secret_key is injected from the environment (M4) and its
 #     limiter is on; the same password file holds SEARXNG_SECRET_KEY.
