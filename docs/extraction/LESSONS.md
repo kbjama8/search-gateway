@@ -586,3 +586,25 @@ Source: github.com/lexiforest/curl_cffi.
     (PerimeterX), `funcaptcha`/`arkose` body.
   - PerimeterX/Kasada/Akamai/Arkose live captures remain open; synthetic
     markers cover them in unit tests.
+- **2026-08-26 (intense bug sweep)** — 12 bugs found + fixed across the
+  pipeline, containment layer, and sources (commit `9236032`):
+  - **ratelimit race**: read-then-set let concurrent callers fire together —
+    ban-protection pacing defeated under concurrency. Now an atomic SET NX
+    claim loop; stale slots deleted + reclaimed.
+  - **_singleflight key**: (source, query) ignored limit/category — concurrent
+    same-query different-limit requests returned the wrong count. Key now
+    covers every outcome-shaping param (live-verified with an 8-way burst).
+  - **run_cmd orphaned children**: a cancelled outer task (GLOBAL_TIMEOUT /
+    disconnect) left subprocesses running — CancelledError now kills.
+  - **Identifier path injection**: crossref/openalex/semantic_scholar
+    interpolated user-supplied DOIs/IDs raw into URL paths (traversal/URL-
+    breaking chars) — segments now quoted.
+  - **Facade exception contract**: 8 sources bypassed extract.http (no floor,
+    no impersonation seam). All migrated; HTTPStatusError ⊂ HttpError (one
+    catch type); JSON parsed LAZILY (the eager parse broke arxiv's Atom
+    feed — found by the live probe).
+  - **Auth timing**: Bearer comparison → hmac.compare_digest.
+  - **MMR floor**: all-below-floor returned [] → top-k fallback.
+  - Test-infra lesson: payload-based global-httpx mocks silently broke under
+    the lazy-parse facade — module-level facade patching (per-source queues)
+    is the deterministic pattern.
