@@ -1,0 +1,4182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      Crunchbase | Private Company Data &amp; Predictive Intelligence
+    </title>
+    <meta
+      name="description"
+      content="Discover private company data, funding insights, and AI-powered predictions with Crunchbase."
+    />
+    <style>
+      @font-face {
+        font-family: "Public Sans";
+        font-style: normal;
+        font-weight: 300 800;
+        font-display: swap;
+        src: url("/assets/static/static-pages/public-sans-latin.woff2")
+          format("woff2");
+      }
+
+      :root {
+        --ink: #102b38;
+        --ink-deep: #071f2a;
+        --ink-card: #08232f;
+        --paper: #ffffff;
+        --mist: #f2f7fb;
+        --line: #dce6ed;
+        --blue: #146aff;
+        --blue-bright: #2877ff;
+        --cta-light-blue: #d5edff;
+        --cta-light-blue-hover: #bfe3ff;
+        --cta-light-blue-active: #a9d9ff;
+        --lilac: #d7c7ff;
+        --muted: #b9c9d0;
+        --upsell-background: #fad391;
+        --upsell-active: #f8c165;
+        --upsell-focus-border: 2px solid #fce4bd;
+        --upsell-hover-shadow: 0 2px 4px 0 #cbd8df;
+        --max: 1180px;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "Public Sans", Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      a:focus-visible,
+      button:focus-visible,
+      input:focus-visible + label {
+        outline: 3px solid #78a7ff;
+        outline-offset: 4px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .container {
+        width: min(calc(100% - 48px), var(--max));
+        margin-inline: auto;
+      }
+
+      .dark-shell {
+        color: var(--paper);
+        background:
+          radial-gradient(circle at 82% 13%, #123e51 0, transparent 26rem),
+          var(--ink);
+      }
+
+      .site-header {
+        position: relative;
+        z-index: 10;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        anchor-name: --static-homepage-header;
+      }
+
+      .nav {
+        min-height: 68px;
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+      }
+
+      .brand-logo {
+        display: block;
+        width: 110px;
+        height: auto;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .nav-links > li {
+        position: relative;
+      }
+
+      .nav-links > li > a {
+        display: flex;
+        align-items: center;
+        line-height: normal;
+      }
+
+      .nav-links a,
+      .nav-dropdown-trigger,
+      .nav-login {
+        color: #d9e4e8;
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .nav-links a:hover,
+      .nav-dropdown-trigger:hover,
+      .nav-links
+        > li:has(> .nav-dropdown-panel:popover-open)
+        .nav-dropdown-trigger,
+      .nav-login:hover {
+        color: var(--paper);
+      }
+
+      .nav-dropdown-trigger {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0;
+        font-family: inherit;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+      }
+
+      .nav-dropdown-trigger-solutions {
+        anchor-name: --nav-solutions-trigger;
+      }
+
+      .nav-dropdown-trigger-products {
+        anchor-name: --nav-products-trigger;
+      }
+
+      .nav-dropdown-trigger-resources {
+        anchor-name: --nav-resources-trigger;
+      }
+
+      .nav-dropdown-trigger::after {
+        width: 6px;
+        height: 6px;
+        margin-top: -3px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        content: "";
+        transform: rotate(45deg);
+        transition: transform 140ms ease;
+      }
+
+      .nav-links
+        > li:has(> .nav-dropdown-panel:popover-open)
+        .nav-dropdown-trigger::after {
+        margin-top: 3px;
+        transform: rotate(225deg);
+      }
+
+      .nav-dropdown-trigger:focus-visible {
+        border-radius: 2px;
+        outline: 3px solid #78a7ff;
+        outline-offset: 4px;
+      }
+
+      .nav-dropdown-panel {
+        position: fixed;
+        inset: auto;
+        top: 76px;
+        left: 50%;
+        display: none;
+        width: 280px;
+        max-height: calc(100dvh - 84px);
+        gap: 4px;
+        margin: 0;
+        padding: 12px;
+        color: var(--ink);
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        box-shadow: 0 18px 48px rgba(2, 20, 29, 0.24);
+        list-style: none;
+        overflow-y: auto;
+        transform: translateX(-50%);
+      }
+
+      .nav-dropdown-panel:popover-open {
+        display: grid;
+      }
+
+      .nav-dropdown-panel a {
+        display: grid;
+        gap: 2px;
+        padding: 10px 12px;
+        color: var(--ink);
+        border-radius: 6px;
+      }
+
+      .nav-dropdown-panel a:hover,
+      .nav-dropdown-panel a:focus-visible {
+        color: var(--ink-deep);
+        background: var(--mist);
+      }
+
+      .nav-dropdown-panel strong {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .nav-dropdown-panel span {
+        color: #526975;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .nav-dropdown-panel-solutions {
+        width: 330px;
+      }
+
+      .nav-dropdown-panel-resources {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 430px;
+      }
+
+      .nav-dropdown-panel::backdrop {
+        background: transparent;
+      }
+
+      @supports (top: anchor(--static-homepage-header bottom)) {
+        .nav-dropdown-panel {
+          top: calc(anchor(--static-homepage-header bottom) + 8px);
+          transform: none;
+        }
+
+        .nav-dropdown-panel-solutions {
+          left: calc(anchor(--nav-solutions-trigger left) - 20px);
+        }
+
+        .nav-dropdown-panel-products {
+          left: calc(anchor(--nav-products-trigger left) - 20px);
+        }
+
+        .nav-dropdown-panel-resources {
+          left: calc(anchor(--nav-resources-trigger center) - 215px);
+        }
+      }
+
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-left: auto;
+      }
+
+      .nav-search {
+        display: flex;
+        align-items: center;
+      }
+
+      .nav-search input {
+        width: 0;
+        min-width: 0;
+        padding: 8px 0;
+        color: var(--paper);
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid transparent;
+        opacity: 0;
+        transition:
+          width 160ms ease,
+          opacity 160ms ease,
+          padding 160ms ease;
+      }
+
+      .nav-search input:focus {
+        width: 150px;
+        padding-inline: 8px;
+        border-color: #7893a0;
+        opacity: 1;
+        outline: 0;
+      }
+
+      .nav-search button {
+        width: 34px;
+        height: 34px;
+        padding: 7px;
+        color: var(--paper);
+        background: transparent;
+        border: 0;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      .nav-search svg {
+        width: 100%;
+        height: 100%;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 18px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        font-family: "Public Sans", Arial, sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+      }
+
+      .button-primary {
+        color: var(--paper);
+        background: var(--blue);
+      }
+
+      .button-secondary {
+        color: var(--paper);
+        background: transparent;
+        border-color: #81939b;
+      }
+
+      .button-light {
+        color: var(--ink);
+        background: var(--paper);
+      }
+
+      .hero-secondary-cta {
+        color: var(--ink);
+        background: var(--cta-light-blue);
+      }
+
+      .hero-secondary-cta:hover {
+        background: var(--cta-light-blue-hover);
+      }
+
+      .hero-secondary-cta:active {
+        background: var(--cta-light-blue-active);
+      }
+
+      .trial-cta {
+        color: rgba(0, 0, 0, 0.87);
+        background: var(--upsell-background);
+      }
+
+      .trial-cta:hover {
+        background: var(--upsell-background);
+        box-shadow: var(--upsell-hover-shadow);
+      }
+
+      .trial-cta:focus-visible {
+        background: var(--upsell-background);
+        outline: var(--upsell-focus-border);
+        outline-offset: 2px;
+      }
+
+      .trial-cta:active {
+        background: var(--upsell-active);
+        box-shadow: none;
+      }
+
+      .hero {
+        min-height: 490px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr);
+        align-items: center;
+        gap: clamp(48px, 8vw, 112px);
+        padding-block: 82px 96px;
+      }
+
+      .hero h1 {
+        max-width: 630px;
+        margin: 0;
+        font-size: clamp(43px, 5.3vw, 72px);
+        font-weight: 350;
+        letter-spacing: -0.045em;
+        line-height: 1.04;
+      }
+
+      .hero-copy > p {
+        max-width: 610px;
+        margin: 25px 0 27px;
+        color: #d4e0e5;
+        font-size: 18px;
+      }
+
+      .hero-search {
+        display: flex;
+        width: min(100%, 610px);
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+        padding: 6px;
+        color: var(--ink);
+        background: var(--paper);
+        border: 1px solid #8ab5ff;
+        border-radius: 10px;
+        box-shadow: 0 14px 34px rgba(0, 8, 16, 0.24);
+      }
+
+      .hero-search:focus-within {
+        outline: 3px solid #8ab5ff;
+        outline-offset: 3px;
+      }
+
+      .hero-search-icon {
+        width: 24px;
+        height: 24px;
+        flex: 0 0 auto;
+        margin-left: 10px;
+        fill: none;
+        stroke: #526975;
+        stroke-width: 1.8;
+      }
+
+      .hero-search-field {
+        position: relative;
+        min-width: 0;
+        flex: 1;
+      }
+
+      .hero-search input {
+        width: 100%;
+        min-width: 0;
+        padding: 12px 4px;
+        color: var(--ink);
+        background: transparent;
+        border: 0;
+        font: inherit;
+        font-size: 17px;
+        outline: 0;
+      }
+
+      .hero-search input::placeholder {
+        color: transparent;
+        opacity: 1;
+      }
+
+      .hero-search input:focus::placeholder {
+        color: #526975;
+        opacity: 1;
+      }
+
+      .hero-search-prompts {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        color: #526975;
+        pointer-events: none;
+        transition: opacity 160ms ease;
+      }
+
+      .hero-search-prompt {
+        position: absolute;
+        top: 50%;
+        right: 0;
+        left: 4px;
+        overflow: hidden;
+        opacity: 0;
+        transform: translateY(-50%);
+        animation: hero-search-prompt-cycle 18s infinite;
+        font-size: 17px;
+        line-height: 1.4;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .hero-search-prompt:first-child {
+        opacity: 1;
+      }
+
+      .hero-search-prompt:nth-child(2) {
+        animation-delay: 3s;
+      }
+
+      .hero-search-prompt:nth-child(3) {
+        animation-delay: 6s;
+      }
+
+      .hero-search-prompt:nth-child(4) {
+        animation-delay: 9s;
+      }
+
+      .hero-search-prompt:nth-child(5) {
+        animation-delay: 12s;
+      }
+
+      .hero-search-prompt:nth-child(6) {
+        animation-delay: 15s;
+      }
+
+      .hero-search:focus-within .hero-search-prompts,
+      .hero-search input:not(:placeholder-shown) + .hero-search-prompts {
+        opacity: 0;
+      }
+
+      @keyframes hero-search-prompt-cycle {
+        0%,
+        13.5% {
+          opacity: 1;
+          transform: translateY(-50%);
+        }
+
+        16.67%,
+        100% {
+          opacity: 0;
+          transform: translateY(calc(-50% - 4px));
+        }
+      }
+
+      .hero-search button {
+        min-height: 48px;
+        flex: 0 0 auto;
+        padding-inline: 22px;
+        color: var(--paper);
+        background: var(--blue);
+        border: 0;
+        border-radius: 6px;
+        font: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .hero-search button:hover {
+        background: #0057dc;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .signal-board {
+        position: relative;
+        padding: 32px;
+        border: 1px solid rgba(106, 144, 160, 0.24);
+        border-radius: 10px;
+        background:
+          linear-gradient(rgba(52, 90, 106, 0.13) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(52, 90, 106, 0.13) 1px, transparent 1px),
+          rgba(4, 28, 39, 0.55);
+        background-size: 32px 32px;
+      }
+
+      .signal-label {
+        margin: 0 0 12px 3px;
+        color: #d9e4e8;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .signal-card {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        margin-top: 13px;
+        padding: 11px 13px;
+        color: #dbe7eb;
+        border: 1px solid #214757;
+        border-radius: 5px;
+        background: rgba(6, 33, 44, 0.92);
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .signal-card:first-of-type {
+        border-color: #2877ff;
+        box-shadow: 0 0 24px rgba(20, 106, 255, 0.58);
+      }
+
+      .signal-card.signal-fade {
+        opacity: 0.28;
+        transform: scale(0.96);
+      }
+
+      .signal-card.signal-fade:last-child {
+        opacity: 0.12;
+        transform: scale(0.92);
+      }
+
+      .signal-card.signal-fade:focus-visible {
+        opacity: 1;
+      }
+
+      .signal-logo {
+        width: 34px;
+        height: 34px;
+        object-fit: contain;
+        border: 1px solid #31505e;
+        border-radius: 5px;
+        background: var(--paper);
+      }
+
+      .signal-company {
+        min-width: 0;
+      }
+
+      .signal-company strong,
+      .signal-company span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .signal-company span {
+        color: #9cb0b9;
+        font-size: 10px;
+      }
+
+      .signal-value {
+        max-width: 155px;
+        color: #c7d4d9;
+        font-size: 10px;
+        font-weight: 700;
+        text-align: right;
+        text-transform: uppercase;
+      }
+
+      .signal-value small {
+        display: block;
+        color: #7f98a3;
+        font-size: 8px;
+        letter-spacing: 0.08em;
+      }
+
+      .section-intro {
+        max-width: 720px;
+        margin-inline: auto;
+        text-align: center;
+      }
+
+      .section-intro h2 {
+        margin: 0;
+        font-size: clamp(34px, 4vw, 51px);
+        font-weight: 350;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+      }
+
+      .section-intro p {
+        margin: 18px 0 0;
+        color: var(--muted);
+      }
+
+      .data-pillars {
+        padding-block: 28px 128px;
+      }
+
+      .pillar-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+        margin-top: 52px;
+      }
+
+      .pillar {
+        min-height: 222px;
+        padding: 27px;
+        border: 1px solid #214653;
+        border-radius: 7px;
+        background: rgba(5, 30, 41, 0.78);
+      }
+
+      .pillar-icon {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        margin-bottom: 20px;
+        color: var(--lilac);
+        font-size: 24px;
+      }
+
+      .pillar-icon svg {
+        width: 34px;
+        height: 34px;
+      }
+
+      .pillar h3 {
+        margin: 0 0 14px;
+        font-size: 17px;
+        font-weight: 650;
+      }
+
+      .pillar p {
+        margin: 0;
+        color: #c0d0d6;
+        font-size: 14px;
+      }
+
+      .prediction-section {
+        padding-bottom: 112px;
+        overflow: hidden;
+      }
+
+      .prediction-section .section-intro {
+        max-width: 862px;
+      }
+
+      .prediction-section .section-intro h2 {
+        font-size: clamp(38px, 4.3vw, 53px);
+      }
+
+      .prediction-section .section-intro p {
+        max-width: 760px;
+        margin-inline: auto;
+        font-size: 20px;
+      }
+
+      .prediction-marquee {
+        --prediction-fade: clamp(24px, 5vw, 72px);
+        width: min(calc(100% - 48px), 1357px);
+        margin-top: 52px;
+        margin-inline: auto;
+        padding-block: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-mask-image: linear-gradient(
+          to right,
+          transparent,
+          #000 var(--prediction-fade),
+          #000 calc(100% - var(--prediction-fade)),
+          transparent
+        );
+        mask-image: linear-gradient(
+          to right,
+          transparent,
+          #000 var(--prediction-fade),
+          #000 calc(100% - var(--prediction-fade)),
+          transparent
+        );
+      }
+
+      .prediction-marquee::-webkit-scrollbar {
+        display: none;
+      }
+
+      .prediction-track {
+        display: flex;
+        width: max-content;
+        animation: prediction-marquee 30s linear infinite;
+        will-change: transform;
+      }
+
+      .prediction-marquee:hover .prediction-track,
+      .prediction-marquee:focus-within .prediction-track {
+        animation-play-state: paused;
+      }
+
+      .prediction-marquee:focus-within {
+        -webkit-mask-image: none;
+        mask-image: none;
+      }
+
+      .prediction-group {
+        display: flex;
+        flex: none;
+        gap: 36px;
+        padding-right: 36px;
+      }
+
+      .prediction-card {
+        position: relative;
+        width: 196px;
+        height: 178px;
+        flex: none;
+        color: var(--paper);
+        border: 1px solid #214653;
+        border-radius: 7px;
+        background: rgba(5, 30, 41, 0.78);
+        outline: 0;
+        overflow: hidden;
+      }
+
+      .prediction-card:focus-visible {
+        outline: 3px solid #78a7ff;
+        outline-offset: 3px;
+      }
+
+      .prediction-face {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        text-align: center;
+        transition:
+          opacity 300ms ease,
+          transform 300ms ease;
+      }
+
+      .prediction-front {
+        flex-direction: column;
+        gap: 17px;
+      }
+
+      .prediction-front svg {
+        display: block;
+        width: 40px;
+        height: 40px;
+        flex: none;
+      }
+
+      .prediction-front h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 650;
+        line-height: 1.2;
+      }
+
+      .prediction-back {
+        background: var(--blue);
+        opacity: 0;
+        transform: translateY(-10%);
+      }
+
+      .prediction-card:nth-child(4n + 3) .prediction-back,
+      .prediction-card:nth-child(4n + 4) .prediction-back {
+        transform: translateY(10%);
+      }
+
+      .prediction-back p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .prediction-card:is(:hover, :focus-visible) .prediction-front {
+        opacity: 0;
+        transform: translateY(10%);
+      }
+
+      .prediction-card:nth-child(4n + 3):is(:hover, :focus-visible)
+        .prediction-front,
+      .prediction-card:nth-child(4n + 4):is(:hover, :focus-visible)
+        .prediction-front {
+        transform: translateY(-10%);
+      }
+
+      .prediction-card:is(:hover, :focus-visible) .prediction-back {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @keyframes prediction-marquee {
+        to {
+          transform: translateX(-50%);
+        }
+      }
+
+      .section-divider {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .section-divider--reversed {
+        transform: scaleY(-1);
+      }
+
+      .metrics {
+        padding: 12px 0 86px;
+      }
+
+      .metrics-panel {
+        display: grid;
+        grid-template-columns: 1.2fr repeat(2, 1fr);
+        padding: 38px 42px;
+        border: 1px solid #e3ebf0;
+        border-radius: 7px;
+        background: var(--mist);
+      }
+
+      .metrics-copy {
+        grid-row: span 2;
+        align-self: center;
+        max-width: 250px;
+        padding-right: 36px;
+        font-size: 17px;
+        font-weight: 650;
+        line-height: 1.2;
+      }
+
+      .metric {
+        min-height: 100px;
+        padding: 7px 34px 22px;
+        border-left: 1px solid #d9e4ea;
+      }
+
+      .metric:nth-last-child(-n + 2) {
+        padding-top: 22px;
+        padding-bottom: 7px;
+        border-top: 1px solid #d9e4ea;
+      }
+
+      .metric strong {
+        display: block;
+        color: var(--blue);
+        font-size: clamp(34px, 4vw, 47px);
+        font-weight: 400;
+        letter-spacing: -0.04em;
+        line-height: 1;
+      }
+
+      .metric span {
+        color: #526a76;
+        font-size: 12px;
+      }
+
+      .use-cases {
+        padding: 42px 0 98px;
+      }
+
+      .use-cases > h2 {
+        margin: 0 0 44px;
+        font-size: clamp(36px, 4vw, 50px);
+        font-weight: 350;
+        letter-spacing: -0.04em;
+        text-align: center;
+      }
+
+      .use-case-shell {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      .use-case-shell > input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+      }
+
+      .use-case-layout {
+        display: grid;
+        grid-template-columns: 230px 1fr;
+        gap: 30px;
+      }
+
+      .use-case-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        scrollbar-width: none;
+      }
+
+      .use-case-options::-webkit-scrollbar {
+        display: none;
+      }
+
+      .use-case-options label {
+        display: block;
+        padding: 13px 18px;
+        color: #526a76;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: var(--paper);
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      #case-investors:checked ~ .use-case-layout label[for="case-investors"],
+      #case-products:checked ~ .use-case-layout label[for="case-products"],
+      #case-gtm:checked ~ .use-case-layout label[for="case-gtm"],
+      #case-analysts:checked ~ .use-case-layout label[for="case-analysts"],
+      #case-wealth:checked ~ .use-case-layout label[for="case-wealth"],
+      #case-founders:checked ~ .use-case-layout label[for="case-founders"] {
+        color: var(--paper);
+        border-color: var(--ink-deep);
+        background: var(--ink-deep);
+        font-weight: 650;
+      }
+
+      #case-investors:focus-visible
+        ~ .use-case-layout
+        label[for="case-investors"],
+      #case-products:focus-visible
+        ~ .use-case-layout
+        label[for="case-products"],
+      #case-gtm:focus-visible ~ .use-case-layout label[for="case-gtm"],
+      #case-analysts:focus-visible
+        ~ .use-case-layout
+        label[for="case-analysts"],
+      #case-wealth:focus-visible ~ .use-case-layout label[for="case-wealth"],
+      #case-founders:focus-visible
+        ~ .use-case-layout
+        label[for="case-founders"] {
+        outline: 3px solid #78a7ff;
+        outline-offset: 3px;
+      }
+
+      .use-case-panel {
+        display: none;
+        min-height: 340px;
+        grid-template-columns: minmax(0, 1fr) 250px;
+        align-items: stretch;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--mist);
+      }
+
+      #case-investors:checked ~ .use-case-layout .panel-investors,
+      #case-products:checked ~ .use-case-layout .panel-products,
+      #case-gtm:checked ~ .use-case-layout .panel-gtm,
+      #case-analysts:checked ~ .use-case-layout .panel-analysts,
+      #case-wealth:checked ~ .use-case-layout .panel-wealth,
+      #case-founders:checked ~ .use-case-layout .panel-founders {
+        display: grid;
+      }
+
+      .use-case-content {
+        align-self: center;
+        padding: 46px;
+      }
+
+      .use-case-content h3 {
+        max-width: 480px;
+        margin: 0 0 16px;
+        font-size: clamp(27px, 3vw, 38px);
+        font-weight: 400;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+      }
+
+      .use-case-content p {
+        max-width: 610px;
+        margin: 0 0 22px;
+        color: #445f6b;
+      }
+
+      .text-link {
+        color: var(--blue);
+        font-size: 14px;
+        font-weight: 650;
+        text-underline-offset: 4px;
+      }
+
+      .use-case-result {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 34px;
+        border-left: 1px solid var(--line);
+        background:
+          radial-gradient(circle at 100% 0, #dfe9ff 0, transparent 12rem),
+          #f7fafc;
+      }
+
+      .use-case-result span:first-child {
+        margin-bottom: 30px;
+        font-size: 13px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .use-case-result strong {
+        font-size: 44px;
+        font-weight: 350;
+        letter-spacing: -0.04em;
+      }
+
+      .use-case-result span:last-child {
+        color: #526a76;
+        font-size: 12px;
+      }
+
+      .trust-and-proof {
+        padding: 72px 0 92px;
+        background: linear-gradient(
+          to bottom,
+          var(--mist) calc(100% - 92px),
+          var(--paper)
+        );
+      }
+
+      .trust-label {
+        margin: 0;
+        color: #526a76;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .trust-strip {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        align-items: center;
+        gap: 24px;
+        padding-bottom: 72px;
+      }
+
+      .trust-marquee {
+        min-width: 0;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(
+          90deg,
+          transparent,
+          #000 8%,
+          #000 92%,
+          transparent
+        );
+        mask-image: linear-gradient(
+          90deg,
+          transparent,
+          #000 8%,
+          #000 92%,
+          transparent
+        );
+      }
+
+      .trust-track {
+        display: flex;
+        width: max-content;
+        animation: trust-scroll 24s linear infinite;
+      }
+
+      .trust-group {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: clamp(34px, 5vw, 68px);
+        margin: 0;
+        padding-block: 0;
+        padding-right: clamp(34px, 5vw, 68px);
+        list-style: none;
+      }
+
+      .trust-logo {
+        display: block;
+        width: 150px;
+        height: 60px;
+        object-fit: contain;
+      }
+
+      @keyframes trust-scroll {
+        to {
+          transform: translateX(-50%);
+        }
+      }
+
+      .story-track {
+        display: grid;
+        grid-auto-columns: minmax(560px, 72%);
+        grid-auto-flow: column;
+        gap: 24px;
+        margin: 0;
+        padding: 4px 4px 22px;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+        scroll-behavior: smooth;
+        scroll-padding-left: 4px;
+        scrollbar-color: var(--blue) #d6e1e8;
+        scrollbar-gutter: stable;
+        scrollbar-width: auto;
+        list-style: none;
+      }
+
+      .story-track::-webkit-scrollbar {
+        height: 12px;
+      }
+
+      .story-track::-webkit-scrollbar-track {
+        border-radius: 999px;
+        background: #d6e1e8;
+      }
+
+      .story-track::-webkit-scrollbar-thumb {
+        border: 2px solid #d6e1e8;
+        border-radius: 999px;
+        background: var(--blue);
+      }
+
+      .story-track:focus-visible {
+        outline: 3px solid var(--blue);
+        outline-offset: 4px;
+      }
+
+      .story-card {
+        min-height: 330px;
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        overflow: hidden;
+        border: 1px solid #dce5eb;
+        border-radius: 8px;
+        background: var(--paper);
+      }
+
+      .story-stat {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding: 26px;
+        text-align: right;
+        background:
+          radial-gradient(
+            circle at 0 0,
+            rgba(74, 89, 255, 0.92),
+            transparent 58%
+          ),
+          var(--paper);
+      }
+
+      .story-stat strong {
+        font-size: 26px;
+        font-weight: 350;
+        letter-spacing: -0.04em;
+      }
+
+      .story-stat--long-value {
+        padding-inline: 12px;
+      }
+
+      .story-stat span {
+        color: #526a76;
+        font-size: 12px;
+      }
+
+      .story-copy {
+        display: flex;
+        flex-direction: column;
+        padding: 32px;
+      }
+
+      .story-logo {
+        margin-bottom: auto;
+        min-height: 38px;
+      }
+
+      .story-logo img {
+        display: block;
+        width: auto;
+        max-width: 175px;
+        height: 34px;
+        object-fit: contain;
+        object-position: left center;
+      }
+
+      .story-copy blockquote {
+        margin: 32px 0 24px;
+        color: #2b4754;
+        font-size: 16px;
+      }
+
+      .story-person {
+        margin: 0;
+        font-size: 13px;
+      }
+
+      .story-person strong {
+        display: block;
+      }
+
+      .all-stories {
+        display: inline-block;
+        margin: 24px 4px 0;
+        color: var(--blue);
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .all-stories:hover {
+        text-decoration: underline;
+      }
+
+      .closing-cta {
+        padding-block: 50px;
+        color: var(--paper);
+        background: var(--ink);
+      }
+
+      .closing-cta-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.92fr);
+        align-items: start;
+        gap: clamp(72px, 9vw, 120px);
+        padding: 30px;
+      }
+
+      .closing-cta-copy h2 {
+        max-width: 650px;
+        margin: 0 0 14px;
+        font-size: clamp(42px, 4.2vw, 56px);
+        font-weight: 400;
+        letter-spacing: -0.04em;
+        line-height: 1.1;
+      }
+
+      .closing-cta-subheading {
+        max-width: 600px;
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.15;
+      }
+
+      .g2-proof {
+        margin-top: 50px;
+      }
+
+      .g2-score {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        margin-bottom: 17px;
+      }
+
+      .g2-stars {
+        display: inline-flex;
+        gap: 2px;
+        color: var(--blue);
+        font-size: 21px;
+        line-height: 1;
+      }
+
+      .g2-half-star {
+        position: relative;
+        color: rgba(20, 106, 255, 0.2);
+      }
+
+      .g2-half-star::after {
+        position: absolute;
+        inset: 0;
+        width: 50%;
+        overflow: hidden;
+        color: var(--blue);
+        content: "★";
+      }
+
+      .g2-rating {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px 7px;
+        align-items: baseline;
+      }
+
+      .g2-rating strong {
+        font-size: 36px;
+        font-weight: 500;
+      }
+
+      .g2-rating span {
+        color: #c5d2d8;
+        font-size: 14px;
+      }
+
+      .g2-badges {
+        display: grid;
+        grid-template-columns: repeat(5, 75px);
+        gap: 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .g2-badges img {
+        display: block;
+        width: 75px;
+        height: auto;
+      }
+
+      .closing-sales-form {
+        display: grid;
+        gap: 11px;
+        width: 100%;
+        max-width: 416px;
+      }
+
+      .closing-sales-field {
+        display: grid;
+        gap: 5px;
+      }
+
+      .closing-sales-field label {
+        color: #e1eaee;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .closing-sales-field input {
+        width: 100%;
+        min-height: 44px;
+        padding: 9px 12px;
+        border: 1px solid #d4dbe3;
+        border-radius: 2px;
+        color: var(--ink);
+        background: var(--paper);
+        font: inherit;
+        font-size: 16px;
+      }
+
+      .closing-sales-field input:focus-visible {
+        outline: 3px solid #78a7ff;
+        outline-offset: 3px;
+      }
+
+      .closing-sales-submit {
+        justify-self: start;
+        min-height: 41px;
+        margin-top: 4px;
+        padding: 10px 14px;
+        border: 1px solid var(--blue);
+        border-radius: 8px;
+        color: var(--paper);
+        background: var(--blue);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      .closing-sales-submit:hover {
+        background: #0759e5;
+      }
+
+      .closing-sales-status {
+        max-width: 416px;
+        margin: 0;
+        color: #aebfc7;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .closing-sales-status:empty {
+        display: none;
+      }
+
+      .closing-sales-status a {
+        color: inherit;
+        text-decoration: underline;
+      }
+
+      .site-footer {
+        color: #c8d6dc;
+        background: var(--ink);
+      }
+
+      .footer-main {
+        display: grid;
+        grid-template-columns: minmax(190px, 1.2fr) repeat(4, minmax(0, 1fr));
+        gap: 32px;
+        padding-block: 72px 54px;
+      }
+
+      .footer-brand-column {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 32px;
+      }
+
+      .footer-brand {
+        align-self: start;
+      }
+
+      .footer-brand .brand-logo {
+        width: 124px;
+      }
+
+      .footer-column h2 {
+        margin: 3px 0 18px;
+        color: #8fa5ae;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .footer-column ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .footer-column li + li {
+        margin-top: 10px;
+      }
+
+      .footer-column a {
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .footer-column a:hover {
+        color: var(--paper);
+        text-decoration: underline;
+      }
+
+      .footer-sales-status {
+        display: block;
+        margin-top: 8px;
+        color: #91a6af;
+        font-size: 11px;
+      }
+
+      .footer-sales-status:empty {
+        display: none;
+      }
+
+      .footer-sales-status a {
+        color: inherit;
+        font-size: inherit;
+        text-decoration: underline;
+      }
+
+      .footer-socials {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .footer-socials a {
+        display: inline-flex;
+        width: 30px;
+        height: 30px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #58717c;
+        border-radius: 50%;
+      }
+
+      .footer-socials a:hover {
+        border-color: var(--paper);
+        text-decoration: none;
+      }
+
+      .footer-socials svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
+
+      .footer-legal {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 24px;
+        padding: 22px 0 30px;
+        border-top: 1px solid #2b4855;
+        color: #91a6af;
+        font-size: 11px;
+      }
+
+      .footer-ai-disclaimer {
+        width: 100%;
+        margin: 0;
+      }
+
+      .footer-ai-disclaimer a {
+        margin-left: 3px;
+      }
+
+      .footer-legal-action {
+        padding: 0;
+        border: 0;
+        color: inherit;
+        background: none;
+        font: inherit;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+
+      .footer-copyright {
+        margin-left: auto;
+      }
+
+      @media (max-width: 1100px) {
+        .footer-main {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 900px) {
+        .nav-links {
+          display: none;
+        }
+
+        .nav-dropdown-panel:popover-open {
+          display: none;
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .signal-board {
+          max-width: 620px;
+        }
+
+        .pillar-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .pillar {
+          min-height: 0;
+        }
+
+        .use-case-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .closing-cta-grid {
+          grid-template-columns: 1fr;
+          gap: 64px;
+        }
+
+        .use-case-options {
+          flex-direction: row;
+          padding: 4px 4px 12px;
+          overflow-x: auto;
+        }
+
+        .use-case-options label {
+          flex: 0 0 auto;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .container {
+          width: min(calc(100% - 32px), var(--max));
+        }
+
+        .nav {
+          min-height: 62px;
+          gap: 6px;
+        }
+
+        .nav-actions {
+          gap: 6px;
+        }
+
+        .nav-login {
+          flex: 0 0 auto;
+        }
+
+        .nav-search input:focus {
+          width: 110px;
+        }
+
+        .nav-actions .button {
+          min-height: 36px;
+          padding-inline: 8px;
+          font-size: 12px;
+        }
+
+        .hero {
+          min-height: 0;
+          padding-block: 66px 82px;
+        }
+
+        .hero h1 {
+          font-size: clamp(40px, 13vw, 56px);
+        }
+
+        .hero-search {
+          gap: 4px;
+        }
+
+        .hero-search-icon {
+          margin-left: 7px;
+        }
+
+        .hero-search input {
+          font-size: 16px;
+        }
+
+        .hero-search-prompt {
+          font-size: 16px;
+        }
+
+        .hero-search button {
+          padding-inline: 16px;
+        }
+
+        .signal-board {
+          padding: 20px;
+        }
+
+        .signal-card {
+          grid-template-columns: 34px minmax(0, 1fr);
+        }
+
+        .signal-value {
+          grid-column: 2;
+          max-width: none;
+          text-align: left;
+        }
+
+        .data-pillars {
+          padding-bottom: 90px;
+        }
+
+        .prediction-section {
+          padding-bottom: 88px;
+        }
+
+        .prediction-section .section-intro p {
+          font-size: 18px;
+        }
+
+        .prediction-marquee {
+          --prediction-fade: 16px;
+          width: calc(100% - 32px);
+          margin-top: 42px;
+        }
+
+        .prediction-group {
+          gap: 16px;
+          padding-right: 16px;
+        }
+
+        .prediction-card {
+          width: 160px;
+          height: 145px;
+        }
+
+        .prediction-face {
+          padding: 16px;
+        }
+
+        .prediction-front {
+          gap: 12px;
+        }
+
+        .prediction-front svg {
+          width: 36px;
+          height: 36px;
+        }
+
+        .prediction-front h3 {
+          font-size: 16px;
+        }
+
+        .prediction-back p {
+          font-size: 13px;
+        }
+
+        .metrics-panel {
+          grid-template-columns: repeat(2, 1fr);
+          padding: 25px 20px;
+        }
+
+        .metrics-copy {
+          grid-column: 1 / -1;
+          grid-row: auto;
+          max-width: none;
+          padding: 0 0 26px;
+        }
+
+        .metric {
+          min-height: 92px;
+          padding: 18px 16px;
+          border-top: 1px solid #d9e4ea;
+          border-left: 0;
+        }
+
+        .metric:nth-child(even) {
+          border-left: 1px solid #d9e4ea;
+        }
+
+        .use-cases {
+          padding-bottom: 70px;
+        }
+
+        .use-case-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .use-case-content {
+          padding: 30px;
+        }
+
+        .use-case-result {
+          min-height: 180px;
+          padding: 30px;
+          border-top: 1px solid var(--line);
+          border-left: 0;
+        }
+
+        .use-case-result span:first-child {
+          margin-bottom: 18px;
+        }
+
+        .trust-strip {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+
+        .trust-logo {
+          width: 130px;
+          height: 52px;
+        }
+
+        .story-track {
+          grid-auto-columns: 92%;
+        }
+
+        .story-card {
+          min-height: 420px;
+          grid-template-columns: 1fr;
+        }
+
+        .story-stat {
+          min-height: 145px;
+        }
+
+        .story-stat--long-value {
+          padding-inline: 26px;
+        }
+
+        .story-copy {
+          padding: 24px;
+        }
+
+        .closing-cta {
+          padding-block: 20px;
+        }
+
+        .closing-cta-grid {
+          gap: 64px;
+          padding: 20px;
+          border-radius: 10px;
+          background: linear-gradient(
+            180deg,
+            rgba(16, 43, 56, 0) 20%,
+            rgba(89, 139, 144, 0.56) 54%,
+            #9fd4cd 100%
+          );
+        }
+
+        .closing-cta-copy h2 {
+          font-size: clamp(38px, 12vw, 48px);
+        }
+
+        .closing-cta-subheading {
+          font-size: 14px;
+        }
+
+        .g2-badges {
+          grid-template-columns: repeat(3, 68px);
+          gap: 16px;
+        }
+
+        .g2-badges img {
+          width: 68px;
+        }
+
+        .g2-rating strong {
+          font-size: 24px;
+        }
+
+        .closing-sales-field label,
+        .closing-sales-status {
+          color: var(--ink-deep);
+        }
+
+        .footer-main {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 36px 24px;
+        }
+
+        .footer-brand-column {
+          grid-column: 1 / -1;
+        }
+
+        .footer-copyright {
+          width: 100%;
+          margin-left: 0;
+        }
+      }
+
+      @media (max-width: 360px) {
+        .brand-logo {
+          width: 96px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html,
+        .story-track {
+          scroll-behavior: auto;
+        }
+
+        .hero-search input::placeholder {
+          color: #526975;
+        }
+
+        .hero-search-prompts {
+          display: none;
+        }
+
+        .nav-search input {
+          transition: none;
+        }
+
+        .nav-dropdown-trigger::after {
+          transition: none;
+        }
+
+        .trust-track {
+          animation: none;
+          width: 100%;
+        }
+
+        .prediction-track {
+          animation: none;
+          will-change: auto;
+        }
+
+        .prediction-group[aria-hidden="true"] {
+          display: none;
+        }
+
+        .prediction-face {
+          transition: none;
+        }
+
+        .trust-marquee {
+          overflow: visible;
+          -webkit-mask-image: none;
+          mask-image: none;
+        }
+
+        .trust-group {
+          width: 100%;
+          flex-wrap: wrap;
+          justify-content: center;
+          padding-right: 0;
+        }
+
+        .trust-group[aria-hidden="true"] {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header dark-shell">
+      <nav class="nav container" aria-label="Primary navigation">
+        <a class="brand" href="/" aria-label="Crunchbase home">
+          <img
+            class="brand-logo"
+            src="../assets/static/static-homepage/crunchbase-logo.svg"
+            width="193"
+            height="27"
+            alt=""
+          />
+        </a>
+        <ul class="nav-links">
+          <li>
+            <button
+              class="nav-dropdown-trigger nav-dropdown-trigger-solutions"
+              type="button"
+              popovertarget="nav-solutions-menu"
+              data-global-nav-type="nav_menu"
+              data-global-nav-label="Solutions"
+              data-testid="static-homepage-solutions-trigger"
+            >
+              Solutions
+            </button>
+            <ul
+              id="nav-solutions-menu"
+              class="nav-dropdown-panel nav-dropdown-panel-solutions"
+              popover="auto"
+              aria-label="Solutions"
+              data-testid="static-homepage-solutions-menu"
+            >
+              <li>
+                <a
+                  href="https://about.crunchbase.com/gtm-teams"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="GTM Teams"
+                >
+                  <strong>GTM Teams</strong>
+                  <span>Sell first and win more deals</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/investors"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Investors"
+                >
+                  <strong>Investors</strong>
+                  <span>Invest smarter and exit stronger</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/build-your-product"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Product Developers"
+                >
+                  <strong>Product Developers</strong>
+                  <span>Drive stronger product value</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/market-research"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Analysts"
+                >
+                  <strong>Analysts</strong>
+                  <span>Make smarter build, buy, and partner decisions</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/wealth-managers"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Wealth Managers"
+                >
+                  <strong>Wealth Managers</strong>
+                  <span>Predict wealth and grow AUM</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/find-investors"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Entrepreneurs"
+                >
+                  <strong>Entrepreneurs</strong>
+                  <span>Connect with top investors</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <button
+              class="nav-dropdown-trigger nav-dropdown-trigger-products"
+              type="button"
+              popovertarget="nav-products-menu"
+              data-global-nav-type="nav_menu"
+              data-global-nav-label="Products"
+              data-testid="static-homepage-products-trigger"
+            >
+              Products
+            </button>
+            <ul
+              id="nav-products-menu"
+              class="nav-dropdown-panel nav-dropdown-panel-products"
+              popover="auto"
+              aria-label="Products"
+              data-testid="static-homepage-products-menu"
+            >
+              <li>
+                <a
+                  href="https://about.crunchbase.com/products/crunchbase-pro"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Crunchbase Pro"
+                  ><strong>Crunchbase Pro</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/products/crunchbase-business"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Crunchbase Business"
+                  ><strong>Crunchbase Business</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/products/crunchbase-api"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Crunchbase API"
+                  ><strong>Crunchbase API</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/products/crunchbase-mcp"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Crunchbase MCP"
+                  ><strong>Crunchbase MCP</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/products/data-enrichment"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Data Enrichment"
+                  ><strong>Data Enrichment</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/products/data-licensing"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Data Licensing"
+                  ><strong>Data Licensing</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/data-boost"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Data Boost"
+                  ><strong>Data Boost</strong></a
+                >
+              </li>
+            </ul>
+          </li>
+          <li>
+            <button
+              class="nav-dropdown-trigger nav-dropdown-trigger-resources"
+              type="button"
+              popovertarget="nav-resources-menu"
+              data-global-nav-type="nav_menu"
+              data-global-nav-label="Resources"
+              data-testid="static-homepage-resources-trigger"
+            >
+              Resources
+            </button>
+            <ul
+              id="nav-resources-menu"
+              class="nav-dropdown-panel nav-dropdown-panel-resources"
+              popover="auto"
+              aria-label="Resources"
+              data-testid="static-homepage-resources-menu"
+            >
+              <li>
+                <a
+                  href="https://about.crunchbase.com/about-us"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="About Us"
+                  ><strong>About Us</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/data"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Our Data"
+                  ><strong>Our Data</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://news.crunchbase.com/"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Crunchbase News"
+                  ><strong>Crunchbase News</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/product-updates"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Product Updates"
+                  ><strong>Product Updates</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/partners"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Partners"
+                  ><strong>Partners</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://support.crunchbase.com/"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Support"
+                  ><strong>Support</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/customers"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Customer Stories"
+                  ><strong>Customer Stories</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/press"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Press"
+                  ><strong>Press</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/blog"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Blog"
+                  ><strong>Blog</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/about-us/contact-us"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="Contact Us"
+                  ><strong>Contact Us</strong></a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/prospecting-roi-calculator"
+                  data-global-nav-type="nav_menu_item"
+                  data-global-nav-label="ROI Calculator"
+                  ><strong>ROI Calculator</strong></a
+                >
+              </li>
+            </ul>
+          </li>
+          <li>
+            <a
+              class="nav-advanced-search"
+              href="/discover"
+              data-global-nav-type="nav_action_item"
+              data-global-nav-label="Advanced Search"
+              data-testid="static-homepage-advanced-search-link"
+              >Advanced Search</a
+            >
+          </li>
+          <li>
+            <a
+              class="nav-pricing"
+              href="/buy/select-product"
+              data-global-nav-type="nav_action_item"
+              data-global-nav-label="Pricing"
+              data-upsell-trigger-location="header-pricing"
+              >Pricing</a
+            >
+          </li>
+        </ul>
+        <div class="nav-actions">
+          <form
+            class="nav-search"
+            role="search"
+            aria-label="Site search"
+            action="/textsearch"
+            method="get"
+          >
+            <label class="sr-only" for="nav-search">Search Crunchbase</label>
+            <input
+              id="nav-search"
+              type="search"
+              name="q"
+              aria-label="Search Crunchbase"
+              placeholder="Search"
+              required
+            />
+            <input type="hidden" name="scout" value="1" />
+            <button type="submit" aria-label="Search">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                <path d="m15.5 15.5 5 5"></path>
+              </svg>
+              <span class="sr-only">Search</span>
+            </button>
+          </form>
+          <a class="nav-login" href="/login">Log In</a>
+          <a
+            class="button button-primary trial-cta"
+            href="/buy/select-product"
+            data-upsell-trigger-location="header-upsell"
+            >Start Free Trial</a
+          >
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <div class="dark-shell">
+        <section class="hero container" aria-labelledby="homepage-heading">
+          <div class="hero-copy">
+            <h1 id="homepage-heading">Before It's News, It's In Crunchbase</h1>
+            <p>
+              Be the first to know about private market opportunities with
+              industry-leading predictive intelligence.
+            </p>
+            <form
+              class="hero-search"
+              role="search"
+              aria-label="Crunchbase Scout search"
+              action="/textsearch"
+              method="get"
+            >
+              <label class="sr-only" for="hero-search"
+                >Search companies or ask Crunchbase Scout</label
+              >
+              <span id="hero-search-guidance" class="sr-only"
+                >Search for a company or ask Scout which companies are likely to
+                raise funding, grow, or go public.</span
+              >
+              <svg
+                class="hero-search-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                <path d="m15.5 15.5 5 5"></path>
+              </svg>
+              <div class="hero-search-field">
+                <input
+                  id="hero-search"
+                  type="search"
+                  name="q"
+                  placeholder="Search companies or ask a question"
+                  aria-describedby="hero-search-guidance"
+                  enterkeyhint="search"
+                  required
+                />
+                <span class="hero-search-prompts" aria-hidden="true">
+                  <span class="hero-search-prompt">OpenAI</span>
+                  <span class="hero-search-prompt"
+                    >Which AI companies are most likely to go public?</span
+                  >
+                  <span class="hero-search-prompt">World Labs</span>
+                  <span class="hero-search-prompt"
+                    >Which companies show the strongest growth signals?</span
+                  >
+                  <span class="hero-search-prompt">PhonePe</span>
+                  <span class="hero-search-prompt"
+                    >Which fintech companies may raise funding soon?</span
+                  >
+                </span>
+              </div>
+              <input type="hidden" name="scout" value="1" />
+              <button type="submit">Search</button>
+            </form>
+            <div class="hero-actions">
+              <a
+                class="button button-light trial-cta"
+                href="/buy/select-product"
+                data-upsell-trigger-location="homepage-anon-see-plans"
+                >Start Free Trial</a
+              >
+              <a
+                class="button hero-secondary-cta"
+                href="#closing-sales-form"
+                data-homepage-cta-action="talk_to_sales"
+                >Talk to Sales</a
+              >
+              <a
+                class="button button-secondary"
+                href="/discover"
+                data-homepage-cta-action="explore_our_data"
+                >Explore Our Data</a
+              >
+            </div>
+          </div>
+          <div
+            class="signal-board"
+            aria-label="Examples of live private market signals"
+          >
+            <p class="signal-label">Live signals</p>
+            <a class="signal-card" href="/organization/onyx-security-inc">
+              <img
+                class="signal-logo"
+                src="https://images.crunchbase.com/image/upload/c_pad,h_80,w_80,f_auto,b_white,q_auto:eco/89b7a003c4734bc69aff57fe9bcd4c19"
+                width="34"
+                height="34"
+                alt=""
+              />
+              <span class="signal-company"
+                ><strong>Onyx Security</strong><span>Funding round</span></span
+              >
+              <span class="signal-value"
+                >$113M Series B<small>New funding</small></span
+              >
+            </a>
+            <a class="signal-card" href="/organization/phonepe">
+              <img
+                class="signal-logo"
+                src="https://images.crunchbase.com/image/upload/c_pad,h_80,w_80,f_auto,b_white,q_auto:eco/ldkghwns1fmi3nhbzp11"
+                width="34"
+                height="34"
+                alt=""
+              />
+              <span class="signal-company"
+                ><strong>PhonePe</strong><span>Growth insight</span></span
+              >
+              <span class="signal-value"
+                >₹3,918 crore<small>+22.2% year over year</small></span
+              >
+            </a>
+            <a class="signal-card" href="/organization/world-labs">
+              <img
+                class="signal-logo"
+                src="https://images.crunchbase.com/image/upload/c_pad,h_80,w_80,f_auto,b_white,q_auto:eco/7e39375157714ef1b7733d002ebb3017"
+                width="34"
+                height="34"
+                alt=""
+                loading="lazy"
+              />
+              <span class="signal-company"
+                ><strong>World Labs</strong
+                ><span>Acquisition prediction</span></span
+              >
+              <span class="signal-value"
+                >Very likely<small>New prediction</small></span
+              >
+            </a>
+            <a class="signal-card signal-fade" href="/organization/base-power">
+              <img
+                class="signal-logo"
+                src="https://images.crunchbase.com/image/upload/c_pad,h_80,w_80,f_auto,b_white,q_auto:eco/fe2f6f2a2c924232bacd18af50c1e213"
+                width="34"
+                height="34"
+                alt=""
+                loading="lazy"
+              />
+              <span class="signal-company"
+                ><strong>Base Power</strong><span>Product launch</span></span
+              >
+              <span class="signal-value"
+                >Backyard battery<small>New product</small></span
+              >
+            </a>
+            <a
+              class="signal-card signal-fade"
+              href="/organization/capitol-meridian-partners"
+            >
+              <img
+                class="signal-logo"
+                src="https://images.crunchbase.com/image/upload/c_pad,h_80,w_80,f_auto,b_white,q_auto:eco/gihcdbeeagcuoj8i5nnk"
+                width="34"
+                height="34"
+                alt=""
+                loading="lazy"
+              />
+              <span class="signal-company"
+                ><strong>Capitol Meridian</strong
+                ><span>Leadership hire</span></span
+              >
+              <span class="signal-value"
+                >Maisha Glover<small>New operating partner</small></span
+              >
+            </a>
+          </div>
+        </section>
+
+        <section class="data-pillars container" aria-labelledby="data-heading">
+          <div class="section-intro">
+            <h2 id="data-heading">Live Data That’s Always One Step Ahead</h2>
+            <p>
+              Unrivaled depth, coverage, and accuracy — the engine behind our
+              intelligence.
+            </p>
+          </div>
+          <div class="pillar-grid">
+            <article class="pillar">
+              <span class="pillar-icon" aria-hidden="true">◉</span>
+              <h3>Proprietary data</h3>
+              <p>
+                A multi-layer data pipeline combines direct input, engagement
+                signals, proprietary ingestion systems, trusted sources, and
+                analyst validation.
+              </p>
+            </article>
+            <article class="pillar">
+              <span class="pillar-icon" aria-hidden="true">
+                <svg viewBox="0 0 60 60" fill="none">
+                  <defs>
+                    <linearGradient
+                      id="early-signal-gradient"
+                      x1="13.4799"
+                      y1="28.8145"
+                      x2="46.2103"
+                      y2="28.8145"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop offset="15%" stop-color="#c6d5ff" />
+                      <stop offset="100%" stop-color="#edccf9" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    fill="url(#early-signal-gradient)"
+                    d="M46.2103 44.583H13.4799V40.583H46.2103V44.583ZM45.8158 13.0459C45.8155 25.5641 35.9144 35.8016 23.5922 35.8018H13.4799V31.8018H23.5922C33.608 31.8016 41.8155 23.4536 41.8158 13.0459H45.8158ZM19.3549 15.8467C19.7102 15.0652 20.8208 15.0652 21.1761 15.8467L22.2308 18.167C22.3309 18.387 22.5078 18.564 22.7279 18.6641L25.0492 19.7188C25.8305 20.0741 25.8304 21.1846 25.0492 21.54L22.7279 22.5947C22.5078 22.6948 22.3309 22.8717 22.2308 23.0918L21.1761 25.4131C20.8208 26.1945 19.7102 26.1945 19.3549 25.4131L18.3002 23.0918C18.2001 22.8717 18.0232 22.6948 17.8031 22.5947L15.4818 21.54C14.7006 21.1846 14.7005 20.0741 15.4818 19.7188L17.8031 18.6641C18.0232 18.564 18.2001 18.387 18.3002 18.167L19.3549 15.8467Z"
+                  />
+                </svg>
+              </span>
+              <h3>Early signal detection</h3>
+              <p>
+                Billions of live private company signals are continually
+                monitored and analyzed to reveal opportunity earlier.
+              </p>
+            </article>
+            <article class="pillar">
+              <span class="pillar-icon" aria-hidden="true">◎</span>
+              <h3>AI prediction models</h3>
+              <p>
+                Models trained on nearly two decades of private market data
+                deliver an early view of opportunity and risk.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section
+          class="prediction-section"
+          aria-labelledby="prediction-heading"
+        >
+          <div class="section-intro container">
+            <h2 id="prediction-heading">
+              Predictive Intelligence Changes What's Possible
+            </h2>
+            <p>
+              Crunchbase gives you the power to know first, decide first, and
+              act first. From funding rounds to IPOs, acquisitions to closures,
+              anticipate every major moment in a private company's lifecycle.
+            </p>
+          </div>
+          <div class="prediction-marquee">
+            <div class="prediction-track">
+              <div class="prediction-group">
+                <article
+                  class="prediction-card"
+                  tabindex="0"
+                  aria-labelledby="prediction-funding-title"
+                  aria-describedby="prediction-funding-copy"
+                >
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#funding"
+                      ></use>
+                    </svg>
+                    <h3 id="prediction-funding-title">Funding Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p id="prediction-funding-copy">
+                      Make moves on companies with forecasted funding.
+                    </p>
+                  </div>
+                </article>
+                <article
+                  class="prediction-card"
+                  tabindex="0"
+                  aria-labelledby="prediction-growth-title"
+                  aria-describedby="prediction-growth-copy"
+                >
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#growth"
+                      ></use>
+                    </svg>
+                    <h3 id="prediction-growth-title">Growth Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p id="prediction-growth-copy">
+                      Prioritize the companies most likely to scale.
+                    </p>
+                  </div>
+                </article>
+                <article
+                  class="prediction-card"
+                  tabindex="0"
+                  aria-labelledby="prediction-acquisition-title"
+                  aria-describedby="prediction-acquisition-copy"
+                >
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#acquisition"
+                      ></use>
+                    </svg>
+                    <h3 id="prediction-acquisition-title">
+                      Acquisition Predictions
+                    </h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p id="prediction-acquisition-copy">
+                      Position yourself ahead of every major deal.
+                    </p>
+                  </div>
+                </article>
+                <article
+                  class="prediction-card"
+                  tabindex="0"
+                  aria-labelledby="prediction-ipo-title"
+                  aria-describedby="prediction-ipo-copy"
+                >
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#ipo"
+                      ></use>
+                    </svg>
+                    <h3 id="prediction-ipo-title">IPO Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p id="prediction-ipo-copy">
+                      Get in early on companies approaching the public markets.
+                    </p>
+                  </div>
+                </article>
+                <article
+                  class="prediction-card"
+                  tabindex="0"
+                  aria-labelledby="prediction-private-title"
+                  aria-describedby="prediction-private-copy"
+                >
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#remain-private"
+                      ></use>
+                    </svg>
+                    <h3 id="prediction-private-title">
+                      Remain Private Predictions
+                    </h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p id="prediction-private-copy">
+                      Build the right strategy around companies unlikely to
+                      exit.
+                    </p>
+                  </div>
+                </article>
+                <article
+                  class="prediction-card"
+                  tabindex="0"
+                  aria-labelledby="prediction-closure-title"
+                  aria-describedby="prediction-closure-copy"
+                >
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#closure"
+                      ></use>
+                    </svg>
+                    <h3 id="prediction-closure-title">Closure Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p id="prediction-closure-copy">
+                      Guard yourself from early indicators of risk.
+                    </p>
+                  </div>
+                </article>
+                <article
+                  class="prediction-card"
+                  tabindex="0"
+                  aria-labelledby="prediction-layoff-title"
+                  aria-describedby="prediction-layoff-copy"
+                >
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#layoff"
+                      ></use>
+                    </svg>
+                    <h3 id="prediction-layoff-title">Layoff Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p id="prediction-layoff-copy">
+                      Protect your pipeline from signs of instability.
+                    </p>
+                  </div>
+                </article>
+              </div>
+              <div class="prediction-group" aria-hidden="true" inert>
+                <article class="prediction-card">
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#funding"
+                      ></use>
+                    </svg>
+                    <h3>Funding Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p>Make moves on companies with forecasted funding.</p>
+                  </div>
+                </article>
+                <article class="prediction-card">
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#growth"
+                      ></use>
+                    </svg>
+                    <h3>Growth Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p>Prioritize the companies most likely to scale.</p>
+                  </div>
+                </article>
+                <article class="prediction-card">
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#acquisition"
+                      ></use>
+                    </svg>
+                    <h3>Acquisition Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p>Position yourself ahead of every major deal.</p>
+                  </div>
+                </article>
+                <article class="prediction-card">
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#ipo"
+                      ></use>
+                    </svg>
+                    <h3>IPO Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p>
+                      Get in early on companies approaching the public markets.
+                    </p>
+                  </div>
+                </article>
+                <article class="prediction-card">
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#remain-private"
+                      ></use>
+                    </svg>
+                    <h3>Remain Private Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p>
+                      Build the right strategy around companies unlikely to
+                      exit.
+                    </p>
+                  </div>
+                </article>
+                <article class="prediction-card">
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#closure"
+                      ></use>
+                    </svg>
+                    <h3>Closure Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p>Guard yourself from early indicators of risk.</p>
+                  </div>
+                </article>
+                <article class="prediction-card">
+                  <div class="prediction-face prediction-front">
+                    <svg width="40" height="40" aria-hidden="true">
+                      <use
+                        href="../assets/static/static-homepage/prediction-icons.svg#layoff"
+                      ></use>
+                    </svg>
+                    <h3>Layoff Predictions</h3>
+                  </div>
+                  <div class="prediction-face prediction-back">
+                    <p>Protect your pipeline from signs of instability.</p>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <img
+        class="section-divider"
+        src="../assets/static/static-homepage/section-divider.avif"
+        width="2600"
+        height="599"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+      />
+
+      <section class="metrics" aria-labelledby="metrics-heading">
+        <div class="metrics-panel container">
+          <h2 class="metrics-copy" id="metrics-heading">
+            Unmatched private market data. Industry-leading predictive
+            intelligence.
+          </h2>
+          <div class="metric">
+            <strong>39B</strong><span>live private market signals</span>
+          </div>
+          <div class="metric">
+            <strong>30M+</strong><span>verified updates per year</span>
+          </div>
+          <div class="metric">
+            <strong>15M+</strong><span>predictions refreshed weekly</span>
+          </div>
+          <div class="metric">
+            <strong>84%</strong
+            ><span>of real-world funding rounds predicted</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="use-cases container" aria-labelledby="use-cases-heading">
+        <h2 id="use-cases-heading">Use Cases</h2>
+        <fieldset class="use-case-shell">
+          <legend class="sr-only">Choose a use case</legend>
+          <input id="case-investors" type="radio" name="use-case" checked />
+          <input id="case-products" type="radio" name="use-case" />
+          <input id="case-gtm" type="radio" name="use-case" />
+          <input id="case-analysts" type="radio" name="use-case" />
+          <input id="case-wealth" type="radio" name="use-case" />
+          <input id="case-founders" type="radio" name="use-case" />
+
+          <div class="use-case-layout">
+            <div class="use-case-options">
+              <label for="case-investors">Investors</label>
+              <label for="case-products">Product Developers</label>
+              <label for="case-gtm">GTM Teams</label>
+              <label for="case-analysts">Analysts</label>
+              <label for="case-wealth">Wealth Managers</label>
+              <label for="case-founders">Entrepreneurs</label>
+            </div>
+            <div class="use-case-panels">
+              <article
+                class="use-case-panel panel-investors"
+                role="region"
+                aria-label="Investors use case"
+              >
+                <div class="use-case-content">
+                  <h3>Invest smarter and exit stronger</h3>
+                  <p>
+                    Outpace the market with trusted company predictions that
+                    help you spot high-ROI opportunities early, de-risk your
+                    pipeline, and close with confidence.
+                  </p>
+                  <a
+                    class="text-link"
+                    data-testid="use-case-investors-link"
+                    href="https://about.crunchbase.com/investors"
+                    >Browse Companies</a
+                  >
+                </div>
+                <div class="use-case-result">
+                  <span>Picus Capital</span><strong>25%</strong
+                  ><span>faster due diligence</span>
+                </div>
+              </article>
+              <article
+                class="use-case-panel panel-products"
+                role="region"
+                aria-label="Product developers use case"
+              >
+                <div class="use-case-content">
+                  <h3>Drive stronger product value</h3>
+                  <p>
+                    Power products and models with private company data and
+                    predictions. Build smarter tools, faster, on a data
+                    foundation competitors cannot replicate.
+                  </p>
+                  <a
+                    class="text-link"
+                    data-testid="use-case-product-developers-link"
+                    href="https://about.crunchbase.com/build-your-product"
+                    >Search Company Data</a
+                  >
+                </div>
+                <div class="use-case-result">
+                  <span>Product teams</span><strong>2.6M+</strong
+                  ><span>actions powered</span>
+                </div>
+              </article>
+              <article
+                class="use-case-panel panel-gtm"
+                role="region"
+                aria-label="GTM teams use case"
+              >
+                <div class="use-case-content">
+                  <h3>Sell first and win more deals</h3>
+                  <p>
+                    Anticipate private company funding and growth, identify
+                    emerging buying power, and reach high-fit accounts before
+                    the window closes.
+                  </p>
+                  <a
+                    class="text-link"
+                    data-testid="use-case-gtm-teams-link"
+                    href="https://about.crunchbase.com/gtm-teams"
+                    >Explore Companies</a
+                  >
+                </div>
+                <div class="use-case-result">
+                  <span>Revenue teams</span><strong>60%</strong
+                  ><span>faster prospecting</span>
+                </div>
+              </article>
+              <article
+                class="use-case-panel panel-analysts"
+                role="region"
+                aria-label="Analysts use case"
+              >
+                <div class="use-case-content">
+                  <h3>Make smarter build, buy, and partner decisions</h3>
+                  <p>
+                    Map competitive landscapes, track sector trends, and
+                    identify emerging players across millions of private
+                    companies worldwide.
+                  </p>
+                  <a
+                    class="text-link"
+                    data-testid="use-case-analysts-link"
+                    href="https://about.crunchbase.com/market-research"
+                    >View Featured Searches</a
+                  >
+                </div>
+                <div class="use-case-result">
+                  <span>Market coverage</span><strong>39B</strong
+                  ><span>live signals analyzed</span>
+                </div>
+              </article>
+              <article
+                class="use-case-panel panel-wealth"
+                role="region"
+                aria-label="Wealth managers use case"
+              >
+                <div class="use-case-content">
+                  <h3>Predict wealth and grow AUM</h3>
+                  <p>
+                    Predict liquidity events before they happen, win
+                    high-net-worth relationships, and deploy capital ahead of
+                    market shifts.
+                  </p>
+                  <a
+                    class="text-link"
+                    data-testid="use-case-wealth-managers-link"
+                    href="https://about.crunchbase.com/wealth-managers"
+                    >Search Private Companies</a
+                  >
+                </div>
+                <div class="use-case-result">
+                  <span>Private markets</span><strong>84%</strong
+                  ><span>of funding rounds predicted</span>
+                </div>
+              </article>
+              <article
+                class="use-case-panel panel-founders"
+                role="region"
+                aria-label="Entrepreneurs use case"
+              >
+                <div class="use-case-content">
+                  <h3>Connect with top investors</h3>
+                  <p>
+                    Identify investors for your stage, sector, and geography,
+                    then approach them with market intelligence that makes every
+                    conversation count.
+                  </p>
+                  <a class="text-link" href="/discover">Explore Crunchbase</a>
+                </div>
+                <div class="use-case-result">
+                  <span>Visibility</span><strong>80M+</strong><span>users</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="trust-and-proof" aria-labelledby="customer-proof-heading">
+        <div class="container">
+          <div class="trust-strip" aria-label="Selected Crunchbase customers">
+            <p class="trust-label">Trusted by the world’s top companies</p>
+            <div class="trust-marquee">
+              <div class="trust-track">
+                <ul class="trust-group">
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169b7_Logo_Bar_Mixpanel.svg"
+                      width="186"
+                      height="75"
+                      alt="Mixpanel"
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="../assets/static/static-homepage/oecd-logo.svg"
+                      width="186"
+                      height="75"
+                      alt="OECD"
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169b6_Logo_Bar_Bayer.svg"
+                      width="186"
+                      height="75"
+                      alt="Bayer"
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169ba_Logo_Bar_Outreach.svg"
+                      width="186"
+                      height="75"
+                      alt="Outreach"
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169b9_Logo_Bar_Monday.svg"
+                      width="186"
+                      height="75"
+                      alt="monday.com"
+                      loading="lazy"
+                    />
+                  </li>
+                </ul>
+                <ul class="trust-group" aria-hidden="true">
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169b7_Logo_Bar_Mixpanel.svg"
+                      width="186"
+                      height="75"
+                      alt=""
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="../assets/static/static-homepage/oecd-logo.svg"
+                      width="186"
+                      height="75"
+                      alt=""
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169b6_Logo_Bar_Bayer.svg"
+                      width="186"
+                      height="75"
+                      alt=""
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169ba_Logo_Bar_Outreach.svg"
+                      width="186"
+                      height="75"
+                      alt=""
+                      loading="lazy"
+                    />
+                  </li>
+                  <li>
+                    <img
+                      class="trust-logo"
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169b9_Logo_Bar_Monday.svg"
+                      width="186"
+                      height="75"
+                      alt=""
+                      loading="lazy"
+                    />
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="customer-proof">
+            <h2 class="sr-only" id="customer-proof-heading">Customer Proof</h2>
+            <ol class="story-track" aria-label="Customer stories" tabindex="0">
+              <li class="story-card">
+                <div class="story-stat">
+                  <strong>1 in 3</strong
+                  ><span>net-new opportunities powered</span>
+                </div>
+                <article class="story-copy">
+                  <div class="story-logo">
+                    <img
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169bf_Quote_Slider_Logo_atomico.svg"
+                      width="214"
+                      height="46"
+                      alt="Atomico"
+                      loading="lazy"
+                    />
+                  </div>
+                  <blockquote>
+                    “When we look at data solutions, we're prioritizing maximum
+                    coverage. Crunchbase delivers exceptional value by providing
+                    comprehensive coverage of the companies we care about —
+                    across funding activity, leadership changes, market signals,
+                    and more. It's a critical backbone of our data foundation.”
+                  </blockquote>
+                  <p class="story-person">
+                    <strong>Sarah Guemouri</strong>Head of Insights, Atomico
+                  </p>
+                </article>
+              </li>
+              <li class="story-card">
+                <div class="story-stat">
+                  <strong>2.6 million</strong
+                  ><span
+                    >actions (and growing) have been powered using Crunchbase
+                    data in Clay.</span
+                  >
+                </div>
+                <article class="story-copy">
+                  <div class="story-logo">
+                    <img
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1951cdaa9b9e041699d_Clay%20Logo%20Dark.png.avif"
+                      width="214"
+                      height="69"
+                      alt="Clay"
+                      loading="lazy"
+                    />
+                  </div>
+                  <blockquote>
+                    “Alongside investor and acquisition data, we're giving GTM
+                    teams something they haven't had before: the chance to move
+                    earlier, act smarter, and stand out before the rest of the
+                    market even knows what's coming.”
+                  </blockquote>
+                  <p class="story-person">
+                    <strong>Stefan Kollenberg</strong>Data Partnerships Lead,
+                    Clay
+                  </p>
+                </article>
+              </li>
+              <li class="story-card">
+                <div class="story-stat story-stat--long-value">
+                  <strong>Accelerated</strong
+                  ><span>install rates among startup program members</span>
+                </div>
+                <article class="story-copy">
+                  <div class="story-logo">
+                    <img
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169c0_Quote_Slider_Logo_HubSpot.svg"
+                      width="214"
+                      height="46"
+                      alt="HubSpot"
+                      loading="lazy"
+                    />
+                  </div>
+                  <blockquote>
+                    “Crunchbase isn't just a tool for us — it's core
+                    infrastructure. We've built key parts of our startup program
+                    on top of that data, and it plays a central role in how we
+                    identify, verify and support the next generation of HubSpot
+                    customers.”
+                  </blockquote>
+                  <p class="story-person">
+                    <strong>Ken Fong</strong>Lead Marketing Technical Manager,
+                    HubSpot for Startups
+                  </p>
+                </article>
+              </li>
+              <li class="story-card">
+                <div class="story-stat">
+                  <strong>25% faster</strong><span>due diligence</span>
+                </div>
+                <article class="story-copy">
+                  <div class="story-logo">
+                    <img
+                      src="https://cdn.prod.website-files.com/687e6d0359c517be389ea464/6a2ef1961cdaa9b9e04169c1_Quote_Slider_Logo_Picus_Capital.svg"
+                      width="214"
+                      height="46"
+                      alt="Picus Capital"
+                      loading="lazy"
+                    />
+                  </div>
+                  <blockquote>
+                    “Crunchbase has transformed how we benchmark companies.
+                    We're able to uncover competitors that aren't visible
+                    through standard searches and spot potential follow-on
+                    investors by analyzing investment patterns — insights that
+                    directly strengthen our diligence process.”
+                  </blockquote>
+                  <p class="story-person"><strong>Senior Manager</strong></p>
+                </article>
+              </li>
+            </ol>
+            <a class="all-stories" href="https://about.crunchbase.com/customers"
+              >See All Customer Stories</a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <img
+      class="section-divider section-divider--reversed"
+      src="../assets/static/static-homepage/section-divider.avif"
+      width="2600"
+      height="599"
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+    />
+
+    <section class="closing-cta" aria-labelledby="closing-cta-heading">
+      <div class="closing-cta-grid container">
+        <div class="closing-cta-copy">
+          <h2 id="closing-cta-heading">
+            Act on private market opportunity before anyone else
+          </h2>
+          <p class="closing-cta-subheading">
+            Enterprise-grade. API and agent-ready. Built to help you move first
+            in private markets.
+          </p>
+          <div class="g2-proof" aria-label="Rated 4.5 out of 5 on G2">
+            <div class="g2-score">
+              <span class="g2-stars" aria-hidden="true"
+                >★★★★<span class="g2-half-star">★</span></span
+              >
+              <span class="g2-rating"
+                ><strong>4.5 / 5</strong><span>rating on G2</span></span
+              >
+            </div>
+            <ul class="g2-badges" aria-label="2026 G2 Mid-Market awards">
+              <li>
+                <img
+                  src="../assets/static/static-homepage/g2-leader-mid-market-2026.png"
+                  width="100"
+                  height="115"
+                  alt="G2 Summer 2026 Mid-Market Leader badge"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </li>
+              <li>
+                <img
+                  src="../assets/static/static-homepage/g2-easiest-setup-mid-market-2026.png"
+                  width="100"
+                  height="115"
+                  alt="G2 Summer 2026 Mid-Market Easiest Setup badge"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </li>
+              <li>
+                <img
+                  src="../assets/static/static-homepage/g2-highest-user-adoption-mid-market-2026.png"
+                  width="100"
+                  height="115"
+                  alt="G2 Summer 2026 Mid-Market Highest User Adoption badge"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </li>
+              <li>
+                <img
+                  src="../assets/static/static-homepage/g2-fastest-implementation-mid-market-2026.png"
+                  width="100"
+                  height="115"
+                  alt="G2 Summer 2026 Mid-Market Fastest Implementation badge"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </li>
+              <li>
+                <img
+                  src="../assets/static/static-homepage/g2-best-roi-mid-market-2026.png"
+                  width="100"
+                  height="115"
+                  alt="G2 Summer 2026 Mid-Market Best ROI badge"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </li>
+            </ul>
+          </div>
+        </div>
+        <form
+          id="closing-sales-form"
+          class="closing-sales-form"
+          action="https://about.crunchbase.com/contact-sales-product/?utm_source=Crunchbase&amp;utm_medium=In-Prod-FallBack&amp;utm_campaign=Global-Footer"
+          method="get"
+          target="_blank"
+          data-sales-campaign="experience-1740604865544"
+          aria-labelledby="closing-cta-heading"
+          aria-describedby="closing-sales-status"
+        >
+          <input type="hidden" name="utm_source" value="Crunchbase" />
+          <input type="hidden" name="utm_medium" value="In-Prod-FallBack" />
+          <input type="hidden" name="utm_campaign" value="Global-Footer" />
+          <div class="closing-sales-field">
+            <label for="closing-sales-first-name">First Name</label>
+            <input
+              id="closing-sales-first-name"
+              type="text"
+              placeholder="First Name"
+              autocomplete="given-name"
+              required
+            />
+          </div>
+          <div class="closing-sales-field">
+            <label for="closing-sales-last-name">Last Name</label>
+            <input
+              id="closing-sales-last-name"
+              type="text"
+              placeholder="Last Name"
+              autocomplete="family-name"
+              required
+            />
+          </div>
+          <div class="closing-sales-field">
+            <label for="closing-sales-email">Company Email</label>
+            <input
+              id="closing-sales-email"
+              type="email"
+              placeholder="Company Email"
+              autocomplete="email"
+              required
+            />
+          </div>
+          <div class="closing-sales-field">
+            <label for="closing-sales-company">Company</label>
+            <input
+              id="closing-sales-company"
+              type="text"
+              placeholder="Company"
+              autocomplete="organization"
+              required
+            />
+          </div>
+          <button class="closing-sales-submit" type="submit">
+            Talk to Sales
+          </button>
+          <p
+            class="closing-sales-status"
+            id="closing-sales-status"
+            role="status"
+            aria-live="polite"
+            data-sales-status
+          ></p>
+        </form>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="footer-main container">
+        <div class="footer-brand-column">
+          <a class="brand footer-brand" href="/" aria-label="Crunchbase home">
+            <img
+              class="brand-logo"
+              src="../assets/static/static-homepage/crunchbase-logo.svg"
+              width="193"
+              height="27"
+              alt=""
+              loading="lazy"
+            />
+          </a>
+          <nav class="footer-column" aria-labelledby="footer-stay-connected">
+            <h2 id="footer-stay-connected">Stay Connected</h2>
+            <ul>
+              <li>
+                <a
+                  href="https://about.crunchbase.com/blog"
+                  data-navigation-location="footer-stay-connected-blog"
+                  >Crunchbase Blog</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://news.crunchbase.com/"
+                  data-navigation-location="footer-stay-connected-news"
+                  >Crunchbase News</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://news.crunchbase.com/daily"
+                  data-navigation-location="footer-stay-connected-daily"
+                  >Subscribe to the Crunchbase Daily</a
+                >
+              </li>
+              <li class="footer-socials">
+                <a
+                  href="https://twitter.com/crunchbase"
+                  aria-label="Crunchbase on X"
+                  data-navigation-location="footer-social-x"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      d="M18.901 1h3.681l-8.04 9.189L24 22.694h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.829L0 1h7.594l5.243 6.932L18.901 1Zm-1.291 19.491h2.039L6.486 3.087H4.298L17.61 20.491Z"
+                    />
+                  </svg>
+                </a>
+                <a
+                  href="https://www.facebook.com/crunchbase/"
+                  aria-label="Crunchbase on Facebook"
+                  data-navigation-location="footer-social-facebook"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24Zm1.051 4.5h2.25v3h-1.5c-.518 0-.75.608-.75 1.125V10.5h2.25v3h-2.25v6h-3v-6h-2.25v-3h2.25v-3a3 3 0 0 1 3-3Z"
+                    />
+                  </svg>
+                </a>
+                <a
+                  href="https://www.linkedin.com/company/crunchbase/"
+                  aria-label="Crunchbase on LinkedIn"
+                  data-navigation-location="footer-social-linkedin"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      d="M19 19h-3v-5.3a1.5 1.5 0 0 0-3 0V19h-3v-9h3v1.2a3.1 3.1 0 0 1 2.5-1.4 3.5 3.5 0 0 1 3.5 3.5V19ZM6.5 8.31a1.81 1.81 0 1 1 0-3.62 1.81 1.81 0 0 1 0 3.62ZM8 19H5v-9h3v9ZM20 2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"
+                    />
+                  </svg>
+                </a>
+                <a
+                  href="https://www.instagram.com/crunchbase"
+                  aria-label="Crunchbase on Instagram"
+                  data-navigation-location="footer-social-instagram"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      d="M15.5 12a3.5 3.5 0 1 1-6.9-.6H7.4V16c0 .3.3.6.6.6h8.1c.3 0 .6-.3.6-.6v-4.6h-1.2v.6ZM12 14.3a2.3 2.3 0 1 0 0-4.6 2.3 2.3 0 0 0 0 4.6Zm2.8-4.7h1.4c.2 0 .3-.2.3-.3V7.8c0-.2-.2-.3-.3-.3h-1.4c-.2 0-.3.2-.3.3v1.4c-.1.2.1.4.3.4ZM12 .8a11.2 11.2 0 1 0 0 22.4A11.2 11.2 0 0 0 12 .8Zm5.8 15.7c0 .7-.6 1.3-1.3 1.3h-9c-.7 0-1.3-.6-1.3-1.3v-9c0-.7.6-1.3 1.3-1.3h9c.7 0 1.3.6 1.3 1.3v9Z"
+                    />
+                  </svg>
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+        <nav class="footer-column" aria-labelledby="footer-browse">
+          <h2 id="footer-browse">Browse By</h2>
+          <ul>
+            <li>
+              <a
+                href="/search/organization.companies"
+                data-navigation-location="footer-browse-organizations"
+                >Organizations</a
+              >
+            </li>
+            <li>
+              <a
+                href="/search/people"
+                data-navigation-location="footer-browse-people"
+                >People</a
+              >
+            </li>
+            <li>
+              <a
+                href="/search/events"
+                data-navigation-location="footer-browse-events"
+                >Events</a
+              >
+            </li>
+          </ul>
+        </nav>
+        <nav class="footer-column" aria-labelledby="footer-who-we-are">
+          <h2 id="footer-who-we-are">Who We Are</h2>
+          <ul>
+            <li>
+              <a
+                href="https://about.crunchbase.com/about-us"
+                data-navigation-location="footer-who-we-are-company"
+                >Company</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/about-us/careers"
+                data-navigation-location="footer-who-we-are-careers"
+                >Careers</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/partners"
+                data-navigation-location="footer-who-we-are-partners"
+                >Partners</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/about-us/contact-us"
+                data-navigation-location="footer-who-we-are-press"
+                >Press</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/about-us/contact-us"
+                data-navigation-location="footer-who-we-are-contact-us"
+                >Contact Us</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/contact-sales-product/?utm_source=Crunchbase&amp;utm_medium=In-Prod-FallBack&amp;utm_campaign=Global-Footer"
+                target="_blank"
+                rel="noopener"
+                data-navigation-location="footer-who-we-are-talk-with-sales"
+                data-sales-campaign="experience-1740604865544"
+                >Talk With Sales</a
+              >
+              <span
+                class="footer-sales-status"
+                role="status"
+                aria-live="polite"
+                data-sales-status
+              ></span>
+            </li>
+          </ul>
+        </nav>
+        <nav class="footer-column" aria-labelledby="footer-what-we-do">
+          <h2 id="footer-what-we-do">What We Do</h2>
+          <ul>
+            <li>
+              <a
+                href="https://about.crunchbase.com/products/crunchbase-pro"
+                data-navigation-location="footer-what-we-do-crunchbase-pro"
+                >Crunchbase Pro</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/products/crunchbase-business"
+                data-navigation-location="footer-what-we-do-crunchbase-business"
+                >Crunchbase Business</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/products/data-licensing"
+                data-navigation-location="footer-what-we-do-data-licensing"
+                >Data Licensing</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/customers"
+                data-navigation-location="footer-what-we-do-customer-stories"
+                >Customer Stories</a
+              >
+            </li>
+            <li>
+              <a
+                href="/buy/select-product"
+                data-navigation-location="footer-what-we-do-pricing"
+                data-upsell-trigger-location="footer-pricing"
+                >Pricing</a
+              >
+            </li>
+          </ul>
+        </nav>
+        <nav class="footer-column" aria-labelledby="footer-helpful-links">
+          <h2 id="footer-helpful-links">Helpful Links</h2>
+          <ul>
+            <li>
+              <a
+                href="/add-new"
+                data-navigation-location="footer-helpful-links-create-profile"
+                >Create Profile</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://support.crunchbase.com/hc/en-us"
+                data-navigation-location="footer-helpful-links-knowledge-center"
+                >Knowledge Center</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://about.crunchbase.com/topics/announcements/"
+                data-navigation-location="footer-helpful-links-product-updates"
+                >Latest Product Updates</a
+              >
+            </li>
+          </ul>
+        </nav>
+      </div>
+      <div class="footer-legal container">
+        <p class="footer-ai-disclaimer">
+          AI Content may contain mistakes and is not legal, financial or
+          investment advice.
+          <a
+            href="https://about.crunchbase.com/terms-of-service"
+            data-navigation-location="footer-ai-disclaimer-learn-more"
+            >Learn more.</a
+          >
+        </p>
+        <a
+          href="https://about.crunchbase.com/terms-of-service"
+          data-navigation-location="footer-terms-of-service"
+          >Terms of Service</a
+        >
+        <a
+          href="https://about.crunchbase.com/terms-of-service/privacy-policy"
+          data-navigation-location="footer-privacy-policy"
+          >Privacy Policy</a
+        >
+        <a
+          href="https://techcrunch.com/"
+          data-navigation-location="footer-editorial-partner"
+          >Editorial Partners: Verizon Media Tech</a
+        >
+        <a
+          href="https://about.crunchbase.com/terms-of-service/privacy-policy"
+          data-navigation-location="footer-ca-privacy-notice"
+          >CA Privacy Notice</a
+        >
+        <button
+          class="footer-legal-action"
+          type="button"
+          data-open-cookie-preferences
+        >
+          Cookie Settings
+        </button>
+        <button
+          class="footer-legal-action"
+          type="button"
+          data-open-cookie-preferences
+        >
+          Do Not Sell or Share My Personal Info
+        </button>
+        <span class="footer-copyright"
+          >© 2026 Crunchbase Inc. All Rights Reserved.</span
+        >
+      </div>
+    </footer>
+    <script data-static-homepage-analytics>
+      (() => {
+        if (location.pathname !== "/") {
+          return;
+        }
+
+        let openCookiePreferencesWhenReady = false;
+        const openCookiePreferences = () => {
+          if (
+            window.OneTrust &&
+            typeof window.OneTrust.ToggleInfoDisplay === "function"
+          ) {
+            openCookiePreferencesWhenReady = false;
+            window.OneTrust.ToggleInfoDisplay();
+            return;
+          }
+
+          openCookiePreferencesWhenReady = true;
+        };
+
+        window.OptanonWrapper = () => {
+          if (openCookiePreferencesWhenReady) {
+            openCookiePreferences();
+          }
+        };
+
+        const chatCampaign = "experience-1740604865544";
+        const chatbotLoadTimeoutMs = 10_000;
+        const chatbotFeedbackDelayMs = 2_000;
+        let consentCategories;
+        let chatbotReady = false;
+        let chatbotRequestActive = false;
+        let chatbotUnavailable = false;
+        let chatbotConsentBlocked = false;
+        let chatbotTimeout;
+        let chatbotFeedbackTimeout;
+        let gtmInjected = false;
+        let gtmUnavailable = false;
+        let qualifiedRequested = false;
+        let pendingQualifiedIdentity;
+        let activeSalesFallbackUrl;
+        let activeSalesStatus;
+
+        const setSalesStatus = message => {
+          if (activeSalesStatus) {
+            activeSalesStatus.textContent = message;
+          }
+        };
+
+        const setSalesFallbackStatus = fallbackUrl => {
+          if (!activeSalesStatus) {
+            return;
+          }
+
+          activeSalesStatus.textContent =
+            "We weren't able to connect you to our sales team automatically. ";
+          const fallbackLink = document.createElement("a");
+          fallbackLink.href = fallbackUrl;
+          fallbackLink.target = "_blank";
+          fallbackLink.rel = "noopener";
+          fallbackLink.textContent = "Click here";
+          activeSalesStatus.append(fallbackLink, " to get in touch!");
+        };
+
+        const getConsentCategories = activeGroups => ({
+          ads: activeGroups.includes("C0004"),
+          analytics: activeGroups.includes("C0002"),
+          functionality: activeGroups.includes("C0003"),
+          personalization: activeGroups.includes("C0005"),
+          security: activeGroups.includes("C0001"),
+        });
+
+        const updateConsentCategories = event => {
+          const activeGroups = event.detail;
+          if (
+            !Array.isArray(activeGroups) ||
+            activeGroups.some(category => category.includes("BG"))
+          ) {
+            return;
+          }
+
+          const nextConsentCategories = getConsentCategories(activeGroups);
+          const consentChanged =
+            !consentCategories ||
+            Object.keys(nextConsentCategories).some(
+              category =>
+                consentCategories[category] !== nextConsentCategories[category],
+            );
+          const consentWasResolved = Boolean(consentCategories);
+          consentCategories = nextConsentCategories;
+          window.cbGtmConsent = consentCategories;
+
+          if (!gtmInjected) {
+            injectGtm();
+          } else if (consentWasResolved && consentChanged) {
+            reportGtmConsentUpdate();
+          }
+
+          if (consentCategories.functionality && chatbotConsentBlocked) {
+            chatbotUnavailable = false;
+            chatbotConsentBlocked = false;
+            qualifiedRequested = false;
+            setSalesStatus("");
+          }
+
+          if (chatbotRequestActive) {
+            if (consentCategories.functionality) {
+              startQualifiedCampaign();
+            } else {
+              failChatbotRequest("error", true);
+            }
+          }
+        };
+
+        window.addEventListener(
+          "OneTrustGroupsUpdated",
+          updateConsentCategories,
+        );
+
+        const oneTrustScript = document.createElement("script");
+        oneTrustScript.src =
+          "https://cdn.cookielaw.org/scripttemplates/otSDKStub.js";
+        oneTrustScript.async = true;
+        oneTrustScript.dataset.domainScript =
+          "d71c660f-7eb5-4a5e-983e-ca1d7f1e56d4";
+        document.head.append(oneTrustScript);
+
+        let sendUsageEvent = () => undefined;
+
+        const reportGtmEvent = (event, payload) => {
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({ event, ...payload });
+        };
+
+        const reportGtmCommand = function () {
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push(arguments);
+        };
+
+        const reportGtmConsentUpdate = () => {
+          const consentState = granted => (granted ? "granted" : "denied");
+          reportGtmCommand("consent", "update", {
+            ad_storage: consentState(consentCategories.ads),
+            analytics_storage: consentState(consentCategories.analytics),
+            functionality_storage: consentState(
+              consentCategories.functionality,
+            ),
+            personalization_storage: consentState(
+              consentCategories.personalization,
+            ),
+            security_storage: "granted",
+          });
+        };
+
+        const openSalesFallback = () => {
+          const fallbackUrl = activeSalesFallbackUrl;
+          if (fallbackUrl && window.open(fallbackUrl, "_blank")) {
+            setSalesStatus("");
+            return;
+          }
+
+          if (fallbackUrl) {
+            setSalesFallbackStatus(fallbackUrl);
+          }
+        };
+
+        const finishChatbotRequest = () => {
+          chatbotRequestActive = false;
+          pendingQualifiedIdentity = undefined;
+          clearTimeout(chatbotTimeout);
+          clearTimeout(chatbotFeedbackTimeout);
+        };
+
+        const failChatbotRequest = (status, consentBlocked = false) => {
+          if (!chatbotRequestActive) {
+            return;
+          }
+
+          chatbotUnavailable = true;
+          chatbotConsentBlocked = consentBlocked;
+          finishChatbotRequest();
+          sendUsageEvent("chatbot_campaign_error", {
+            chatbotCampaign: chatCampaign,
+            chatbotStatus: status,
+          });
+          openSalesFallback();
+        };
+
+        const injectGtm = () => {
+          if (gtmInjected) {
+            return;
+          }
+
+          gtmInjected = true;
+          window.cbGtmConsent = consentCategories;
+          reportGtmEvent("gtm.js", { "gtm.start": Date.now() });
+          const gtmScript = document.createElement("script");
+          gtmScript.async = true;
+          gtmScript.src =
+            "https://www.googletagmanager.com/gtm.js?id=GTM-MCH8573";
+          gtmScript.addEventListener("error", () => {
+            gtmUnavailable = true;
+            failChatbotRequest("error");
+          });
+          document.head.append(gtmScript);
+        };
+
+        const startQualifiedCampaign = () => {
+          if (
+            !chatbotRequestActive ||
+            !consentCategories ||
+            qualifiedRequested
+          ) {
+            return;
+          }
+
+          if (!consentCategories.functionality) {
+            failChatbotRequest("error", true);
+            return;
+          }
+
+          if (gtmUnavailable) {
+            failChatbotRequest("error");
+            return;
+          }
+
+          injectGtm();
+          qualifiedRequested = true;
+          reportGtmEvent("getHelp", { showHelpChat: false });
+        };
+
+        const getQualifiedIdentity = () => {
+          const fieldIds = [
+            "closing-sales-first-name",
+            "closing-sales-last-name",
+            "closing-sales-email",
+            "closing-sales-company",
+          ];
+          const fields = fieldIds.map(fieldId =>
+            document.getElementById(fieldId),
+          );
+          if (
+            fields.some(
+              field =>
+                !(field instanceof HTMLInputElement) ||
+                !field.value.trim() ||
+                !field.checkValidity(),
+            )
+          ) {
+            return;
+          }
+
+          return {
+            first_name: fields[0].value.trim(),
+            last_name: fields[1].value.trim(),
+            email: fields[2].value.trim(),
+            company: fields[3].value.trim(),
+          };
+        };
+
+        const identifyQualifiedVisitor = identity => {
+          if (!identity || typeof window.qualified !== "function") {
+            return;
+          }
+
+          try {
+            window.qualified("identify", identity);
+          } catch {}
+        };
+
+        window.addEventListener("chatbotReady", () => {
+          chatbotReady = true;
+          if (!chatbotRequestActive) {
+            return;
+          }
+
+          if (!consentCategories?.functionality) {
+            failChatbotRequest("error", true);
+            return;
+          }
+
+          const qualifiedIdentity = pendingQualifiedIdentity;
+          finishChatbotRequest();
+          setSalesStatus("");
+          identifyQualifiedVisitor(qualifiedIdentity);
+          reportGtmEvent("sidePanelState", { sidePanelState: "none" });
+          reportGtmEvent("startChatbotCampaign", {
+            chatbotCampaign: chatCampaign,
+          });
+        });
+
+        const requestSalesCampaign = salesControl => {
+          const statusScope =
+            salesControl instanceof HTMLFormElement
+              ? salesControl
+              : salesControl.closest("li");
+          activeSalesStatus = statusScope?.querySelector("[data-sales-status]");
+          activeSalesFallbackUrl =
+            salesControl instanceof HTMLAnchorElement
+              ? salesControl.href
+              : salesControl.action;
+          initializeAnalytics();
+          sendUsageEvent("chatbot_campaign_start", {
+            chatbotCampaign: salesControl.dataset.salesCampaign,
+          });
+
+          if (chatbotUnavailable) {
+            return false;
+          }
+
+          const qualifiedIdentity = getQualifiedIdentity();
+
+          if (consentCategories && !consentCategories.functionality) {
+            chatbotRequestActive = true;
+            failChatbotRequest("error", true);
+            return true;
+          }
+
+          if (chatbotReady) {
+            identifyQualifiedVisitor(qualifiedIdentity);
+            reportGtmEvent("sidePanelState", { sidePanelState: "none" });
+            reportGtmEvent("startChatbotCampaign", {
+              chatbotCampaign: chatCampaign,
+            });
+            return true;
+          }
+
+          if (!chatbotRequestActive) {
+            chatbotRequestActive = true;
+            pendingQualifiedIdentity = qualifiedIdentity;
+            chatbotFeedbackTimeout = setTimeout(
+              () =>
+                setSalesStatus("Give us a moment, our sales team is loading"),
+              chatbotFeedbackDelayMs,
+            );
+            chatbotTimeout = setTimeout(
+              () => failChatbotRequest("timeout"),
+              chatbotLoadTimeoutMs,
+            );
+            startQualifiedCampaign();
+          }
+
+          return true;
+        };
+
+        document.addEventListener("click", event => {
+          const target =
+            event.target instanceof Element ? event.target : undefined;
+          const preferenceControl = target?.closest(
+            "[data-open-cookie-preferences]",
+          );
+
+          if (preferenceControl instanceof HTMLButtonElement) {
+            openCookiePreferences();
+            return;
+          }
+
+          const salesLink = target?.closest("a[data-sales-campaign]");
+
+          if (
+            salesLink instanceof HTMLAnchorElement &&
+            requestSalesCampaign(salesLink)
+          ) {
+            event.preventDefault();
+          }
+        });
+
+        document.addEventListener("submit", event => {
+          const salesForm =
+            event.target instanceof HTMLFormElement &&
+            event.target.matches("form[data-sales-campaign]")
+              ? event.target
+              : undefined;
+
+          if (salesForm && requestSalesCampaign(salesForm)) {
+            event.preventDefault();
+          }
+        });
+
+        const interactionEvents = [
+          "keydown",
+          "pointerdown",
+          "pointermove",
+          "scroll",
+        ];
+        let analyticsInitialized = false;
+
+        const initializeAnalytics = () => {
+          if (analyticsInitialized) {
+            return;
+          }
+
+          analyticsInitialized = true;
+          interactionEvents.forEach(eventType => {
+            window.removeEventListener(eventType, initializeAnalytics, {
+              passive: true,
+            });
+          });
+
+          const endpoint = "/v4/cb/events/clientapp";
+          const instanceId = crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random()}`;
+
+          sendUsageEvent = (eventType, analyticsProperties) => {
+            const event = {
+              event_type: eventType,
+              user_agent: navigator.userAgent,
+              uri: location.href,
+              client_timestamp: new Date().toISOString(),
+            };
+
+            if (
+              analyticsProperties &&
+              Object.keys(analyticsProperties).length
+            ) {
+              event.analytics_properties = analyticsProperties;
+            }
+
+            void fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                "x-cb-client-app-instance-id": instanceId,
+              },
+              body: JSON.stringify({ events: [event] }),
+              credentials: "same-origin",
+              keepalive: true,
+            }).catch(() => undefined);
+          };
+
+          let documentReferrer = document.referrer;
+          try {
+            documentReferrer =
+              sessionStorage.getItem("cf_original_referrer") ||
+              documentReferrer;
+          } catch {
+            // Keep document.referrer when storage is unavailable.
+          }
+
+          sendUsageEvent(
+            "navigation",
+            documentReferrer
+              ? { document_referrer: documentReferrer }
+              : undefined,
+          );
+
+          document.addEventListener("click", event => {
+            const target =
+              event.target instanceof Element ? event.target : undefined;
+
+            const globalNavItem = target?.closest(
+              "[data-global-nav-type][data-global-nav-label]",
+            );
+
+            if (globalNavItem instanceof HTMLElement) {
+              sendUsageEvent("global_nav_click", {
+                type: globalNavItem.dataset.globalNavType,
+                label: globalNavItem.dataset.globalNavLabel,
+                version: "global_nav_2025",
+              });
+            }
+
+            const homepageCta = target?.closest("a[data-homepage-cta-action]");
+
+            if (homepageCta instanceof HTMLAnchorElement) {
+              sendUsageEvent("homepage_cta_click", {
+                action: homepageCta.dataset.homepageCtaAction,
+                label: homepageCta.textContent.trim(),
+                destination: homepageCta.getAttribute("href"),
+                trigger_location: "hero",
+              });
+            }
+
+            const link = target?.closest("a[data-upsell-trigger-location]");
+
+            if (!(link instanceof HTMLAnchorElement)) {
+              return;
+            }
+
+            sendUsageEvent("upsell_link", {
+              landing_page: new URL(link.href).pathname,
+              trigger_location: link.dataset.upsellTriggerLocation,
+            });
+          });
+        };
+
+        interactionEvents.forEach(eventType => {
+          window.addEventListener(eventType, initializeAnalytics, {
+            passive: true,
+          });
+        });
+      })();
+    </script>
+  <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a31536d84d34a229',t:'MTc4Nzc3MjI0MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

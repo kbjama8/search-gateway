@@ -475,7 +475,7 @@ class TestCamoufox:
         fake = types.ModuleType("camoufox")
 
         class FakeAsyncCamoufox:
-            kw: dict = {}
+            kw: dict = {}  # noqa: RUF012 — test holder
 
             def __init__(self, **kw):
                 FakeAsyncCamoufox.kw = kw

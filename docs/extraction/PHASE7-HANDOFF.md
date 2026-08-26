@@ -229,14 +229,14 @@ complete; suite + ruff + ≥85%; version `0.4.2` + CHANGELOG + docs.
 
 ## 7. Execution checklist (in order)
 
-- [ ] Fold Phase 7 research (§3 above) into LESSONS.md; close parking-lot R8/R13–R16
-- [ ] **0.4.1**: `egress.py` floor + tests → `vault.py` + migration + tests →
+- [x] Fold Phase 7 research (§3 above) into LESSONS.md; close parking-lot R8/R13–R16
+- [x] **0.4.1**: `egress.py` floor + tests → `vault.py` + migration + tests →
       stats reservoir + doctor sections + tests → config/.env.example/docs →
       version 0.4.1 + CHANGELOG → full verification → commit + push
-- [ ] **0.4.2**: `harden.py` + CLI + tests → EgressProxy + camoufox flags +
+- [x] **0.4.2**: `harden.py` + CLI + tests → EgressProxy + camoufox flags +
       tests → bench browser → systemd unit + deployment doc → config/docs →
       version 0.4.2 + CHANGELOG → full verification → commit + push
-- [ ] Update PLAN.md status board after each release; refresh crg graph;
+- [x] Update PLAN.md status board after each release; refresh crg graph;
       leave the working tree clean
 
 ## 8. Gotchas carried from the v0.4.0 build (see LESSONS.md §Changelog)

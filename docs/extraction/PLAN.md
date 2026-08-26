@@ -91,27 +91,27 @@ Each phase ships with acceptance criteria; no phase merges before its AC is
 green. Feature flags default OFF unless stated.
 
 ### Phase 0 — Ops hygiene
-- [ ] Kill stale `search-gateway` processes (3 found 2026-08-22); single
+- [x] Kill stale `search-gateway` processes (3 found 2026-08-22); single
   systemd-managed instance; PID lock in the unit.
-- [ ] `.env.example` + README: Redis `requirepass` note (B6 hardening).
-- [ ] Baseline: full fast suite + `bench.py search` numbers recorded here.
+- [x] `.env.example` + README: Redis `requirepass` note (B6 hardening).
+- [x] Baseline: full fast suite + `bench.py search` numbers recorded here.
 - **AC:** one gateway process under systemd; suite green; baseline recorded.
 
 ### Phase 1 — Extraction tiering
 `search_gateway/extract/router.py` + `scheduler.py`
-- [ ] `TierRouter`: A public-API (cost 1) / B CLI (cost 3) / C browser
+- [x] `TierRouter`: A public-API (cost 1) / B CLI (cost 3) / C browser
   (cost 10); extends `FALLBACK_CHAINS` semantics; cheapest-tier-first.
-- [ ] `scheduler`: per-profile locks + global browser budget replace
+- [x] `scheduler`: per-profile locks + global browser budget replace
   `OPENCLI_LOCK`; ±30% jitter in `ratelimit.wait_if_needed`.
-- [ ] Envelope: `extract: {tier, engine, profile?}`.
+- [x] Envelope: `extract: {tier, engine, profile?}`.
 - **AC:** `DEFAULT_SOURCES` behavior unchanged; scheduler unit tests
   (RedisStub); envelope field in contract test.
 
 ### Phase 2 — Profile farm & session manager
 `search_gateway/extract/profiles.py`
-- [ ] (platform × persona × purpose) registry; persistent `user-data-dir`
+- [x] (platform × persona × purpose) registry; persistent `user-data-dir`
   sessions survive restarts.
-- [ ] Health state machine `healthy → throttled → cooldown → quarantined`;
+- [x] Health state machine `healthy → throttled → cooldown → quarantined`;
   exponential-backoff cooldowns; profile-level reliability feeds weighted RRF
   via `(source, profile)` seam in `fusion.py`.
 - **AC:** profile manager unit tests; rotation logic tests; no default-fan-out
@@ -119,77 +119,77 @@ green. Feature flags default OFF unless stated.
 
 ### Phase 3 — Stealth layer (dual-path)
 `search_gateway/extract/fingerprints.py` + Camoufox adapter
-- [ ] Path 1: OpenCLI/Chromium authenticated tier (unchanged surface).
-- [ ] Path 2: Camoufox adapter (`Source`-contract), `SEARCH_GATEWAY_STEALTH`
+- [x] Path 1: OpenCLI/Chromium authenticated tier (unchanged surface).
+- [x] Path 2: Camoufox adapter (`Source`-contract), `SEARCH_GATEWAY_STEALTH`
   flag, experimental.
-- [ ] Fingerprint bundles: persona-derived JSON; coherence across all four
+- [x] Fingerprint bundles: persona-derived JSON; coherence across all four
   families; geo-alignment hook consumed by the proxy engine (Phase 3.5).
-- [ ] Migration track: `docs/extraction/camoufox-migration.md` (parity →
+- [x] Migration track: `docs/extraction/camoufox-migration.md` (parity →
   dual-run → per-platform cutover → OpenCLI retirement).
 - **AC:** adapter unit tests with mocked Camoufox import; bundle validation
   (schema + coherence lint) tests; migration doc present.
 
 ### Phase 3.5 — Proxy subsystem (env-gated, default OFF)
 `search_gateway/extract/proxies.py`
-- [ ] Provider-agnostic gateway interface; username-targeting grammar
+- [x] Provider-agnostic gateway interface; username-targeting grammar
   (`country/sid/ttl`), sticky-per-profile sessions, TTL-bound.
-- [ ] Geo-consistency engine: at sticky-IP provision, resolve egress geo →
+- [x] Geo-consistency engine: at sticky-IP provision, resolve egress geo →
   derive TZ/locale/language bundle → write into profile fingerprint bundle.
-- [ ] Per-IP health scoring → feeds profile health + rotation.
-- [ ] Config: `SEARCH_GATEWAY_PROXY_ENABLED=0` + provider/credentials/geo/
+- [x] Per-IP health scoring → feeds profile health + rotation.
+- [x] Config: `SEARCH_GATEWAY_PROXY_ENABLED=0` + provider/credentials/geo/
   sticky-TTL knobs. Secrets via `~/.agent-reach/` env files, never inline.
-- [ ] `docs/extraction/proxy-funding-guide.md`: provider table, cost model,
+- [x] `docs/extraction/proxy-funding-guide.md`: provider table, cost model,
   procurement checklist, setup walkthrough, gotchas.
 - **AC:** unit tests (provider mock); geo-bundle derivation tests; funding
   guide present; zero behavior change when disabled.
 
 ### Phase 4 — Block & challenge intelligence
 `search_gateway/extract/detectors.py`
-- [ ] Signature matchers: CF (`__cf_bm`, `cf_chl_*`, "Just a moment",
+- [x] Signature matchers: CF (`__cf_bm`, `cf_chl_*`, "Just a moment",
   Turnstile), DataDome, PerimeterX/HUMAN, Kasada (`x-kpsdk-*`), Akamai
   (`ak_bmsc`), Arkose, CN equivalents (Bilibili 风控, XHS 操作过于频繁,
   Zhihu 人机验证).
-- [ ] Classification ladder: transient / IP-level / account-level → act:
+- [x] Classification ladder: transient / IP-level / account-level → act:
   retry-once → throttle → rotate profile → rotate IP → quarantine +
   negative-cache → envelope.
-- [ ] Per-platform circuit breaker (≥N profiles blocked → stop for T).
-- [ ] `blocked:` + `auth:` envelope fields; captcha → skip + flag.
+- [x] Per-platform circuit breaker (≥N profiles blocked → stop for T).
+- [x] `blocked:` + `auth:` envelope fields; captcha → skip + flag.
 - **AC:** detector unit tests on fixture HTML/headers; ladder tests; envelope
   fields in contract test.
 
 ### Phase 5 — Parser intelligence
 `search_gateway/extract/parse.py` + `tests/fixtures/platforms/`
-- [ ] Multi-shape pipeline: JSON → JSON-LD → CSS → regex → gated LLM-assist
+- [x] Multi-shape pipeline: JSON → JSON-LD → CSS → regex → gated LLM-assist
   (validated), canonical `Result`/`meta` output.
-- [ ] Fixture vault: recorded 2026 samples per platform; hermetic parser
+- [x] Fixture vault: recorded 2026 samples per platform; hermetic parser
   regression tests.
-- [ ] `read_url` multi-stage: Jina (SPA) → Trafilatura (precision) →
+- [x] `read_url` multi-stage: Jina (SPA) → Trafilatura (precision) →
   readability-lxml (recall) → html2text; per-stage telemetry.
 - **AC:** fixture tests green; parser success-rate telemetry wired to stats.
 
 ### Phase 6 — CN expansion (D3 order)
-- [ ] bilibili wbi upgrade: dynamic key fetch + mixin table + w_rid/wts +
+- [x] bilibili wbi upgrade: dynamic key fetch + mixin table + w_rid/wts +
   buvid3 cookie; fixtures.
-- [ ] zhihu (new): web search API + hot list; cookies-gated.
-- [ ] weibo (new): m.weibo.cn ajax + hot search; config-gated.
-- [ ] baidu/toutiao hot lists (free public JSON, no auth).
-- [ ] Register all in `ALL_SOURCES`; `FALLBACK_CHAINS` entries; doctor probes;
+- [x] zhihu (new): web search API + hot list; cookies-gated.
+- [x] weibo (new): m.weibo.cn ajax + hot search; config-gated.
+- [x] baidu/toutiao hot lists (free public JSON, no auth).
+- [x] Register all in `ALL_SOURCES`; `FALLBACK_CHAINS` entries; doctor probes;
   negative-cache integration.
 - **AC:** 23 sources; contract test updated; per-source parser fixtures.
 
 ### Phase 7 — Containment & observability
-- [ ] Browser tier sandboxing: `NoNewPrivileges`, `PrivateTmp`, egress
+- [x] Browser tier sandboxing: `NoNewPrivileges`, `PrivateTmp`, egress
   blocked to Redis/SSH-agent/Docker-socket/metadata; per-profile network
   namespaces (systemd or firejail).
-- [ ] Per-profile secret vault under `~/.agent-reach/profiles/` (0600).
-- [ ] Block/health/tier telemetry → stats reservoir → `doctor` section;
+- [x] Per-profile secret vault under `~/.agent-reach/profiles/` (0600).
+- [x] Block/health/tier telemetry → stats reservoir → `doctor` section;
   `bench.py` browser-tier benchmarks.
 - **AC:** sandbox unit smoke; doctor shows new sections; bench output.
 
 ### Phase 8 — Verification & rollout
-- [ ] Contract tests: 23 sources, 14 tools (unchanged), envelope 0.4.
-- [ ] Hermetic + slow-marked live tests; full suite + ruff + coverage gate.
-- [ ] Docs: project-map, architecture, config-reference, CHANGELOG, api/tools;
+- [x] Contract tests: 23 sources, 14 tools (unchanged), envelope 0.4.
+- [x] Hermetic + slow-marked live tests; full suite + ruff + coverage gate.
+- [x] Docs: project-map, architecture, config-reference, CHANGELOG, api/tools;
   version bump `0.4.0`.
 - **AC:** `pytest -m "not slow"` green; ruff clean; coverage ≥85%; graph
   refreshed; CHANGELOG entry.
@@ -303,9 +303,9 @@ where the gateway is reachable; otherwise the agent-reach fallback channel):
 
 | Q | Owner | Note |
 |---|-------|------|
-| Stale-process cleanup mechanics: systemd unit ownership of the gateway | KBJ | unit exists in `infra/systemd/`; verify enablement |
-| Proxy pilot budget approval (if/when enabled) | KBJ | guide gives $10–30/mo realistic figure |
-| Camoufox cutover per-platform sign-off | KBJ | migration doc defines the go/no-go gates |
+| ~~Stale-process cleanup: systemd unit ownership~~ | KBJ | **RESOLVED 2026-08-25**: `search-gateway@8765` enabled + verified over HTTP |
+| Proxy pilot budget approval (if/when enabled) | KBJ | parked (PHASE8 Plans 4/8) — guide gives $10–30/mo realistic figure |
+| Camoufox cutover per-platform sign-off | KBJ | parked (PHASE8 Plan 9) — Stage 1 parity verified live; Stage 2 needs proxies |
 
 ## 11. Risks & mitigations
 

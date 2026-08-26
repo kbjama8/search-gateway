@@ -35,11 +35,14 @@ so an engine failure never leaves us starting from zero. Research:
 3. Coherence doctrine applies identically: proxy geo drives locale
    alignment regardless of engine.
 
-## Fixture vault
+## Fixture vault (DR-1)
 
-Recorded challenge pages (Cloudflare + DataDome fixtures for the detector
-regression suite) remain a DR-1 task — noted honestly: this matrix is
-research-grade, not fixture-grade, until DR-1 lands.
+Recorded challenge pages under `tests/fixtures/challenges/` (captured live
+2026-08-25): **Cloudflare** (crunchbase managed-challenge, indeed challenge
+page) and **DataDome** (g2.com — x-datadome: protected + datadome cookie
+behind both vendors). The detector suite is now fixture-driven for these;
+PerimeterX/Kasada/Akamai/Arkose live captures remain open (synthetic
+markers cover them in unit tests).
 
 Sources: proxycove.com stealth-browsers-2026 benchmark; dreamscrape
 camoufox-vs-playwright-stealth; LESSONS.md §1.1/§1.5.

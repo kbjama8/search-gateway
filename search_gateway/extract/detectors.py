@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 _CF_BODY_MARKERS = ("just a moment", "cf-chl", "cf_chl", "turnstile",
-                    "checking your browser")
+                    "checking your browser", "challenge-platform")
 _CN_MARKERS = {
     "bilibili": ("v_voucher", "风控校验", "访问异常"),
     "xhs": ("操作过于频繁", "请求过于频繁", "请稍后再试"),
@@ -40,33 +40,44 @@ def classify(status: int, headers: dict[str, str] | None,
              body: str | None) -> BlockSignal | None:
     """Classify a response; None when no challenge is detected."""
     hdrs = {k.lower(): v for k, v in (headers or {}).items()}
-    text = (body or "")[:4000]
+    # scan the FULL body — challenge markers land anywhere (DR-1 fixture:
+    # cloudflare_crunchbase carries challenge-platform at char ~127k);
+    # substring scans are linear and cheap
+    text = body or ""
     low = text.lower()
 
     # Official Cloudflare signal (verified primary doc, LESSONS.md §1.4).
     if hdrs.get("cf-mitigated") == "challenge":
         return BlockSignal("cloudflare", "transient", "cf-mitigated: challenge")
 
+    # Vendor-specific walls first — a page can carry CF cookies AND a
+    # DataDome/PerimeterX wall (verified live: g2.com sets __cf_bm + datadome);
+    # the specific wall is the actionable signal, so it wins over the CF
+    # cookie heuristic below (DR-1, 2026-08-25).
+    if (hdrs.get("x-datadome", "") == "protected"
+            or "datadome" in (hdrs.get("set-cookie", "") + " " + low)):
+        return BlockSignal("datadome", "ip", "datadome marker")
+
+    if "_pxcaptcha" in low or "_px" in hdrs.get("set-cookie", "") \
+            or "_px3" in hdrs.get("set-cookie", "") or "perimeterx" in low:
+        return BlockSignal("perimeterx", "transient", "perimeterx marker")
+
+    if any(k.startswith("x-kpsdk") for k in hdrs) or "kpsdk" in low:
+        return BlockSignal("kasada", "transient", "x-kpsdk marker")
+
+    if "ak_bmsc" in (hdrs.get("set-cookie", "") or "") \
+            or "_abck" in (hdrs.get("set-cookie", "") or ""):
+        return BlockSignal("akamai", "transient", "akamai bot-manager cookie")
+
+    if "arkoselabs" in low or "funcaptcha" in low or "arkose" in low \
+            or "x-algolia" in hdrs.get("set-cookie", ""):
+        return BlockSignal("arkose", "transient", "arkose marker")
+
+    # Cloudflare cookie/body heuristics (after the specific walls above).
     if "__cf_bm" in (hdrs.get("set-cookie", "") or "") or any(
             m in low for m in _CF_BODY_MARKERS):
         return BlockSignal("cloudflare", "transient",
                            "cf challenge marker (cookie/body)")
-
-    if "datadome" in (hdrs.get("set-cookie", "") + " " + low):
-        return BlockSignal("datadome", "ip", "datadome marker")
-
-    if "_pxcaptcha" in low or "_px" in hdrs.get("set-cookie", "") or \
-            "perimeterx" in low:
-        return BlockSignal("perimeterx", "transient", "perimeterx marker")
-
-    if any(k.startswith("x-kpsdk") for k in hdrs):
-        return BlockSignal("kasada", "transient", "x-kpsdk header")
-
-    if "ak_bmsc" in (hdrs.get("set-cookie", "") or ""):
-        return BlockSignal("akamai", "transient", "ak_bmsc cookie")
-
-    if "arkoselabs" in low or "x-algolia" in hdrs.get("set-cookie", ""):
-        return BlockSignal("arkose", "transient", "arkose marker")
 
     for vendor, markers in _CN_MARKERS.items():
         if any(m in text for m in markers):

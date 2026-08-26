@@ -430,7 +430,7 @@ Source: github.com/lexiforest/curl_cffi.
 | R6 | ~~Jina headers~~ → **DONE**: X-Target/Wait-Selector, X-With-Links-Summary, X-Proxy-Url (§4.2) | Phase 5 |
 | R7 | ~~curl_cffi~~ → **DONE**: impersonation + async + proxy rotation (§5.5) | Phase 3 |
 | R8 | ~~firejail vs systemd sandboxing for browser tier~~ → **DONE**: firejail REJECTED (suid + CVE history); systemd eBPF for the service + **nftables cgroupv2** for per-process egress (L3, §1.5) | Phase 7 |
-| R9 | ~~Cloudflare challenge markers~~ → **DONE**: `cf-mitigated: challenge` official header (§1.4); remaining: DataDome/Kasada/Akamai marker catalog — DR-1 fixture task | Phase 4 |
+| R9 | ~~Cloudflare challenge markers~~ → **DONE**: `cf-mitigated: challenge` official header (§1.4); **DR-1 markers catalog DONE** (2026-08-25): x-datadome/x-datadome-cid, challenge-platform body, _abck, _px3, funcaptcha + 3 real fixture captures (CF×2, DD×1) | Phase 4 |
 | R10 | IPRoyal/SOXA API specifics: geo grammar, sticky TTL caps, dashboard/API provisioning | Phase 3.5 |
 | R11 | ~~Zhihu hot-list JSON endpoint (public?)~~ → **DONE**: `api.zhihu.com/topstory/hot-list` anonymous, 30-item cap (PHASE8 §2.1); shipped as `zhihu_hot` (0.4.3) | Phase 6 |
 | R12 | ~~Baidu/Toutiao live verification~~ → **DONE**: toutiao fine; **baidu BROKEN** (tabTextList shape, no hotScore) → fixed with dual-shape parser + drift guard (0.4.3) | Phase 6 |
@@ -574,3 +574,15 @@ Source: github.com/lexiforest/curl_cffi.
   - **Empty-query crash** traced to the None-snippet bug (CN board runs);
   - Stale per-source/final caches repeatedly masked real behavior during the
     session — flush discipline: sg:s:<src>:* and sg:<category>:<src>:* keys.
+- **2026-08-25 (DR-1)** — challenge fixture vault + marker catalog landed:
+  - **Live captures**: crunchbase + indeed (Cloudflare managed challenges,
+    marker `challenge-platform` at char ~127k — the classify window was
+    capped at 4000 chars and MISSED real pages; now scans the full body) and
+    g2.com (DataDome `x-datadome: protected` + `datadome` cookie + `__cf_bm`
+    on the SAME response — vendor-specific walls must classify before the CF
+    cookie heuristic, or the DataDome wall is masked).
+  - New markers: `challenge-platform` (CF body), `x-datadome` header,
+    `kpsdk` body (Kasada), `_abck` (Akamai bot manager), `_px3`
+    (PerimeterX), `funcaptcha`/`arkose` body.
+  - PerimeterX/Kasada/Akamai/Arkose live captures remain open; synthetic
+    markers cover them in unit tests.

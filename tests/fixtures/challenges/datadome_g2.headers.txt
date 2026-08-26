@@ -1,0 +1,5 @@
+access-control-expose-headers: x-dd-b, x-set-cookie
+x-datadome: protected
+x-datadome-cid: AHrlqAAAAAMAsXHVRE1oQ5AAzb27Ew==
+set-cookie: datadome=OZeoafG7lEWeqpu0MgG~dAKe4GOO6NnkSMU2olrgtsF8lucMtiSetOu3A1V7tQoY6plOFe6iIxUV3rWt0Y~Zfq660pgQ~9He17yXfSCy75~6ZyT8LXA284erRbixvlpG; Max-Age=31536000; Domain=.g2.com; Path=/; Secure; SameSite=Lax
+set-cookie: __cf_bm=Hqo_B0csjyuFFXv1ccXGPUzNZe4T0.WkXHzDkt0lvbw-1787772222.9632602-1.0.1.1-tloX4vwhYDjlx4gWoxJu6iILlDHpev.fBQj4LGfwl7U19seTdotA76WoNhegoMP1j7G3wsXoyg7vpUmvP5mezbRgsJefjgltMSnhZMPVBsbRJqpTD72JKJRxS2u6eBna; HttpOnly; SameSite=None; Secure; Path=/; Domain=g2.com; Expires=Wed, 26 Aug 2026 19:53:43 GMT
