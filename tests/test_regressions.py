@@ -27,6 +27,7 @@ import asyncio
 import importlib
 import os
 import time
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -54,7 +55,8 @@ def test_filter_fresh_undated_result_appears_once():
 
 
 def test_filter_fresh_mixed_undated_and_dated():
-    fresh = _res("fresh", published="2026-08-20")
+    recent = (datetime.now(UTC) - timedelta(days=2)).strftime("%Y-%m-%d")
+    fresh = _res("fresh", published=recent)
     old = _res("old", published="2020-01-01")
     undated = _res("undated", published=None)
     out = _filter_fresh([fresh, old, undated], "week")

@@ -5,6 +5,7 @@ paths, server tool dispatches, llm/cache/dedup/diversity edges."""
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -70,8 +71,9 @@ def test_orchestrator_search_pipeline(monkeypatch, rds):
         assert "slow" in out3["pending"] or "slow" in out3["sources"]
 
         # per-source freshness + year + oa filters
+        recent = (datetime.now(UTC) - timedelta(days=2)).strftime("%Y-%m-%d")
         old = _mk("Old", "https://o.com/1", published="2020-01-01")
-        fresh = _mk("Fresh", "https://n.com/1", published="2026-08-20")
+        fresh = _mk("Fresh", "https://n.com/1", published=recent)
         undated = _mk("Undated", "https://u.com/1")
         f = FakeSource("f", [old, fresh, undated])
 
