@@ -159,20 +159,20 @@ kortex-search harden --status           # installed + covered state
 kortex-search harden --check            # browser-tier enforceability report
 ```
 
-`install` derives the ruleset path from a probe of the `sg-egress` transient
+`install` derives the ruleset path from a probe of the `ks-egress` transient
 scope (the one `run_opencli` wraps browser children into) — the gateway
 itself never sits under the strict cgroup, so its loopback (Redis/SearXNG)
 stays open. The kernel floor exempts loopback by design (the browser's own
 CDP/extension machinery + the L2 egress proxy live there) and absolutely
 blocks link-local/IMDS, RFC1918, CGNAT and v6 equivalents for scoped
 children. `run_opencli` wraps each browser child in
-`systemd-run --user --scope --unit=sg-egress` (serialized — keep
+`systemd-run --user --scope --unit=ks-egress` (serialized — keep
 `KORTEX_SEARCH_BROWSER_BUDGET=1` in ad-hoc scoped mode). For the Camoufox
 anonymous tier the *gateway itself* must run inside the scope (Camoufox
 spawns its own children):
 
 ```bash
-systemd-run --user --scope --unit=sg-egress -- kortex-search serve
+systemd-run --user --scope --unit=ks-egress -- kortex-search serve
 ```
 
 **systemd deployment**: the gateway unit keeps the full namespace sandbox
@@ -191,13 +191,13 @@ Plan 7, option B):
 ```bash
 sudo tee /etc/sudoers.d/kortex-search-nft > /dev/null <<'SUDOERS'
 Defaults:kbj !requiretty
-kbj ALL=(root) NOPASSWD: /usr/bin/nft -f /home/kbj/.config/kortex-search/sg-egress.nft
+kbj ALL=(root) NOPASSWD: /usr/bin/nft -f /home/kbj/.config/kortex-search/ks-egress.nft
 SUDOERS
 sudo chmod 440 /etc/sudoers.d/kortex-search-nft
 ```
 
 Without the drop-in, load the ruleset by hand after each boot (`sudo nft -f
-~/.config/kortex-search/sg-egress.nft`). Uninstall:
+~/.config/kortex-search/ks-egress.nft`). Uninstall:
 `kortex-search harden --uninstall`. Sandboxed CI that cannot run nft sets
 `KORTEX_SEARCH_HARDEN=permissive` — the explicit opt-out, not the default.
 

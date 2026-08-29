@@ -208,14 +208,14 @@ restart.
 1. Prepare: `kortex-search harden --install` (writes the ruleset for the
    current cgroup + pending state; idempotent).
 2. **Operator action (sudo password):** one copy-paste command —
-   `sudo nft -f ~/.config/kortex-search/sg-egress.nft` (exact command
+   `sudo nft -f ~/.config/kortex-search/ks-egress.nft` (exact command
    delivered at execution; never handled by the agent).
 3. Verify: `harden --status` → installed+covered; `harden --check` →
    enforceable; one browser-tier source query returns results (or the
    explicit refusal message pre-install).
 4. **Reboot persistence (engineered decision):** recommend the sudoers
    drop-in `kortex-search-nft` (NOPASSWD for exactly
-   `nft -f ~/.config/kortex-search/sg-egress.nft`) so the unit's
+   `nft -f ~/.config/kortex-search/ks-egress.nft`) so the unit's
    ExecStartPre auto-loads on every start — created as a documented snippet
    for the operator to place (root-owned file), OR option A (manual re-run
    after reboot) if the operator prefers zero sudoers edits. Decision

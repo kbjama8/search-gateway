@@ -95,7 +95,7 @@ Source: developers.cloudflare.com/cloudflare-challenges/challenge-types/challeng
   dispatches per-cgroup. No suid binary, no kernel module, works for ad-hoc
   processes (the browser children outlive our process; a kernel-level floor
   is the only thing that still sees them). **Implication:** L3 kernel filter
-  = nft table `inet sg_egress` + cgroupv2 scope. (Sources: identd-ng/
+  = nft table `inet ks_egress` + cgroupv2 scope. (Sources: identd-ng/
   pam_authnft ARCHITECTURE.txt; spinics.net nftables thread.)
 - **IMDS SSRF is a real incident class**: hermes-agent's browser hybrid
   routing bypassed its pre-nav guard for the whole `169.254.0.0/16` (link-
@@ -385,7 +385,7 @@ Source: r.jina.ai/docs.
 - `Source` ABC → `Result` contract; 4-step source addition; golden contract
   test — Phase 6 follows it verbatim.
 - Redis as shared state (cache/stats/ratelimit) with in-memory fallback —
-  profile health + proxy health use the same shape (`sg:ph:*`, `sg:px:*`).
+  profile health + proxy health use the same shape (`ks:ph:*`, `ks:px:*`).
 - Graceful degradation everywhere; envelope names the failure — Phase 4
   extends the same honesty to `blocked`/`auth`.
 - Subprocess env allowlist (`sources/base.py`) — the browser tier must get
@@ -481,11 +481,11 @@ Source: github.com/lexiforest/curl_cffi.
   (the hook tests polluted real Redis once before that discipline was added).
 - **2026-08-23 (0.4.2 build)** — L2 + L3 + bench + unit shipped (`8d1601e`):
   - **Empirical scoping fact**: `systemd-run --user --scope` places the scope
-    under `app.slice/sg-egress-<unit>.scope` (sibling of the caller's unit
+    under `app.slice/ks-egress-<unit>.scope` (sibling of the caller's unit
     path, NOT nested) — so `install()` must derive the rule path from
     `/proc/self/cgroup` at install time (run install inside the scope, or
     let the unit's `ExecStartPre` do it in the unit cgroup), and the
-    `run_opencli` wrapper must reuse the FIXED unit name `sg-egress` so the
+    `run_opencli` wrapper must reuse the FIXED unit name `ks-egress` so the
     paths agree. Serialized browser budget implied for ad-hoc scoped mode.
   - **CONNECT header hygiene**: a proxy must consume-and-discard the
     CONNECT request's remaining headers before replying 200 — leaking them
@@ -545,8 +545,23 @@ Source: github.com/lexiforest/curl_cffi.
   - **Test hygiene regression**: a CLI smoke test writing state to the REAL
     ~/.config/kortex-search/harden.json left a bogus installed_at (kernel
     had no table) — tests must patch STATE_PATH. Fixed.
+- **2026-08-29 (rename cutover completion)** — root block executed, floor
+  live end-to-end; two operational lessons:
+  - **`nft -f` APPENDS, it does not replace**: a manual `sudo nft -f
+    ks-egress.nft` minutes before the loader unit's own load duplicated every
+    rule in the live table (idempotent DROPs, so harmless — but dirty).
+    Discipline: never hand-load while the loader unit is about to run; to
+    clean a duplicated table, load a file that starts with
+    `delete table inet ks_egress` then re-apply the canonical ruleset (the
+    canonical file itself stays delete-free — on a fresh boot the table
+    doesn't exist and `delete` would fail the unit's ExecStart).
+  - **The sudoers drop-in is exact-match**: `/etc/sudoers.d/kortex-search-nft`
+    grants ONLY `nft -f /home/kbj/.config/kortex-search/ks-egress.nft` —
+    `nft list/delete/flush` remain password-gated by design (least privilege;
+    the agent can rewrite the ruleset file but only reload through that one
+    command).
   - **Service verified end-to-end**: 401 without token; MCP handshake over
-    HTTP (initialize -> session -> tools/list = 14 tools); sg_egress table
+    HTTP (initialize -> session -> tools/list = 14 tools); ks_egress table
     live in the kernel; loopback intact.
 - **2026-08-25 (live smoke tests, PHASE8)** — browser + CN + anonymous tiers
   exercised through the hardened service; four more real bugs caught:
@@ -573,7 +588,7 @@ Source: github.com/lexiforest/curl_cffi.
     kernel floor. KORTEX_SEARCH_STEALTH=1 is now set in the service env.
   - **Empty-query crash** traced to the None-snippet bug (CN board runs);
   - Stale per-source/final caches repeatedly masked real behavior during the
-    session — flush discipline: sg:s:<src>:* and sg:<category>:<src>:* keys.
+    session — flush discipline: ks:s:<src>:* and ks:<category>:<src>:* keys.
 - **2026-08-25 (DR-1)** — challenge fixture vault + marker catalog landed:
   - **Live captures**: crunchbase + indeed (Cloudflare managed challenges,
     marker `challenge-platform` at char ~127k — the classify window was

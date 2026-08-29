@@ -43,7 +43,7 @@ multi-stage (Jina→Trafilatura→readability), envelope `extract{}`/`blocked[]`
   SIGTERM when stdin is gone (needed SIGKILL). If the gateway MCP channel is
   down, research fallback = `mcporter call exa.web_search_exa query="…"` and
   `curl -s https://r.jina.ai/<url>` (both verified working this session).
-- **Redis keys `sg:bili:wbi:img` / `sg:bili:wbi:sub` were cleaned** at the end
+- **Redis keys `ks:bili:wbi:img` / `ks:bili:wbi:sub` were cleaned** at the end
   of the v0.4.0 session — do not expect cached wbi keys; the source refetches
   from the nav API on demand (that is the designed path).
 - `~/.agent-reach/` currently holds flat auth files (`twitter-auth.env`,
@@ -160,7 +160,7 @@ Target layout (persona from `KORTEX_SEARCH_PERSONA`, default `kaiser`):
 
 ### 5.3 Telemetry
 
-- `stats.py`: block-event reservoir `sg:bl:<source>:<vendor>` (bounded,
+- `stats.py`: block-event reservoir `ks:bl:<source>:<vendor>` (bounded,
   TTL 24h) + counters; `record_block(source, vendor, level)` called from
   `base._blocked_error`, `orchestrator._extract_signals`, egress denials;
   `snapshot()` gains `blocks`. Config `KORTEX_SEARCH_BLOCK_RESERVOIR=120`.
@@ -193,11 +193,11 @@ ruff + ≥85% coverage; version bump `0.4.1` + CHANGELOG + docs (config-ref
 ### 6.2 L3 kernel filter — `kortex_search/extract/harden.py` (new) + CLI `harden`
 
 - `build_rules(cgroup_path) -> str` **pure function** (golden-tested): nft
-  table `inet sg_egress`, `socket cgroupv2 level 2 "<path>"` verdict map →
+  table `inet ks_egress`, `socket cgroupv2 level 2 "<path>"` verdict map →
   DROP chains for all private/link-local v4+v6, ACCEPT else.
 - `install([--sudo])` idempotent: cgroup via `systemd-run --scope`, rules via
   `nft -f -`; refuses without `nft`/cgroupv2 (reports, never crashes).
-- `status()` read-only (`nft list table inet sg_egress` + cgroup existence);
+- `status()` read-only (`nft list table inet ks_egress` + cgroup existence);
   `uninstall()`.
 - **Enforcement (D7.1)**: browser-tier sources + anonymous engine check
   `harden.status()` before spawning; absent → `SourceError("blocked

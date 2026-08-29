@@ -65,7 +65,7 @@ normal fusion/re-rank pipeline, and diffs against the last snapshot.
 
 ## Notes
 
-- Saved queries are Redis keys (`sg:sq:*`); they survive until deleted (no TTL
+- Saved queries are Redis keys (`ks:sq:*`); they survive until deleted (no TTL
   by design — a recurring query is meant to persist).
 - Diffs are identity-based (canonical URL, then title fallback), matching the
   gateway's dedup identity.

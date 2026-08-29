@@ -105,7 +105,7 @@ IP → quarantine), never opportunistically.
 
 ## Operations notes
 
-- **Per-IP health** is tracked in Redis (`sg:px:*`): a sticky IP with falling
+- **Per-IP health** is tracked in Redis (`ks:px:*`): a sticky IP with falling
   reliability gets rotated before it burns the persona.
 - **Geo drift**: if the provider's egress country differs from
   `KORTEX_SEARCH_PROXY_COUNTRY`, the coherence lint (`doctor`) will flag it.
