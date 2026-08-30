@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-08-29
+
+"Rename bridge removal" — the 0.5.x `SEARCH_GATEWAY_*` fallback is gone.
+
+### Removed
+- **`SEARCH_GATEWAY_*` env fallback** (`config._read_env` legacy branch +
+  the once-per-variable deprecation warning). Only `KORTEX_SEARCH_*` is
+  read now. Stale env files, units, and shells still carrying the old
+  prefix silently lose those settings — migrate to the new prefix.
+
+### Fixed
+- **CI red since 0.4.2**: `test_vault_status` passed locally only by
+  accident (the machine's real vault files tripped the out-of-vault
+  hygiene finding); in CI's clean HOME the assertion flipped. The fixture
+  is now hermetic — VAULT_DIR points at a nonexistent path and
+  `_CONFIG_PATHS` is patched too, asserting the intended
+  "missing vault → warn" contract.
+- **Time-bomb freshness fixtures**: two tests hardcoded
+  `published=2026-08-20` against `freshness=week` and aged out of their
+  own window two days later; fixtures are now date-relative.
+- **Residual `sg-` doc stragglers** from the rename (deployment.md
+  sudoers heredoc pointed at the old ruleset filename — a broken drop-in
+  waiting to happen).
+
 ## [0.5.0] - 2026-08-26
 
 "Rename to Kortex Search" — product rebrand from Search Gateway.

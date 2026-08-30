@@ -1,40 +1,16 @@
 """Gateway configuration — env-overridable, machine-specific defaults."""
 
-import logging
 import os
 
 # v0.5.0 rename (Search Gateway -> Kortex Search): KORTEX_SEARCH_* is the
-# canonical env prefix; SEARCH_GATEWAY_* is still honored as a deprecated
-# fallback (removal scheduled for 0.6.0) so stale env files, systemd units,
-# and shells keep working through the cutover.
+# canonical env prefix. The SEARCH_GATEWAY_* fallback bridge was removed in
+# 0.6.0 — the old prefix is now ignored entirely.
 _PREFIX = "KORTEX_SEARCH_"
-_LEGACY_PREFIX = "SEARCH_GATEWAY_"
-_warned: set[str] = set()
-
-log = logging.getLogger("kortex_search.config")
-
-
-def _legacy_name(name: str) -> str | None:
-    if not name.startswith(_PREFIX):
-        return None
-    return _LEGACY_PREFIX + name[len(_PREFIX):]
 
 
 def _read_env(name: str) -> str | None:
-    """Primary + deprecated-fallback env read, warning once per variable."""
-    v = os.environ.get(name)
-    if v is not None:
-        return v
-    legacy = _legacy_name(name)
-    if legacy is not None and legacy in os.environ:
-        if legacy not in _warned:
-            _warned.add(legacy)
-            log.warning(
-                "deprecated env var %s is set — rename to %s (removal in 0.6.0)",
-                legacy, name,
-            )
-        return os.environ[legacy]
-    return None
+    """Read the canonical KORTEX_SEARCH_* env var."""
+    return os.environ.get(name)
 
 
 def _env(name: str, default: str) -> str:
