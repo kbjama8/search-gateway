@@ -19,12 +19,17 @@ class TestVaultCli:
 
     def test_vault_status(self, monkeypatch, tmp_path, capsys):
         from kortex_search.extract import vault
-        monkeypatch.setattr(vault, "VAULT_DIR", str(tmp_path))
+        monkeypatch.setattr(vault, "VAULT_DIR", str(tmp_path / "missing"))
+        monkeypatch.setattr(
+            vault, "_CONFIG_PATHS",
+            {k: str(tmp_path / "no-config" / f"{k}.env")
+             for k in ("twitter", "deepseek", "proxy")})
         monkeypatch.setattr("kortex_search.config.CREDENTIALS_DIR", "")
         assert _run(["vault", "status"]) == 0
         out = json.loads(capsys.readouterr().out)
         assert out["persona"] == "kaiser"
         assert out["hygiene"]["ok"] is False  # missing vault → warn
+        assert any(f["kind"] == "missing" for f in out["hygiene"]["findings"])
 
     def test_vault_migrate_dry_run(self, monkeypatch, tmp_path, capsys):
         from kortex_search.extract import vault
