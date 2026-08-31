@@ -278,6 +278,31 @@ class TestFlakyRedis:
         assert stats.latency_percentiles("x") == {"p50_s": 0.0, "p95_s": 0.0,
                                                   "samples": 0}
 
+    def test_poisoned_stats_reservoir_cannot_hang_search(self, monkeypatch, rds):
+        # bug-sweep 2026-08-31: nan/inf latencies in the reservoir flowed
+        # into _adaptive_timeout → wait_for(nan) (undefined/hang). Poisoned
+        # percentiles must fall back to the static timeout; search stays
+        # bounded and honest.
+        from kortex_search import stats
+
+        rds.rpush("ks:stats:chaos:lat", "nan")
+        rds.rpush("ks:stats:chaos:lat", "inf")
+        rds.rpush("ks:stats:chaos:lat", "-inf")
+        rds.rpush("ks:stats:chaos:lat", "junk")
+        _bind(monkeypatch, rds)
+        _chaos_harness(monkeypatch, [ChaosSource()])
+
+        p = stats.latency_percentiles("chaos")
+        assert p["p95_s"] == 0.0  # poisoned reservoir reads as unknown
+
+        async def run():
+            return await orch.search("poison", ["chaos"], category="general",
+                                     limit=3)
+
+        out = asyncio.run(run())
+        _assert_envelope_honest(out, 3, ["chaos"])
+        assert out["count"] == 3
+
 
 class TestConcurrency:
     """The pipeline must stay correct under pressure."""

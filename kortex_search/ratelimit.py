@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 
 import redis
@@ -83,10 +84,11 @@ async def wait_if_needed(source: str, min_interval: float) -> None:
                 remaining = float(prev) + min_interval - time.monotonic()
             except (TypeError, ValueError):
                 remaining = 0.0
-            if remaining <= 0:
-                # the holder's slot is stale (holder died / interval elapsed):
-                # delete and re-claim — the last claim always wins, so pacing
-                # is measured from the newest timestamp, never shorter
+            if not math.isfinite(remaining) or remaining <= 0:
+                # the holder's slot is stale (holder died / interval elapsed)
+                # OR the value is garbage (nan/inf — cache poisoning, chaos
+                # suite): delete and re-claim — the last claim always wins, so
+                # pacing is measured from the newest timestamp, never shorter
                 c.delete(key)
                 continue
             # capped sleeps so cancellation/callers stay responsive

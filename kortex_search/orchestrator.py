@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import datetime as dt
 import logging
+import math
 import re
 import time
 from typing import Any
@@ -185,11 +186,15 @@ async def _expand_query(query: str) -> list[str]:
 
 
 def _adaptive_timeout(name: str, fallback: float = PER_SOURCE_TIMEOUT) -> float:
-    """min(p95(source) x factor, cap) with a floor; fallback when unknown."""
+    """min(p95(source) x factor, cap) with a floor; fallback when unknown.
+
+    Non-finite percentiles (poisoned reservoir) fall back too — a nan
+    timeout would flow into wait_for/sleep with undefined behavior.
+    """
     if not ADAPTIVE_TIMEOUT:
         return fallback
     p95 = stats.latency_percentiles(name).get("p95_s", 0.0)
-    if p95 <= 0:
+    if not math.isfinite(p95) or p95 <= 0:
         return fallback
     return max(ADAPTIVE_TIMEOUT_MIN, min(p95 * ADAPTIVE_TIMEOUT_FACTOR,
                                          ADAPTIVE_TIMEOUT_MAX))

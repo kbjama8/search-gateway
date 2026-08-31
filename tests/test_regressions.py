@@ -139,6 +139,21 @@ async def test_ratelimit_redis_gate_records_timestamp(rds):
     assert abs(float(raw) - time.monotonic()) < 2.0
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("poison", ["nan", "inf", "-inf", "junk"])
+async def test_ratelimit_poisoned_slot_reclaimed_not_hung(rds, poison):
+    # bug-sweep 2026-08-31: float("nan") passes the ValueError guard and
+    # min(nan, 2.0) == nan → asyncio.sleep(nan) (hang/undefined); inf
+    # soft-locks the 2s-capped loop until TTL. Poisoned slots must be
+    # treated as stale and reclaimed — bounded time, no hang.
+    rds.set("ks:rl:poisoned", poison)
+    t0 = time.monotonic()
+    await asyncio.wait_for(
+        ratelimit.wait_if_needed("poisoned", 0.1), timeout=5.0)
+    assert time.monotonic() - t0 < 4.0
+    assert rds.get("ks:rl:poisoned") is not None  # re-claimed fresh
+
+
 # --------------------------------------------------------------------------
 # I1 — run_cmd retries only transient exit codes
 # --------------------------------------------------------------------------

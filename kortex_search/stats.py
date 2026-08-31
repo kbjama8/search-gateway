@@ -10,6 +10,7 @@ bounded. Latency is tracked as a running mean.
 from __future__ import annotations
 
 import logging
+import math
 import time
 
 import redis
@@ -127,9 +128,11 @@ def latency_percentiles(source: str) -> dict:
         vals = []
         for v in raw:
             try:
-                vals.append(float(v))
-            except ValueError:
+                f = float(v)
+            except (TypeError, ValueError):
                 continue
+            if math.isfinite(f):
+                vals.append(f)
         p50, p95 = _percentiles(vals, 50, 95)
         return {"p50_s": p50, "p95_s": p95, "samples": len(vals)}
     except redis.RedisError as exc:
