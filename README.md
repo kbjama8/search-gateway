@@ -336,7 +336,8 @@ binaries and env vars it needs. Adding source #23 is a bounded, four-step
 change documented in `docs/architecture.md`'s source-adapter contract.
 The v0.4 extraction layer (`kortex_search/extract/`) adds tiered routing,
 block detection, a browser profile farm, an env-gated proxy subsystem, and
-multi-stage `read_url` — see `docs/extraction/PLAN.md`. Since 0.4.1 it also
+multi-stage `read_url` — see `docs/extraction/LESSONS.md` (v0.4 build
+lessons). Since 0.4.1 it also
 carries the containment floor: an L1 egress filter (private/link-local/
 metadata ranges, checked pre-nav and post-redirect), a per-persona secrets
 vault (`kortex-search vault migrate|status`), and block-event telemetry in
@@ -391,10 +392,9 @@ history, not rewritten here.
 | Doc | Covers |
 |-----|--------|
 | `docs/project-map.md` | whole-repo navigational map — vision & goals, layout, module map, sources, tools, reliability, tests, skills, ADRs |
-| `docs/extraction/PLAN.md` | the v0.4 extraction overhaul — assignment, phases, decisions, status board |
 | `docs/extraction/LESSONS.md` | running research journal — anti-bot field state, proxy economics, platform playbooks |
 | `docs/extraction/proxy-funding-guide.md` | funding + provisioning the optional proxy tier |
-| `docs/extraction/camoufox-migration.md` | the staged OpenCLI → Camoufox migration track |
+| `docs/extraction/stealth-matrix.md` | nodriver vs Patchright vs Camoufox capability matrix + adoption triggers |
 | `docs/architecture.md` | pipeline, request lifecycle, reliability model, source-adapter contract, decoupling boundary, design decisions, versioning |
 | `docs/api/tools.md` | canonical 14-tool surface — args, returns, worked examples, error semantics |
 | `docs/meta-schema.md` | `Result.meta` contract + one example per `source_type` |
@@ -406,7 +406,6 @@ history, not rewritten here.
 | `docs/adrs/` | six short ADRs — the standing design decisions, linked from `architecture.md` |
 | `docs/voice.md` | the writing voice used across this documentation |
 | `CONTRIBUTING.md` | setup, tests, lint, adding a source, release notes |
-| `docs/history/` | project archaeology (DECOUPLING_PLAN, TODO, tasks) — read-only, not part of this rewrite |
 
 ## License
 

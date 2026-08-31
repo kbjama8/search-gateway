@@ -51,7 +51,7 @@ system would rather name its failure than look like it succeeded:
 **Autonomy is architecture.** No client is the source of truth — the
 conformance check is the protocol handshake, so the server never knows any
 client exists (`docs/adrs/0001-stdio-first.md`). Zero paid APIs: the
-backbone owes no vendor (`docs/history/tasks/todo.md:36`). Upstream drift
+backbone owes no vendor. Upstream drift
 is a decision, not an accident — model weights are pinned to commit SHAs so
 nothing changes on this machine unless the operator changes it
 (`config.py:67-75`, ADR 0005). The burner persona never touches the
@@ -92,7 +92,7 @@ concrete — the project's ethics as implemented, not aspirational:
 | Degrade explicitly, never silently | `orchestrator.py` envelope (`sources`, `partial`, `pending`) |
 | No client is the source of truth | `docs/adrs/0001-stdio-first.md` |
 | Verified, or not yet validated — never hopeful | `docs/voice.md`; `docs/faq.md` |
-| Zero paid keys; the backbone owes no vendor | `docs/history/tasks/todo.md:36`; free sources only |
+| Zero paid keys; the backbone owes no vendor | free sources only |
 | Upstream drift is a decision, not an accident | ADR 0005; `config.py` `*_REVISION` |
 | An unsearched contradiction is a red flag | `skills/deep-research/SKILL.md` red-team pass |
 | The burner never touches your accounts | `ratelimit.py`; auth files under `~/.agent-reach/` |

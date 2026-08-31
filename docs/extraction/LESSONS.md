@@ -441,6 +441,26 @@ Source: github.com/lexiforest/curl_cffi.
 
 ---
 
+## Locked decisions (KBJ, 2026-08-22 → 2026-08-23; do not re-litigate)
+
+Preserved here after the executed plan/handoff docs were retired (2026-08-30
+docs cleanup). D7.x are also summarized in the 0.4.1/0.4.2 CHANGELOG entries.
+
+| ID | Decision |
+|----|----------|
+| D1 | Proxies: **env-gated optional tier** — architect fully, ship disabled; funding guide provided. |
+| D2 | Browser engine: **dual-path now** (OpenCLI/Chromium = authenticated sessions; Camoufox = anonymous tier, experimental opt-in) + full Camoufox migration plan documented. |
+| D3 | CN source order: **bilibili wbi upgrade → zhihu → weibo**; baidu/toutiao hot lists ride along as free JSON wins; douyin deferred (x-gorgon signing). |
+| D4 | Contract: **minor bump 0.4.0** — envelope gains `extract`/`blocked`/`auth`; 18 → 23 sources. |
+| D5 | Stealth posture: **consistency-first, modest randomization.** |
+| D6 | Proxy funding follow-up: recommendation **IPRoyal PAYG for pilot → SOAX for the farm**. |
+| D7.1 | L3 kernel filter is **mandatory-by-default** (`KORTEX_SEARCH_HARDEN=required`); browser-tier ops refuse with `blocked (egress-unhardened)` until installed. |
+| D7.2 | L2 forced-proxy for the **anonymous tier only**; every target re-passes the floor. |
+| D7.3 | Per-persona secrets vault at `~/.agent-reach/profiles/<persona>/` (0600); legacy flat paths removed in 0.4.3. |
+| D7.4 | Block-event telemetry: bounded 24h reservoir `ks:bl:<source>:<vendor>` from the raise site + envelope chokepoint. |
+
+---
+
 ## Changelog
 
 - **2026-08-22** — Journal opened. Recorded: anti-bot/stealth field state (§1),

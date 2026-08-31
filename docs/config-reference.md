@@ -266,7 +266,7 @@ files and never writes to it. A missing directory or a malformed
 
 *Everything the extraction overhaul added. Risky capabilities ship disabled;
 the gateway's behavior is unchanged when the flags below sit at their
-defaults. Full rationale: `docs/extraction/PLAN.md`.*
+defaults. Full rationale: `docs/extraction/LESSONS.md`.*
 
 ### Browser budget & pacing
 
@@ -289,7 +289,7 @@ defaults. Full rationale: `docs/extraction/PLAN.md`.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `KORTEX_SEARCH_STEALTH` | `0` | enable the Camoufox anonymous tier (`docs/extraction/camoufox-migration.md`) |
+| `KORTEX_SEARCH_STEALTH` | `0` | enable the Camoufox anonymous tier (`docs/extraction/stealth-matrix.md`) |
 | `KORTEX_SEARCH_STEALTH_PROFILE` | `""` | pinned Camoufox fingerprint preset (empty = random browserforge) |
 | `KORTEX_SEARCH_IMPERSONATE` | `0` | curl_cffi TLS/JA3 impersonation for bilibili/zhihu/weibo HTTP |
 
@@ -333,8 +333,8 @@ The CN tier's anonymous members: **baidu** + **toutiao** hot boards and
 ### Containment & observability (v0.4.1+, Phase 7)
 
 *The always-blocked network floor, the L2/L3 egress layers, the secrets
-vault, and block telemetry. Full rationale: `docs/extraction/PHASE7-HANDOFF.md`
-+ `docs/security.md`.*
+vault, and block telemetry. Full rationale: `docs/security.md` + the
+D7.x decisions in `docs/extraction/LESSONS.md`.*
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
