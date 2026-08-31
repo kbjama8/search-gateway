@@ -31,7 +31,11 @@ After=network.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=/usr/bin/nft -c -f /etc/kortex-search/ks-egress.nft
-ExecStart=/usr/bin/nft -f /etc/kortex-search/ks-egress.nft
+# Idempotent load: `nft -f` APPENDS to a live table, so a reload/restart
+# would duplicate every rule. Delete first (silently fine when absent —
+# first boot) then apply; the `;` makes the load's exit code the result
+# either way.
+ExecStart=/bin/sh -c '/usr/bin/nft delete table inet ks_egress 2>/dev/null; /usr/bin/nft -f /etc/kortex-search/ks-egress.nft'
 ProtectSystem=full
 ProtectHome=yes
 PrivateTmp=yes
