@@ -109,13 +109,18 @@ def blocks_snapshot() -> dict:
 
 
 def _percentiles(values: list[float], *ps: float) -> list[float]:
-    """Nearest-rank percentiles of a sorted list (empty → 0.0)."""
+    """Nearest-rank percentiles of a sorted list (empty → 0.0).
+
+    Rank index = ceil(P/100 * N) - 1 (the standard nearest-rank definition;
+    a floor here under-picks the high percentiles for non-integer products —
+    sweep 2026-08-31).
+    """
     if not values:
         return [0.0 for _ in ps]
     vals = sorted(values)
     out = []
     for p in ps:
-        idx = max(0, min(len(vals) - 1, int(p / 100 * len(vals)) - 1))
+        idx = max(0, min(len(vals) - 1, math.ceil(p / 100 * len(vals)) - 1))
         out.append(round(vals[idx], 3))
     return out
 

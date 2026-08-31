@@ -85,6 +85,19 @@ def test_parse_date_variants():
     assert _parse_date("not a date") is None
 
 
+def test_parse_date_t_format_preserves_seconds():
+    # sweep 2026-08-31: the ISO-T slice used len(fmt) (18) instead of the
+    # sample length (19) — the last seconds digit was truncated, so
+    # 'T12:30:59' parsed as 12:30:05. Pin the value, not just non-None.
+    import datetime as dt
+    assert _parse_date("2026-08-20T12:30:59") == dt.datetime(  # noqa: DTZ001 — naive parser contract
+        2026, 8, 20, 12, 30, 59)
+    assert _parse_date("2026-08-20T12:30:00Z") == dt.datetime(  # noqa: DTZ001
+        2026, 8, 20, 12, 30, 0)
+    assert _parse_date("2026-08-20 23:59:59") == dt.datetime(  # noqa: DTZ001
+        2026, 8, 20, 23, 59, 59)
+
+
 # --------------------------------------------------------------------------
 # C2 — source cache key must include limit
 # --------------------------------------------------------------------------
@@ -645,7 +658,7 @@ def test_stats_percentiles(rds):
     p = stats.latency_percentiles("searxng")
     assert p["samples"] == 10
     assert 0.5 <= p["p50_s"] <= 0.6  # nearest-rank p50 of 0.1..1.0
-    assert 0.9 <= p["p95_s"] <= 1.0  # nearest-rank p95 → index 8 of 10
+    assert 0.9 <= p["p95_s"] <= 1.0  # nearest-rank p95 → index 9 of 10 (ceil)
     snap = stats.snapshot()
     assert "p95_s" in snap["searxng"]
 

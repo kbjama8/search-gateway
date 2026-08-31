@@ -90,7 +90,10 @@ _FRESHNESS_DAYS = {"day": 1, "week": 7, "month": 30, "year": 365}
 _DATE_PATTERNS = [
     (re.compile(r"(\d{4})-(\d{2})-(\d{2})"), "%Y-%m-%d"),
     (re.compile(r"\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2} [+-]\d{4} (\d{4})"), "%Y"),
-    (re.compile(r"(\d{4})(\d{2})(\d{2})"), "%Y%m%d"),
+    # anchored: compact dates are exactly 8 digits — an epoch-millis string
+    # (13 digits) must NOT match (sweep 2026-08-31: '8796090100000' parsed
+    # as year 8796; epoch strings are deliberately unparseable per I10)
+    (re.compile(r"^(\d{4})(\d{2})(\d{2})$"), "%Y%m%d"),
 ]
 
 
@@ -99,8 +102,13 @@ def _parse_date(s: str) -> dt.datetime | None:
         return None
     s = str(s).strip()
     for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):  # ISO first
+        # slice by the SAMPLE length, not len(fmt): the %-directives are
+        # longer than the text they match ("%Y" vs "2000") — slicing by
+        # len(fmt) truncated the last seconds digit (sweep 2026-08-31:
+        # 'T00:00:59' parsed as 5 seconds).
+        sample_len = len(dt.datetime(2000, 1, 1, 0, 0, 0).strftime(fmt))  # noqa: DTZ001 — sample text, not a real instant
         try:
-            return dt.datetime.strptime(s[: len(fmt)], fmt)  # noqa: DTZ007 — naive by design; callers normalize tz
+            return dt.datetime.strptime(s[:sample_len], fmt)  # noqa: DTZ007 — naive by design; callers normalize tz
         except ValueError:
             continue
     for pat, _ in _DATE_PATTERNS:
@@ -110,9 +118,16 @@ def _parse_date(s: str) -> dt.datetime | None:
             try:
                 if len(groups) == 1:
                     return dt.datetime(int(groups[0]), 1, 1)  # noqa: DTZ001 — naive; callers normalize tz
-                return dt.datetime(*[int(g) for g in groups])  # noqa: DTZ001 — naive; callers normalize tz
+                parsed = dt.datetime(*[int(g) for g in groups])  # noqa: DTZ001 — naive; callers normalize tz
             except (ValueError, TypeError):
                 return None
+            # compact dates must look like plausible published dates — an
+            # 8-digit epoch-seconds value (e.g. '38300701' ≈ 1971-03) must
+            # read as unparseable (I10), not as year 3830 "fresh"
+            # (sweep 2026-08-31)
+            if not 1970 <= parsed.year <= 2100:
+                return None
+            return parsed
     return None
 
 

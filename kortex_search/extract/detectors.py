@@ -38,12 +38,18 @@ class BlockSignal:
 
 def classify(status: int, headers: dict[str, str] | None,
              body: str | None) -> BlockSignal | None:
-    """Classify a response; None when no challenge is detected."""
-    hdrs = {k.lower(): v for k, v in (headers or {}).items()}
+    """Classify a response; None when no challenge is detected.
+
+    Never raises: a non-string body (a hostile adapter passing a parsed
+    object) reads as no-body — marker scans need text, and the headers
+    still carry the authoritative signals.
+    """
+    hdrs = {k.lower(): v for k, v in (headers or {}).items()
+            if isinstance(k, str) and isinstance(v, str)}
     # scan the FULL body — challenge markers land anywhere (DR-1 fixture:
     # cloudflare_crunchbase carries challenge-platform at char ~127k);
     # substring scans are linear and cheap
-    text = body or ""
+    text = body if isinstance(body, str) else ""
     low = text.lower()
 
     # Official Cloudflare signal (verified primary doc, LESSONS.md §1.4).
