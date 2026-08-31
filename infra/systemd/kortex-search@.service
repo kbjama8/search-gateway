@@ -45,10 +45,11 @@ Environment=KORTEX_SEARCH_LOG_FMT=json
 # for manual/system deployments that do not need the in-unit sudo load).
 # Pre-flight gates. The L3 ruleset is NOT loaded here (live-verified
 # 2026-08-25: the namespace sandbox runs this unit in a user namespace where
-# sudo cannot setuid) — the companion unit kortex-search-harden.service owns
-# the privileged load; this unit only verifies + reports state.
+# sudo cannot setuid) — the ROOT unit ks-egress.service owns the privileged
+# load from the root-owned /etc/kortex-search/ks-egress.nft (sweep
+# 2026-08-31); this unit only verifies + reports state.
 ExecStartPre=%h/.local/bin/kortex-search check
-# non-fatal: reports state; the loader unit performs the install
+# non-fatal: reports state; the root loader unit performs the install
 ExecStartPre=-%h/.local/bin/kortex-search harden --status
 ExecStart=%h/.local/bin/kortex-search serve --transport http --host 127.0.0.1 --port %i
 Restart=on-failure

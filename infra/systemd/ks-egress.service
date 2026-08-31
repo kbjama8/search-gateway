@@ -1,0 +1,41 @@
+# Kortex Search — L3 egress-filter ruleset loader (ROOT system unit).
+#
+# Design (sweep 2026-08-31, security): the nftables ruleset for the browser
+# children lives at /etc/kortex-search/ks-egress.nft — ROOT-owned, outside
+# the home dir — and THIS unit loads it at boot. The previous design granted
+# kbj NOPASSWD `nft -f` on a user-writable ruleset file: any kbj-uid process
+# (including the browser automation itself) could rewrite the file and have
+# root parse it into the nf_tables kernel surface (CVE-2023-32233 class).
+# The user-side generation artifact (~/.config/kortex-search/ks-egress.nft)
+# is data only; the operator copies it here with interactive sudo at setup.
+#
+# Rules are validated (nft -c) BEFORE they are applied, and the ruleset is
+# the only file the unit touches (ProtectSystem=full is compatible — nft
+# only needs netlink).
+#
+# One-time setup (see docs/deployment.md §3.2):
+#   kortex-search harden --install --for kortex-search@8765.service
+#   sudo install -d -m0755 /etc/kortex-search
+#   sudo install -m0644 ~/.config/kortex-search/ks-egress.nft /etc/kortex-search/
+#   sudo cp infra/systemd/ks-egress.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ks-egress.service
+#   kortex-search harden --mark-installed
+#   sudo rm /etc/sudoers.d/kortex-search-nft          # remove the seam
+#   systemctl --user disable --now kortex-search-harden.service   # legacy
+#
+[Unit]
+Description=Kortex Search L3 egress-filter ruleset loader
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/bin/nft -c -f /etc/kortex-search/ks-egress.nft
+ExecStart=/usr/bin/nft -f /etc/kortex-search/ks-egress.nft
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

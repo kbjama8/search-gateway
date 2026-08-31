@@ -177,27 +177,30 @@ systemd-run --user --scope --unit=ks-egress -- kortex-search serve
 
 **systemd deployment**: the gateway unit keeps the full namespace sandbox
 (ProtectSystem=strict etc.) and only *verifies* state (`harden --status`,
-non-fatal). The privileged load lives in the **companion loader unit**
-`kortex-search-harden.service` — a deliberately NON-sandboxed unit (the
-sandbox runs --user units in a user namespace where sudo cannot setuid,
-live-verified 2026-08-25) that runs `After=` the gateway, installs the
-ruleset for the gateway unit's cgroup (`harden --install --for
-kortex-search@8765.service` — children inherit that cgroup, no transient
-scope needed), loads it via the sudoers drop-in, and records the receipt.
-Because nft rules are volatile (they do NOT survive reboot), the loader
-makes the floor survive reboots — create the sudoers drop-in once (PHASE8
-Plan 7, option B):
+non-fatal). The privileged load lives in a **root systemd unit**
+(`ks-egress.service`) that applies a **root-owned** ruleset copy from
+`/etc/kortex-search/ks-egress.nft`. The gateway's `~/.config/kortex-search/`
+ruleset file is a generation artifact only — it must never sit in a root
+load path (a NOPASSWD grant on a user-writable ruleset would let any
+kbj-uid process — including the browser automation — inject rules into the
+nf_tables kernel surface; the old sudoers-drop-in design was retired for
+this reason). One-time setup:
 
 ```bash
-sudo tee /etc/sudoers.d/kortex-search-nft > /dev/null <<'SUDOERS'
-Defaults:kbj !requiretty
-kbj ALL=(root) NOPASSWD: /usr/bin/nft -f /home/kbj/.config/kortex-search/ks-egress.nft
-SUDOERS
-sudo chmod 440 /etc/sudoers.d/kortex-search-nft
+kortex-search harden --install --for kortex-search@8765.service   # write rules + state
+sudo install -d -m0755 /etc/kortex-search
+sudo install -m0644 ~/.config/kortex-search/ks-egress.nft /etc/kortex-search/
+sudo cp infra/systemd/ks-egress.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ks-egress.service   # nft -c validates, then applies
+kortex-search harden --mark-installed           # the receipt `status` reads
 ```
 
-Without the drop-in, load the ruleset by hand after each boot (`sudo nft -f
-~/.config/kortex-search/ks-egress.nft`). Uninstall:
+nft rules are volatile (they do NOT survive reboot) — the root unit is what
+makes the floor survive reboots. If the gateway unit's name/port changes,
+re-run the generation + copy steps (the ruleset targets that unit's cgroup).
+Uninstall: `sudo systemctl disable --now ks-egress.service`,
+`sudo rm /etc/kortex-search/ks-egress.nft`,
 `kortex-search harden --uninstall`. Sandboxed CI that cannot run nft sets
 `KORTEX_SEARCH_HARDEN=permissive` — the explicit opt-out, not the default.
 

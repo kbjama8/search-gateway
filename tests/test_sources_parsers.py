@@ -931,3 +931,89 @@ async def test_cn_sources_disabled_by_default():
     for src in (bd.BaiduSource(), zh.ZhihuHotSource(), tt.ToutiaoSource()):
         with pytest.raises(SourceError, match="disabled"):
             await src.search("x")
+
+
+# --------------------------------------------------------------------------
+# read_url SSRF hardening (sweep 2026-08-31): encoded jina targets +
+# per-hop redirect guards
+# --------------------------------------------------------------------------
+
+class TestReadUrlHardening:
+    def test_jina_url_percent_encodes_target(self):
+        from kortex_search.sources.web import _jina_url
+        out = _jina_url("https://example.com/a?b=1#frag")
+        # no delimiter smuggling: the target is one encoded path segment —
+        # no raw '://', '?', '#' or '//' inside our request path
+        assert out.startswith("https://r.jina.ai/")
+        path = out.removeprefix("https://r.jina.ai/")
+        assert "://" not in path and "?" not in path and "#" not in path
+        assert path == "https%3A%2F%2Fexample.com%2Fa%3Fb%3D1%23frag"
+
+    def test_jina_url_smuggling_payloads_are_neutralized(self):
+        from kortex_search.sources.web import _jina_url
+        for payload in ("//169.254.169.254/latest/meta-data",
+                        "https://x.com@169.254.169.254/",
+                        "http://127.0.0.1:6379/",
+                        "..%2F..%2Fetc"):
+            out = _jina_url(payload)
+            path = out.removeprefix("https://r.jina.ai/")
+            # always a single path segment: no unencoded '/' allowed
+            assert "/" not in path
+
+    def test_hop_guard_blocks_private_redirect_target(self, monkeypatch):
+        from kortex_search.extract.egress import EgressBlocked
+        from kortex_search.sources import web
+
+        class FakeURL:
+            def __init__(self, raw):
+                self._u = raw
+                self.scheme = raw.split(":")[0]
+
+            def __str__(self):
+                return self._u
+
+        class FakeReq:
+            def __init__(self, raw):
+                self.url = FakeURL(raw)
+
+        with pytest.raises(EgressBlocked, match="egress-floor"):
+            web._hop_guard(FakeReq("http://169.254.169.254/latest/meta-data"))
+        with pytest.raises(EgressBlocked, match="egress-floor"):
+            web._hop_guard(FakeReq("https://10.0.0.8/admin"))
+
+    def test_hop_guard_rejects_non_http_schemes(self):
+        from kortex_search.sources import web
+
+        class FakeURL:
+            def __init__(self, raw):
+                self._u = raw
+                self.scheme = raw.split(":")[0]
+
+            def __str__(self):
+                return self._u
+
+        class FakeReq:
+            def __init__(self, raw):
+                self.url = FakeURL(raw)
+
+        with pytest.raises(SourceError, match="scheme"):
+            web._hop_guard(FakeReq("file:///etc/passwd"))
+        with pytest.raises(SourceError, match="scheme"):
+            web._hop_guard(FakeReq("gopher://127.0.0.1:6379/"))
+
+    def test_hop_guard_passes_public_target(self, monkeypatch):
+        from kortex_search.sources import web
+
+        class FakeURL:
+            def __init__(self, raw):
+                self._u = raw
+                self.scheme = raw.split(":")[0]
+
+            def __str__(self):
+                return self._u
+
+        class FakeReq:
+            def __init__(self, raw):
+                self.url = FakeURL(raw)
+
+        web._hop_guard(FakeReq("https://example.com/page"))  # must not raise

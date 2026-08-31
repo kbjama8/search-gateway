@@ -66,7 +66,7 @@ class TestMigration:
         def boom(*_a, **_k):
             raise OSError("nope")
 
-        monkeypatch.setattr(vault.Path, "write_text", boom)
+        monkeypatch.setattr(vault, "_atomic_write_0600", boom)
         rows = {r["kind"]: r for r in vault.migrate()}
         assert rows["deepseek"]["status"].startswith("error:")
 
@@ -165,3 +165,56 @@ class TestStatus:
         st = vault.status()
         assert st["hygiene"]["ok"] is False
         assert any(f["kind"] == "mode" for f in st["hygiene"]["findings"])
+
+
+# --------------------------------------------------------------------------
+# TOCTOU hardening (sweep 2026-08-31): symlink-refusing mkdir + atomic 0600
+# writes (O_EXCL + O_NOFOLLOW)
+# --------------------------------------------------------------------------
+
+class TestMigrationHardening:
+    def test_safe_mkdir_refuses_symlink_component(self, tmp_path):
+        real = tmp_path / "real"
+        real.mkdir()
+        (tmp_path / "link").symlink_to(real)
+        with pytest.raises(OSError, match="symlink"):
+            vault._safe_mkdir(tmp_path / "link" / "vault")
+
+    def test_safe_mkdir_accepts_clean_path(self, tmp_path):
+        p = tmp_path / "a" / "b"
+        vault._safe_mkdir(p)
+        assert p.is_dir()
+
+    def test_atomic_write_0600_no_follow(self, tmp_path):
+        f = tmp_path / "secret.env"
+        vault._atomic_write_0600(f, "K=v\n")
+        assert f.read_text() == "K=v\n"
+        assert (f.stat().st_mode & 0o777) == 0o600
+
+    def test_atomic_write_refuses_symlink_target(self, tmp_path):
+        real = tmp_path / "real.txt"
+        real.write_text("original")
+        link = tmp_path / "link.tmp"
+        link.symlink_to(real)
+        # O_EXCL sees the symlink as existing and the handler unlinks the
+        # SYMLINK (never its target), then writes a fresh regular file —
+        # the target must stay untouched and the path must end up regular
+        vault._atomic_write_0600(link, "K=v\n")
+        assert real.read_text() == "original"
+        assert not link.is_symlink()
+        assert link.read_text() == "K=v\n"
+        assert (link.stat().st_mode & 0o777) == 0o600
+
+    def test_migrate_reports_symlink_trap_as_error(self, monkeypatch, tmp_path):
+        real = tmp_path / "real"
+        real.mkdir()
+        (tmp_path / "evil").symlink_to(real)
+        monkeypatch.setattr(vault, "VAULT_DIR", str(tmp_path / "evil" / "vault"))
+        legacy = tmp_path / "legacy" / "twitter-auth.env"
+        legacy.parent.mkdir()
+        legacy.write_text("TWITTER_AUTH_TOKEN=t\n")
+        monkeypatch.setitem(vault.LEGACY_PATHS, "twitter", str(legacy))
+        rows = vault.migrate()
+        tw = next(r for r in rows if r["kind"] == "twitter")
+        assert tw["status"].startswith("error")
+        assert legacy.exists()  # source untouched on refusal

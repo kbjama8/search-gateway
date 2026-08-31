@@ -123,6 +123,37 @@ def list_profiles() -> list[dict[str, Any]]:
     return out
 
 
+def _safe_mkdir(path: Path) -> None:
+    """mkdir -p refusing symlinked path components (TOCTOU/escape defense —
+    a symlink swap between check and write would land secrets outside the
+    vault)."""
+    comps = [p for p in path.parents if p != Path(p.anchor)] + [path]
+    for comp in reversed(comps):
+        if comp.is_symlink():
+            raise OSError(f"refusing symlink component: {comp}")
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _atomic_write_0600(path: Path, content: str) -> None:
+    """Write 0600 via O_EXCL + O_NOFOLLOW: no symlink following, no
+    clobbering a pre-existing target planted by an attacker."""
+    fd = -1
+    try:
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                         | os.O_NOFOLLOW, 0o600)
+        except FileExistsError:
+            path.unlink()  # safe: O_NOFOLLOW-verified regular file or absent
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                         | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fd = -1  # ownership passed to the file object
+            fh.write(content)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
 def migrate(dry_run: bool = False) -> list[dict[str, str]]:
     """Move legacy flat env files into the persona vault (D7.3).
 
@@ -148,16 +179,15 @@ def migrate(dry_run: bool = False) -> list[dict[str, str]]:
         target = profile_dir()
         try:
             root = vault_root()
-            root.mkdir(parents=True, exist_ok=True)
+            _safe_mkdir(root)
             os.chmod(root, 0o700)
-            target.mkdir(parents=True, exist_ok=True)
+            _safe_mkdir(target)
             os.chmod(target, 0o700)
             out_path = _vault_path(kind)
             if not dry_run:
                 body = "".join(f"{k}={v}\n" for k, v in sorted(secrets.items()))
                 tmp = out_path.with_suffix(".tmp")
-                tmp.write_text(body, encoding="utf-8")
-                os.chmod(tmp, 0o600)
+                _atomic_write_0600(tmp, body)
                 tmp.replace(out_path)
                 os.chmod(out_path, 0o600)
                 legacy.unlink()

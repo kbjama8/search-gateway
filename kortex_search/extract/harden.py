@@ -40,6 +40,14 @@ logger = logging.getLogger("kortex_search.extract.harden")
 NFT_TABLE = "inet ks_egress"
 STATE_PATH = Path(os.path.expanduser("~/.config/kortex-search/harden.json"))
 RULES_PATH = Path(os.path.expanduser("~/.config/kortex-search/ks-egress.nft"))
+# The ruleset the ROOT loader unit applies (sweep 2026-08-31). RULES_PATH
+# above is the user-side GENERATION artifact only — it must never sit in a
+# root load path: a NOPASSWD `nft -f <user-writable-file>` grant is an
+# escalation seam (any kbj-uid process — including the browser automation —
+# can rewrite the file and have root parse it into the nf_tables kernel
+# surface). The root-owned copy lives outside the home dir; the loader is a
+# root systemd unit that validates (nft -c) then applies. No sudoers entry.
+SYSTEM_RULES_PATH = Path("/etc/kortex-search/ks-egress.nft")
 
 # Everything the floor blocks, expressed for the kernel. No exemptions here —
 # this is the absolute egress floor for scoped browser children.
@@ -238,6 +246,7 @@ def status() -> dict:
         "systemd_run": systemd_run_available(),
         "covered": covered,
         "cgroup_path": state.get("cgroup_path"),
+        "system_rules": SYSTEM_RULES_PATH.exists(),
         "problems": problems,
     }
 

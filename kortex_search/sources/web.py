@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from urllib.parse import quote
 
 import httpx
 
@@ -29,6 +30,34 @@ logger = logging.getLogger("kortex_search.sources.web")
 
 _MIN_USABLE = 50
 _CAP = 20000
+
+
+def _jina_url(target: str) -> str:
+    """Compose the r.jina.ai request for `target`.
+
+    The target is percent-encoded so it stays ONE path segment of OUR
+    request — an unencoded URL smuggles delimiters (`//`, `?`, `#`, `@`)
+    into our request line and can shift what Jina (or our own client)
+    resolves. Jina decodes it server-side (their docs: "don't forget to
+    encode the URL").
+    """
+    return f"https://r.jina.ai/{quote(target, safe='')}"
+
+
+def _hop_guard(request) -> None:
+    """Per-hop SSRF re-validation (httpx `request` event hook).
+
+    httpx fires request hooks for every redirect hop BEFORE the connection
+    is made (>=0.19); raising aborts the chain. Every hop must stay on
+    http(s) and pass the egress floor — a redirect can jump from a public
+    page to a private/metadata host (LESSONS.md §1.5, hermes-agent
+    PR #21228).
+    """
+    scheme = (getattr(request.url, "scheme", "") or "").lower()
+    if scheme not in ("http", "https"):
+        raise SourceError(
+            f"blocked (egress-floor/scheme {scheme!r}): non-http(s) redirect hop")
+    assert_egress(str(request.url), "web")
 
 
 class WebSource(Source):
@@ -68,9 +97,10 @@ class WebSource(Source):
         proxy = jina_header()
         if proxy:
             headers["X-Proxy-Url"] = proxy
-        async with httpx.AsyncClient(timeout=30.0,
-                                     follow_redirects=True) as client:
-            resp = await client.get(f"https://r.jina.ai/{url}", headers=headers)
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True,
+                                     event_hooks={"request": [_hop_guard]}
+                                     ) as client:
+            resp = await client.get(_jina_url(url), headers=headers)
             resp.raise_for_status()
             return resp.text
 
@@ -95,16 +125,17 @@ class WebSource(Source):
             import httpx as _httpx
             from lxml import html as lxml_html
             from readability import Document
-            resp = _httpx.get(url, timeout=30.0, follow_redirects=True)
-            resp.raise_for_status()
-            # L1 floor, post-redirect: a redirect can jump to a private host
-            # (LESSONS.md §1.5 — hermes lesson). httpx exposes the final URL.
-            final = str(resp.url)
-            if final != url:
-                assert_egress(final, "web")
-            doc = Document(resp.text)
-            summary = doc.summary()
-            if not summary:
-                return ""
-            return " ".join(lxml_html.fromstring(summary).text_content().split())
+            # per-hop guard: every redirect hop passes the floor BEFORE the
+            # connection is made (stronger than the old post-hoc final-URL
+            # check, which let intermediate private hops connect first)
+            with _httpx.Client(timeout=30.0, follow_redirects=True,
+                               event_hooks={"request": [_hop_guard]}) as client:
+                resp = client.get(url)
+                resp.raise_for_status()
+                doc = Document(resp.text)
+                summary = doc.summary()
+                if not summary:
+                    return ""
+                return " ".join(
+                    lxml_html.fromstring(summary).text_content().split())
         return await asyncio.to_thread(_sync)
