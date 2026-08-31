@@ -53,3 +53,31 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build headless image
         run: docker build -f infra/Dockerfile -t kortex-search .
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: pip install -e ".[test]"
+      - name: Bandit scan
+        run: pip install bandit && bandit -c pyproject.toml -r kortex_search -ll
+      - name: Dependency audit
+        # transformers is pinned <4.58 by optimum-onnx; the four RCE advisories
+        # below fix only in 5.x. Mitigation: model loads use git-SHA-pinned
+        # revisions of fixed trusted repos (content-addressed) — see
+        # docs/security.md. torch>=2.13 clears PYSEC-2025-194.
+        run: pip install pip-audit && pip-audit -l
+            --ignore-vuln PYSEC-2025-217
+            --ignore-vuln PYSEC-2026-2288
+            --ignore-vuln PYSEC-2026-2289
+            --ignore-vuln PYSEC-2026-2290
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

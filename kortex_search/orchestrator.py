@@ -321,7 +321,7 @@ async def search(query: str, sources: list[str] | None, category: str = "general
                  expand: bool = QUERY_EXPANSION, year_from: int | None = None,
                  open_access_only: bool = False) -> dict[str, Any]:
     start = time.monotonic()
-    source_names = [s for s in (sources or DEFAULT_SOURCES)]
+    source_names = list(sources or DEFAULT_SOURCES)  # defensive copy of the default
     fkey = _filter_key(freshness, year_from, open_access_only)
 
     cached = cache.get(query, source_names, category, limit, filters=fkey)

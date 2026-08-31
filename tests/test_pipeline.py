@@ -285,7 +285,7 @@ def _mock_orchestrator_search(monkeypatch, results=None):
 
     async def fake_search(query, sources=None, **kw):
         return {"query": query, "results": results or [], "count": len(results or []),
-                "sources": {s: "ok (0)" for s in (sources or [])}, "cached": False,
+                "sources": dict.fromkeys(sources or [], "ok (0)"), "cached": False,
                 "reranked": False, "partial": False, "pending": [], "elapsed_ms": 1}
 
     monkeypatch.setattr(server.orchestrator, "search", fake_search)
@@ -298,7 +298,7 @@ def test_server_search_tool_dispatch(monkeypatch):
 
     async def fake_search(query, sources=None, **kw):
         return {"query": query, "results": results, "count": 1,
-                "sources": {s: "ok (1)" for s in (sources or [])}, "cached": False,
+                "sources": dict.fromkeys(sources or [], "ok (1)"), "cached": False,
                 "reranked": False, "partial": False, "pending": [], "elapsed_ms": 1}
 
     monkeypatch.setattr(server.orchestrator, "search", fake_search)

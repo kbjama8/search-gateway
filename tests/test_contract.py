@@ -62,5 +62,5 @@ def test_result_top_level_fields():
 
 def test_result_meta_accepts_standardized_keys():
     r = Result(title="t", url="u")
-    r.meta.update({k: None for k in EXPECTED_META_KEYS})
+    r.meta.update(dict.fromkeys(EXPECTED_META_KEYS))
     assert set(r.meta) >= EXPECTED_META_KEYS

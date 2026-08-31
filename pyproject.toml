@@ -13,10 +13,12 @@ dependencies = [
     "httpx>=0.27",
     "redis>=5.0",
     "pyyaml>=6.0",
-    "sentence-transformers>=3.0",
-    "huggingface-hub>=0.24",
+    "sentence-transformers>=5.7,<6",
+    "transformers>=4.50,<4.58",
+    "torch>=2.13",
+    "huggingface-hub>=0.24,<1",
     "numpy>=1.24",
-    "optimum[onnxruntime]",
+    "optimum[onnxruntime]>=2.1,<2.2",
     "onnxruntime",
     "trafilatura>=1.8",
     "readability-lxml>=0.8",
@@ -39,6 +41,9 @@ test = [
     "fakeredis>=2.20",
     "respx>=0.21",
     "ruff>=0.6",
+    "hypothesis>=6.100",
+    "bandit>=1.8",
+    "pip-audit>=2.8",
 ]
 
 [tool.setuptools]
@@ -59,11 +64,44 @@ target-version = "py312"
 
 [tool.ruff.lint]
 # F = pyflakes (the documented "F-clean" bar), plus the pragmatic set the
-# codebase already satisfies: E/W formatting, I imports, UP modern syntax,
-# B bugbears, SIM simplify, RUF/FURB nits, S security, DTZ datetimes,
-# BLE blind exceptions (with targeted noqas where intentional).
-select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "FURB", "S", "DTZ", "BLE"]
-ignore = ["S101"]  # asserts in tests are the point
+# codebase already satisfies: E/W formatting, I imports, B bugbears, C4
+# comprehensions, UP modern syntax, SIM simplify, RUF nits, S security,
+# DTZ datetimes, BLE blind exceptions (with targeted noqas where
+# intentional), ASYNC blocking-call-in-async (2xx family), PT pytest-style.
+select = ["E", "F", "W", "I", "B", "C4", "UP", "SIM", "RUF", "FURB", "S",
+          "DTZ", "BLE", "ASYNC", "PT"]
+ignore = [
+    # pytest style-only (shape preferences, not bugs)
+    "PT001", "PT002", "PT003", "PT008", "PT009", "PT013",
+    "PT016", "PT017", "PT018", "PT021", "PT022", "PT023",
+    # ASYNC109 (trio-style advice): the `timeout` params are deliberate API
+    # design — per-request timeouts fed straight to httpx, not cancellable
+    # scope machinery
+    "ASYNC109",
+]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106", "S603"]  # fake tokens + fixed-argv subprocess calls in tests
+# asserts are the point of tests; fake tokens + fixed-argv subprocess calls
+# live there too; blocking opens/asserts are fine in test code; the
+# run_cmd regression tests deliberately exercise REAL subprocesses and
+# blocking paths inside async context
+"tests/**" = ["S101", "S105", "S106", "S603", "B011", "ASYNC230", "PT011",
+              "ASYNC221", "ASYNC240"]
+
+[tool.bandit]
+# Run: bandit -c pyproject.toml -r kortex_search -ll
+# Rationales (see docs/security.md):
+#   B314/B405 — stdlib ElementTree does not resolve external entities (XXE-
+#     safe since 2.7.4); arxiv.org is a fixed trusted host.
+#   B324 — bilibili wbi md5 is the protocol's signature format, not crypto.
+#   B615 — model downloads DO pin revisions (flowed through **kwargs); FP.
+#   B603/B404 — subprocess argv is operator-fixed config/constants, never
+#     user input (harden probes + opencli bridge).
+#   B311 — random jitter is the point (anti-automation pacing).
+#   B107/B110 — "" default = auth-disabled sentinel; except/pass = the
+#     documented engine-fallback chain.
+exclude_dirs = ["tests", "scripts", "skills", ".venv"]
+skips = ["B314", "B405", "B324", "B615", "B603", "B404", "B311", "B107", "B110"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["kortex_search"]

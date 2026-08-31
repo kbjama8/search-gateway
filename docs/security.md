@@ -108,3 +108,23 @@ echoed back into a tool's return value.
   record attributes, so an accidental `logger.info(os.environ)` call would
   still leak via `msg`, but there is no broad-serialization path that could
   leak a secret passed as a *keyword* logging argument.
+## Static analysis & dependency posture (0.6.1+)
+
+- **ruff** (rules `E F W I B C4 UP SIM RUF FURB S DTZ BLE ASYNC PT`),
+  **bandit** (`bandit -c pyproject.toml -r kortex_search -ll`), **pip-audit**
+  (`pip-audit -l`), and **gitleaks** run in CI (see `.github/workflows/ci.yml`
+  `security` job). Bandit skips live in `[tool.bandit]` with per-code
+  rationales.
+- **transformers is pinned `<4.58`** (the optimum-onnx 0.1.0 ceiling). Four
+  RCE advisories (CVE-2025-14929, CVE-2026-1839, CVE-2026-4372,
+  CVE-2026-5241) fix only in 5.x. Accepted risk, mitigated: every model load
+  uses a **git-SHA-pinned revision** of a fixed, trusted repo
+  (`*_REVISION` env vars, ADR-0005) — SHAs are content-addressed, so a
+  compromised upstream cannot alter a pinned snapshot. Re-evaluate when
+  optimum-onnx ships a transformers-5-compatible release.
+- **torch>=2.13** clears PYSEC-2025-194; the transitive set (idna, soupsieve,
+  lxml-html-clean, gitpython, pillow) is kept current by pip-audit.
+- **httpx stewardship**: upstream httpx activity has wound down and the
+  ecosystem is migrating to `httpx2` (Pydantic-led fork, drop-in API).
+  Tracked; not yet migrated — a networking dependency swap needs its own
+  test-and-rollback window, not a sweep.
