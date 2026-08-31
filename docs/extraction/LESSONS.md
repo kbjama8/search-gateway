@@ -438,6 +438,7 @@ Source: github.com/lexiforest/curl_cffi.
 | R14 | ~~systemd credentials for secrets~~ → **DONE**: `LoadCredential=`/`$CREDENTIALS_DIRECTORY`; env vars rejected for secrets (systemd.io/CREDENTIALS, #40333) (§1.5) | Phase 7 |
 | R15 | ~~Chrome 136+ automation constraints~~ → **DONE**: non-default user-data-dir required for remote debugging; CfT recommended (§1.5) | Phase 7 |
 | R16 | ~~Forced-proxy egress for Chromium~~ → **DONE**: `--proxy-server` + `--host-resolver-rules="MAP * 0.0.0.0, EXCLUDE 127.0.0.1"` (chromium proxy.md) (§1.5) | Phase 7 |
+| R17 | httpx stewardship: upstream activity wound down; the ecosystem is moving to `httpx2` (Pydantic-led, drop-in). Track + schedule a dedicated migration window — a networking dependency swap is not sweep work | decision |
 
 ---
 
@@ -463,6 +464,53 @@ docs cleanup). D7.x are also summarized in the 0.4.1/0.4.2 CHANGELOG entries.
 
 ## Changelog
 
+- **2026-08-31 (full-stack bug sweep + security pass)** — the deepest sweep
+  yet; new layers that will outlive the session:
+  - **Property-based testing landed** (`tests/test_properties.py`,
+    hypothesis, dev/ci/sweep profiles via `HYPOTHESIS_PROFILE`). Doctrine
+    adopted from the research pass: pair every no-crash property with a
+    semantic invariant; differential oracles must be structurally different
+    (naive references); never suppress `filter_too_much`; explicit
+    `@pytest.mark.asyncio` for async property tests.
+  - **Bugs the properties caught (all would have been silent)**:
+    `_parse_date`'s ISO-T slice used `len(fmt)` (18) instead of the sample
+    length (19) — **every 2-digit-seconds ISO-T timestamp lost its last
+    digit** (T12:30:59 → 12:30:05) for months; the compact-date regex was
+    unanchored so 13-digit epoch-millis parsed as year-8796 "fresh"; the
+    challenge classifier crashed on non-string bodies; `_percentiles` used
+    floor instead of ceil (p95 under-picked). Lesson: slicing by
+    `len(fmt)` is the trap — always slice by the length of a rendered
+    sample.
+  - **nan/inf poisoning class closed**: Redis-backed pacing, percentiles,
+    and adaptive timeouts now treat non-finite values as absent — a
+    poisoned `nan` slot is reclaimed, not slept on (the gauntlet gained a
+    poisoned-reservoir world + parametrized poison regression).
+  - **CI red-since-0.4.2 root cause**: a test passed locally only because
+    the MACHINE's vault tripped a hygiene finding (hermeticity discipline
+    re-violated — see 2026-08-26 harden lesson; the CI-repro harness
+    (clean HOME + passwordless Redis + py3.13) is now the standard triage
+    tool).
+  - **read_url SSRF hardening**: jina targets percent-encoded into one
+    path segment (no delimiter smuggling); per-hop `request`-hook guards on
+    the redirect-following stages validate every hop BEFORE connection
+    (httpx ≥0.19 fires hooks per hop) — the old readability stage only
+    checked the final URL, letting intermediate private hops connect.
+  - **The sudoers seam (own-goal, now retired)**: a NOPASSWD `nft -f`
+    grant on a user-writable ruleset file was an escalation seam — any
+    kbj-uid process (including the browser automation) could rewrite it
+    and root would parse it into the nf_tables kernel surface
+    (CVE-2023-32233 class). Retired for a root systemd unit
+    (`ks-egress.service`) loading a root-owned `/etc/kortex-search/`
+    copy with `nft -c` validation first. **Doctrine: every file a sudoers
+    entry names is inside the trust boundary — sudo checks the binary,
+    never the data.**
+  - **Dependency posture**: torch≥2.13 (CVE), transformers pinned <4.58 by
+    optimum-onnx — four RCE advisories fix only in 5.x; mitigated by
+    git-SHA-pinned model revisions (content-addressed) + pip-audit CI
+    ignores carrying the IDs. ST 6→5.7 (its transformers≥5 pin conflicts
+    with optimum-onnx's <4.58; 5.7 is the coherent set).
+  - **Docs cleanup**: executed plan/handoff docs + `docs/history/`
+    retired; locked decisions D1–D7.4 preserved as a digest here.
 - **2026-08-22** — Journal opened. Recorded: anti-bot/stealth field state (§1),
   proxy economics (§2), platform playbooks for X/Reddit/YouTube/Bilibili/XHS/CN
   hot-lists (§3), content-extraction benchmark (§4), codebase archaeology (§5).

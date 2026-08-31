@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-08-31
+
+"Deep sweep" — property-based testing layer + the bugs it caught + a
+security pass across containment, SSRF, and the vault.
+
+### Added
+- **Hypothesis property suite** (`tests/test_properties.py`): date-parser
+  round-trips, canonicalization idempotence, fusion differential oracle,
+  nearest-rank percentile reference, extraction-ladder + challenge
+  classifier no-crash/shape contracts, empty-string env contract.
+  dev/ci/sweep profiles via `HYPOTHESIS_PROFILE`.
+- **Linting & security tooling**: ruff rules extended (C4, PT, ASYNC),
+  bandit + pip-audit + gitleaks CI `security` job, per-code skip
+  rationales in `docs/security.md`.
+- **Root loader unit** `ks-egress.service`: validates (`nft -c`) then
+  applies the root-owned `/etc/kortex-search/ks-egress.nft` at boot.
+- `harden --status` reports `system_rules` (is the root-owned copy in place).
+
+### Fixed
+- **Date parsing**: ISO-T timestamps lost the last seconds digit
+  (slice-by-`len(fmt)` trap) — `T12:30:59` parsed as 12:30:05; the
+  compact-date regex was unanchored (13-digit epoch-millis parsed as
+  year-8796 "fresh"); compact dates now carry a 1970–2100 sanity range.
+- **Challenge classifier** crashed on non-string bodies/headers; hostile
+  adapters now read as no-body and headers still classify.
+- **Percentiles** used floor instead of ceil for nearest-rank — p95
+  under-picked for non-integer products.
+- **nan/inf poisoning**: Redis-backed pacing, latency reservoirs, and
+  adaptive timeouts now treat non-finite values as absent (poisoned
+  slots reclaimed, never slept on).
+- **read_url SSRF**: jina targets percent-encoded into one path segment;
+  per-hop pre-connection egress guards on the redirect-following stages
+  (previously only the final URL was checked).
+- **Vault TOCTOU**: symlink-refusing mkdir + O_EXCL/O_NOFOLLOW atomic
+  0600 writes; migration refusals report per-kind without touching
+  sources.
+- **Dependency CVEs**: torch→2.13 (PYSEC-2025-194); idna/soupsieve/
+  lxml-html-clean/gitpython/pillow bumped; transformers pinned <4.58
+  (optimum-onnx ceiling) with SHA-pinned-revision mitigation documented
+  for the four 5.x-only advisories.
+
+### Security
+- **Removed the sudoers escalation seam**: the NOPASSWD `nft -f` grant on
+  a user-writable ruleset could let any kbj-uid process (including the
+  browser automation) inject rules parsed by root into the nf_tables
+  kernel surface. The old companion user loader + sudoers drop-in are
+  retired; boot loading happens via the root unit on a root-owned file.
+
 ## [0.6.0] - 2026-08-29
 
 "Rename bridge removal" — the 0.5.x `SEARCH_GATEWAY_*` fallback is gone.
