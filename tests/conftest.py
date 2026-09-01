@@ -161,3 +161,17 @@ def rds(monkeypatch):
     bind(profiles)
     bind(proxies)
     return stub
+
+
+@pytest.fixture(autouse=True)
+def _reset_http_pools():
+    """Shared httpx pools bind to an event loop — pytest-asyncio spins a
+    fresh loop per test, so drop the singletons after every test (they
+    re-init lazily in the next one)."""
+    yield
+    from kortex_search import llm
+    from kortex_search.extract import http
+    from kortex_search.sources import web
+    for mod, attr in ((http, "_client"), (llm, "_client"),
+                      (web, "_scrape"), (web, "_scrape_sync")):
+        setattr(mod, attr, None)

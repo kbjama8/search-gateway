@@ -4,6 +4,7 @@ saved_queries) + module edge coverage — hermetic, no network."""
 from __future__ import annotations
 
 import asyncio
+import json
 
 from kortex_search import saved_queries as sq
 from kortex_search.models import Result
@@ -336,3 +337,99 @@ def test_cli_version_and_check(monkeypatch):
 
     monkeypatch.setattr(health, "check", fake_check)
     assert _cmd_check(A()) == 0
+
+
+# --------------------------------------------------------------------------
+# Grounded research_answer (sweep 2026-09-01): JSON synthesis + deterministic
+# citation verification
+# --------------------------------------------------------------------------
+
+class TestGroundedAnswer:
+    GOOD = (json.dumps({
+        "answer_md": "PostgreSQL VACUUM reclaims dead tuples [1] and updates "
+                     "statistics [2].",
+        "citations": [
+            {"id": 1, "quote": "VACUUM reclaims storage occupied by dead tuples"},
+            {"id": 2, "quote": "VACUUM updates statistics"},
+        ],
+        "insufficient_evidence": False,
+    }))
+
+    def _run(self, monkeypatch, raw, snippets=("VACUUM reclaims storage "
+              "occupied by dead tuples", "VACUUM updates statistics")):
+        from kortex_search import server
+
+        async def fake_search(query, sources=None, **kw):
+            return {"query": query, "count": 2, "results": [
+                {"title": "Postgres docs", "url": "https://p.org/vacuum",
+                 "snippet": snippets[0], "source": "web"},
+                {"title": "Wiki", "url": "https://w.org/vacuum",
+                 "snippet": snippets[1], "source": "wikipedia"},
+            ], "sources": {}}
+
+        async def fake_complete(messages, **kw):
+            assert kw.get("json_mode") is True
+            return raw
+
+        monkeypatch.setattr(server.orchestrator, "search", fake_search)
+        monkeypatch.setattr(server.llm, "complete", fake_complete)
+        return asyncio.run(server.research_answer("vacuum?"))
+
+    def test_grounded_answer_verified(self, monkeypatch):
+        out = self._run(monkeypatch, self.GOOD)
+        assert out["answer"] == ("PostgreSQL VACUUM reclaims dead tuples [1] "
+                                 "and updates statistics [2].")
+        assert [c["n"] for c in out["citations"]] == [1, 2]
+        assert out["citations"][0]["quote"].startswith("VACUUM reclaims")
+        assert out["insufficient_evidence"] is False
+        assert out["verification"]["status"] == "verified"
+        assert out["verification"]["hallucinated_ids"] == []
+
+    def test_hallucinated_marker_dropped(self, monkeypatch):
+        out = self._run(monkeypatch, json.dumps({
+            "answer_md": "Claim with a real cite [1] and a fake one [9].",
+            "citations": [{"id": 1, "quote": "VACUUM reclaims storage occupied "
+                                             "by dead tuples"}],
+            "insufficient_evidence": False,
+        }))
+        assert "[9]" not in out["answer"]
+        assert "[1]" in out["answer"]
+        assert out["verification"]["hallucinated_ids"] == ["9"]
+
+    def test_quote_mismatch_drops_citation(self, monkeypatch):
+        out = self._run(monkeypatch, json.dumps({
+            "answer_md": "Claim [1] and another [2].",
+            "citations": [
+                {"id": 1, "quote": "VACUUM reclaims storage occupied by dead tuples"},
+                {"id": 2, "quote": "THIS TEXT IS NOT IN ANY SOURCE"},
+            ],
+            "insufficient_evidence": False,
+        }))
+        assert [c["n"] for c in out["citations"]] == [1]
+        assert "[2]" not in out["answer"]
+        assert out["verification"]["dropped_unverifiable"] == 1
+
+    def test_json_degradation_is_honest(self, monkeypatch):
+        out = self._run(monkeypatch, "plain text answer, no json at all")
+        assert out["answer"] == "plain text answer, no json at all"
+        assert out["verification"]["status"] == "unverified-json-degraded"
+
+    def test_json_wrapped_in_noise_still_parses(self, monkeypatch):
+        out = self._run(monkeypatch, "```json\n" + self.GOOD + "\n```")
+        assert out["verification"]["status"] == "verified"
+
+    def test_synthesis_failure_reports(self, monkeypatch):
+        from kortex_search import server
+
+        async def fake_search(query, sources=None, **kw):
+            return {"query": query, "count": 1, "results": [
+                {"title": "x", "url": "https://x.com/", "snippet": "s",
+                 "source": "web"}], "sources": {}}
+
+        async def boom(messages, **kw):
+            raise RuntimeError("deepseek down")
+
+        monkeypatch.setattr(server.orchestrator, "search", fake_search)
+        monkeypatch.setattr(server.llm, "complete", boom)
+        out = asyncio.run(server.research_answer("q"))
+        assert out["answer"].startswith("(answer synthesis failed:")

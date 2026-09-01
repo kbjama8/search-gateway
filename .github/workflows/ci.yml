@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # nightly property sweep — non-deterministic bug hunt (two-kinds-of-testing)
+    - cron: "17 3 * * *"
 
 jobs:
   lint:
@@ -81,3 +84,16 @@ jobs:
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sweep:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: pip install -e ".[test]"
+      - name: Deep property sweep (non-deterministic hunt)
+        run: HYPOTHESIS_PROFILE=sweep python -m pytest tests/test_properties.py

@@ -172,8 +172,11 @@ OA_PAPER = {"title": "P", "id": "https://openalex.org/W1", "doi": "https://doi.o
 
 def _patch_oa(monkeypatch, responses):
     import httpx as _httpx
+
+    from kortex_search.extract import http as eh
     client = SharedFakeClient(responses)
     monkeypatch.setattr(_httpx, "AsyncClient", lambda **kw: client)
+    monkeypatch.setattr(eh, "_client", None)  # shared pool caches fakes — reset
     return client
 
 
@@ -399,14 +402,17 @@ def test_llm_complete_error_paths(monkeypatch):
         monkeypatch.setattr(llm, "get_api_key", lambda: "k")
         monkeypatch.setattr(llm.httpx, "AsyncClient",
                             lambda **kw: FakeLLMClient([FakePostResp({}, status=500)]))
+        llm._client = None  # shared pool caches the fake — reset per step
         with pytest.raises(RuntimeError, match="deepseek"):
             await llm.complete([{"role": "user", "content": "q"}])
         monkeypatch.setattr(llm.httpx, "AsyncClient",
                             lambda **kw: FakeLLMClient([FakePostResp({"error": "overloaded"})]))
+        llm._client = None
         with pytest.raises(RuntimeError, match="API error"):
             await llm.complete([{"role": "user", "content": "q"}])
         monkeypatch.setattr(llm.httpx, "AsyncClient",
                             lambda **kw: FakeLLMClient([FakePostResp({"choices": []})]))
+        llm._client = None
         assert await llm.complete([{"role": "user", "content": "q"}]) == ""
 
     asyncio.run(run())

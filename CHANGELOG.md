@@ -5,7 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-01
+
+"Scale, ground, and pool" — two new sources, a shared-HTTP-pool
+architecture, and grounded answer synthesis with deterministic citation
+verification.
+
+### Added
+- **hackernews source** (Algolia API, no auth): stories with points/
+  comment engagement, item-link synthesis, live-verified.
+- **wikipedia source** (MediaWiki CirrusSearch, no auth): full-text
+  search, HTML-snippet stripping, URL-quoted titles. Registry 23 → **25**.
+- **Grounded `research_answer`**: strict cite-during-write synthesis
+  (inline `[N]` markers, JSON mode on DeepSeek) + a deterministic
+  verification pass — id-space enforcement, URL membership, verbatim
+  quote-substring checks. Unverifiable citations are dropped and counted
+  (`verification{}` block); JSON degradation is reported, never silent.
+- **Nightly property sweep** CI job (`HYPOTHESIS_PROFILE=sweep`,
+  non-deterministic bug hunt) on schedule.
+
+### Changed
+- **Shared HTTP pools** (perf): the facade, the read_url scrape tier, and
+  the LLM client each own ONE pooled client (per-origin keep-alive,
+  `keepalive_expiry=60s`, tier-scoped cookie jars, `trust_env=False`) —
+  the fan-out no longer pays TCP+TLS handshakes per source call.
+  Graceful `aclose()` on shutdown; tests reset the pools per test.
+
+### Fixed
+- `_verify_citations` marker handling (markers of verified citations
+  were stripped — found by the new grounding tests before ship).
+
 ## [0.6.1] - 2026-08-31
+
 
 "Deep sweep" — property-based testing layer + the bugs it caught + a
 security pass across containment, SSRF, and the vault.

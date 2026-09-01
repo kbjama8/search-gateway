@@ -174,7 +174,7 @@ partial, pending[], elapsed_ms, stage_ms{fanout, fusion_dedup, rerank, mmr}}`
 | `server.py` | the MCP surface; 14 `@mcp.tool()` handlers; `_clamp_limit` (1..30), `_resolve_sources` (unknown names fail loudly); `BearerAuthMiddleware` for http/sse; `_scrub` control-char stripping; `main(transport)` | `search`, `research_answer`, `get_paper`, `read_url`, `doctor`, `saved_queries` |
 | `orchestrator.py` | pipeline orchestration; singleflight `_inflight` map; adaptive timeout; expansion gating | `search` (382-LOC module, the hub — 63 edges in the code graph) |
 | `cli.py` | console commands; SIGTERM→SIGINT mapping for graceful shutdown | `serve` (default), `doctor`, `check`, `version`, `warm` |
-| `health.py` | `report()` (cached probes, `DOCTOR_TIMEOUT=12s` budget) + `check()` (strict: 22 sources + Redis) | shared by the `doctor` tool and the CLI |
+| `health.py` | `report()` (cached probes, `DOCTOR_TIMEOUT=12s` budget) + `check()` (strict: 25 sources + Redis) | shared by the `doctor` tool and the CLI |
 | `models.py` | `Result{title,url,snippet,source,engine,published,score,meta}` + `identity()` (canonical dedup key) | — |
 | `config.py` | all 41 env settings + `load_env_file` + `FALLBACK_CHAINS` (per-source degrade-order matrix) | — |
 | `fusion.py` | weighted RRF, `score_raw` preserved in `meta` | `rrf_fuse` |
@@ -199,7 +199,7 @@ and `kortex-search check` read from. Three implementation patterns:
 
 | Pattern | Mechanism | Sources |
 |---------|-----------|---------|
-| HTTP API | `httpx` direct, `SourceError` on failure | searxng (SearXNG JSON), arxiv (Atom), openalex (REST), crossref (REST), semantic_scholar (Graph API), github (REST; token raises rate limit), bilibili (B站 API), v2ex (sov2ex), stackoverflow (Stack Exchange), web (Jina Reader) |
+| HTTP API | `httpx` direct (shared pooled clients since 0.7), `SourceError` on failure | searxng (SearXNG JSON), arxiv (Atom), openalex (REST), crossref (REST), semantic_scholar (Graph API), github (REST; token raises rate limit), bilibili (B站 API), v2ex (sov2ex), stackoverflow (Stack Exchange), hackernews (Algolia), wikipedia (MediaWiki), web (Jina Reader) |
 | Subprocess CLI | `run_cmd` with env allowlist + retry | exa (mcporter), youtube (yt-dlp NDJSON) |
 | Browser / OpenCLI | `run_opencli` (browser budget via `extract/scheduler`, default 1), opt-in via `sources=`, rate-limited 2.5s | twitter (twitter-cli → opencli failover), reddit, facebook, instagram, xiaohongshu (not yet authenticated — errors gracefully), linkedin (mcporter; account blocked on QR verification — errors gracefully) |
 | CN tier (v0.4, gated by `KORTEX_SEARCH_CN_SOURCES`) | zhihu (v4 API, cookie-gated), weibo (hot list + SUB-gated keyword search), baidu + toutiao hot boards (public JSON); bilibili upgraded with wbi signing (always on) |

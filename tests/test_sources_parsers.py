@@ -104,9 +104,14 @@ def _mock_http(monkeypatch, module, responses):
                        ("request", fake_request)):
         if hasattr(module, _name):
             monkeypatch.setattr(module, _name, _fn)
-    # raw-httpx modules (web.py reader stages) still resolve their own client
+    # raw-httpx modules (web.py reader stages) resolve their own shared pool
+    # (sweep 2026-08-31) — drop the cached singleton so the re-patched
+    # AsyncClient takes effect on every _mock_http call
     if hasattr(module, "httpx"):
         monkeypatch.setattr(module.httpx, "AsyncClient", lambda **kw: client)
+    for _pool in ("_scrape", "_scrape_sync"):
+        if hasattr(module, _pool):
+            monkeypatch.setattr(module, _pool, None)
     return client
 
 
@@ -1017,3 +1022,55 @@ class TestReadUrlHardening:
                 self.url = FakeURL(raw)
 
         web._hop_guard(FakeReq("https://example.com/page"))  # must not raise
+
+
+# --------------------------------------------------------------------------
+# v0.7 sources: hackernews (Algolia) + wikipedia (MediaWiki)
+# --------------------------------------------------------------------------
+
+def test_hackernews_parses_stories(monkeypatch):
+    import kortex_search.sources.hackernews as mod
+    _mock_http(monkeypatch, mod, [FakeResp({"hits": [
+        {"title": "Common mistakes in PostgreSQL", "url": "https://wiki.postgresql.org/x",
+         "objectID": "19817531", "points": 1084, "num_comments": 253,
+         "created_at": "2019-05-03T11:52:08Z", "author": "kawera"},
+        # comment hits carry no url — the item link must be synthesized
+        {"title": None, "story_title": "Show HN: My Tool",
+         "objectID": "777", "story_id": "777", "points": 42, "num_comments": 0,
+         "created_at": "2026-08-30T10:00:00Z"},
+        # junk hit without any title — skipped, not crashed
+        {"objectID": "9"},
+    ]})])
+
+    async def run():
+        out = await _r("hackernews").search("postgres")
+        assert len(out) == 2
+        assert out[0].url == "https://wiki.postgresql.org/x"
+        assert out[0].published == "2019-05-03T11:52:08Z"
+        assert out[0].meta["points"] == 1084
+        assert out[1].url == "https://news.ycombinator.com/item?id=777"
+        assert out[1].title == "Show HN: My Tool"
+
+    asyncio.run(run())
+
+
+def test_wikipedia_parses_and_strips_html(monkeypatch):
+    import kortex_search.sources.wikipedia as mod
+    _mock_http(monkeypatch, mod, [FakeResp({"query": {"search": [
+        {"title": "PostgreSQL", "snippet": '<span class="searchmatch">PostgreSQL</span>'
+                                          " is a database",
+         "timestamp": "2026-08-24T16:10:56Z", "wordcount": 9189, "pageid": 23824},
+        {"title": "A/B testing?", "snippet": "split test",
+         "timestamp": "2026-01-01T00:00:00Z", "pageid": 5},
+    ]}})])
+
+    async def run():
+        out = await _r("wikipedia").search("postgres")
+        assert out[0].title == "PostgreSQL"
+        assert out[0].snippet == "PostgreSQL is a database"  # tags stripped
+        assert out[0].published == "2026-08-24T16:10:56Z"
+        # identifier-injection lesson: special chars must be URL-quoted
+        assert out[1].url == "https://en.wikipedia.org/wiki/A%2FB%20testing%3F"
+        assert out[0].meta["wordcount"] == 9189
+
+    asyncio.run(run())

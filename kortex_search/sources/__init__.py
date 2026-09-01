@@ -8,6 +8,7 @@ from .crossref import CrossrefSource
 from .exa import ExaSource
 from .facebook import FacebookSource
 from .github import GitHubSource
+from .hackernews import HackerNewsSource
 from .instagram import InstagramSource
 from .linkedin import LinkedInSource
 from .openalex import OpenAlexSource
@@ -20,6 +21,7 @@ from .twitter import TwitterSource
 from .v2ex import V2EXSource
 from .web import WebSource
 from .weibo import WeiboSource
+from .wikipedia import WikipediaSource
 from .xiaohongshu import XiaohongshuSource
 from .youtube import YouTubeSource
 from .zhihu import ZhihuSource
@@ -46,6 +48,8 @@ ALL_SOURCES: dict[str, Source] = {
         CrossrefSource(),
         StackOverflowSource(),
         SemanticScholarSource(),
+        HackerNewsSource(),
+        WikipediaSource(),
         # Chinese-ecosystem tier (v0.4, gated by KORTEX_SEARCH_CN_SOURCES)
         ZhihuSource(),
         ZhihuHotSource(),

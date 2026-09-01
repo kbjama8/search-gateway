@@ -15,6 +15,9 @@ import logging
 from types import SimpleNamespace  # noqa: F401 — convenience for callers
 from typing import Any
 
+import httpx
+
+from .. import __version__
 from ..config import IMPERSONATE, IMPERSONATE_SOURCES
 from .egress import assert_egress
 
@@ -22,6 +25,42 @@ logger = logging.getLogger("kortex_search.extract.http")
 
 
 _SENTINEL = object()
+
+# Shared connection pool (sweep 2026-08-31): one client per process. The
+# fan-out touches ~20 hosts per search — per-request client construction
+# paid a TCP+TLS handshake on EVERY source call; a pooled client keeps
+# per-origin keep-alive sockets warm (keepalive_expiry 60s vs httpx's 5s
+# default). follow_redirects stays False (API tier; the scrape tier opts in
+# per request with per-hop egress guards). trust_env=False: no surprise
+# proxy pickup on a LAN server. Lazy-init + never closed mid-flight; tests
+# reset via the conftest autouse fixture.
+_client: httpx.AsyncClient | None = None
+
+_CLIENT_TIMEOUT = httpx.Timeout(20.0, connect=5.0, pool=2.0)
+_CLIENT_LIMITS = httpx.Limits(max_connections=100,
+                              max_keepalive_connections=20,
+                              keepalive_expiry=60.0)
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or getattr(_client, "is_closed", False):
+        _client = httpx.AsyncClient(
+            timeout=_CLIENT_TIMEOUT,
+            limits=_CLIENT_LIMITS,
+            follow_redirects=False,
+            trust_env=False,
+            headers={"user-agent": f"kortex-search/{__version__}"},
+        )
+    return _client
+
+
+async def aclose() -> None:
+    """Close the shared pool (graceful shutdown paths)."""
+    global _client
+    if _client is not None and not _client.is_closed:
+        await _client.aclose()
+    _client = None
 
 
 class Response:
@@ -103,12 +142,11 @@ async def request(method: str, url: str, *, source: str | None = None,
 
 async def _httpx_request(method: str, url: str, *, headers, params,
                          timeout: float) -> Response:
-    import httpx
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        r = await client.request(method, url, headers=headers, params=params)
-        # payload parsed LAZILY by Response.json() — eager parsing breaks
-        # text/XML endpoints (arxiv Atom feed; live-verified 2026-08-26)
-        return Response(r.status_code, dict(r.headers), r.text)
+    r = await _get_client().request(method, url, headers=headers,
+                                    params=params, timeout=timeout)
+    # payload parsed LAZILY by Response.json() — eager parsing breaks
+    # text/XML endpoints (arxiv Atom feed; live-verified 2026-08-26)
+    return Response(r.status_code, dict(r.headers), r.text)
 
 
 async def _curl_cffi_request(method: str, url: str, *, headers, params,

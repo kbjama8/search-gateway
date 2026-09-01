@@ -464,6 +464,36 @@ docs cleanup). D7.x are also summarized in the 0.4.1/0.4.2 CHANGELOG entries.
 
 ## Changelog
 
+- **2026-09-01 (scale & grounding pass)** — new layers, evidence-backed
+  deferrals:
+  - **Shared HTTP pools landed** (facade / scrape tier / LLM, one pooled
+    client each): per-origin keep-alive (`keepalive_expiry=60s` vs httpx's
+    5s default), tier-scoped clients to isolate cookie jars, `trust_env=
+    False`, lazy singletons with the `_get_client()` seam (the repo's
+    established pattern) + a conftest autouse reset — a module-level client
+    binds to an event loop and pytest-asyncio spins a fresh loop per test.
+    httpx resolves DNS per NEW connection only (no cache) — keepalive
+    expiry is the dial between sticky sockets and fresh DNS.
+  - **Two new sources, live-verified**: `hackernews` (Algolia; points>10
+    numeric filter for signal over noise; comment hits synthesize the item
+    link) and `wikipedia` (MediaWiki CirrusSearch; descriptive UA required
+    etiquette; titles URL-quoted — the identifier-injection lesson again).
+    Registry 23 → 25.
+  - **Grounded synthesis**: cite-during-write (`[N]` markers) beats
+    post-hoc citation by ~47% on recall (ALCE); the deterministic
+    verification pass (id-space + URL membership + quote-substring) is
+    code, never delegated to the prompt. DeepSeek Chat Completions has
+    `json_object` mode but NO strict `json_schema` (that's the Responses
+    API) — tolerate truncation/wrapping, report degradation honestly.
+  - **Deferred with evidence (parking lot)**: (1) *semantic cache lookup* —
+    raw hit rates collapse to 1.1–2.2% quality-adjusted for search
+    workloads; opposite-intent pairs live at cosine 0.88–0.93, so the
+    exact-key + freshness-bucket cache we already have is the reliable
+    80%; revisit only if logs show ≥10–15% near-duplicate phrasing, and
+    only with the local reranker as a verification gate. (2) *IA fulltext*
+    — unique corpus but the API is flagged experimental. (3) *Brave* — free
+    tier removed 2026-02, card required. (4) *Google CSE* — dead
+    2027-01-01, closed to new customers.
 - **2026-08-31 (full-stack bug sweep + security pass)** — the deepest sweep
   yet; new layers that will outlive the session:
   - **Property-based testing landed** (`tests/test_properties.py`,

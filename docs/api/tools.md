@@ -22,7 +22,7 @@ different failure surfaces — this table is the ground truth per tool.
 | `search` / `search_web` / `search_news` / `search_science` / `search_academic` / `search_social` | Never raises to the client. A source that errors is reported as `sources[name] = "error: <type>: <message>"` and simply excluded from fusion; the response is still `{count, results[], sources{}}`. |
 | `get_paper` | Per-sub-lookup errors are folded into the merged dict as `{"error": "<message>"}` under that sub-source's key (`arxiv`/`crossref`/`openalex`) — the tool itself always returns 200-shaped data, never raises. |
 | `get_citations` / `get_references` | Falls back OpenAlex → Semantic Scholar (citations) or Crossref → OpenAlex → Semantic Scholar (references); if every engine fails, returns `{"identifier": ..., "error": "<message>"}` with no `results` key. |
-| `research_answer` | Empty search results → `{"answer": "No results found to synthesize from.", "citations": [], "results": []}`. A DeepSeek failure → `{"answer": "(answer synthesis failed: <exc>)", "citations": [...], "results": [...]}` — the search results are never discarded even if synthesis fails. |
+| `research_answer` | Empty search results → `{"answer": "No results found to synthesize from.", "citations": [], "results": []}`. A DeepSeek failure → `{"answer": "(answer synthesis failed: <exc>)", ...}`. Since 0.7: grounded synthesis — inline `[N]` markers, `citations[]` with verbatim quotes, and a deterministic `verification` block (id-space + URL membership + quote-substring checks; unverifiable citations are dropped, never served). JSON degradation is reported as `verification.status = "unverified-json-degraded"`, never silent. |
 | `read_url` | `{"url": url, "error": "<message>"}` when every extraction stage fails — no partial content field. |
 | `doctor` | Per-source probe failures appear as `"error: <message>"` string values inside `sources{}`; the tool call itself does not fail. |
 | `stats_report` | Redis errors are swallowed inside `stats.snapshot()` (logged at `debug`) and simply omit that source's entry — never raises. |
@@ -363,7 +363,7 @@ error instead of fetching:
 ### `doctor()`
 Health report: Redis, models, every source, academic latency/rate-limit status,
 ledger health, and (0.4.1+) the containment sections `egress`/`vault`/`blocks`/
-`profiles`. 23 sources + `redis`/`rerank`/`embed`/`llm`/`ledger` keys. Shared
+`profiles`. 25 sources + `redis`/`rerank`/`embed`/`llm`/`ledger` keys. Shared
 with the CLI via `health.report()` — `kortex-search doctor` prints the same
 JSON.
 

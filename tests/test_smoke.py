@@ -28,6 +28,8 @@ EXPECTED_SOURCES = {
     "instagram", "linkedin", "openalex", "reddit", "searxng",
     "semantic_scholar", "stackoverflow", "twitter", "v2ex", "web",
     "xiaohongshu", "youtube",
+    # v0.7 additions (2026-09-01)
+    "hackernews", "wikipedia",
     # CN tier (v0.4, gated)
     "zhihu", "zhihu_hot", "weibo", "baidu", "toutiao",
 }
@@ -42,8 +44,8 @@ def test_package_imports():
     import kortex_search.stats  # noqa: F401
 
 
-def test_all_23_sources_registered():
-    assert len(ALL_SOURCES) == 23, f"expected 23 sources, got {len(ALL_SOURCES)}"
+def test_all_25_sources_registered():
+    assert len(ALL_SOURCES) == 25, f"expected 25 sources, got {len(ALL_SOURCES)}"
     assert set(ALL_SOURCES) == EXPECTED_SOURCES
 
 

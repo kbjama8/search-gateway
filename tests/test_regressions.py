@@ -1142,6 +1142,7 @@ def test_facade_remaining_branches(monkeypatch):
 
     import httpx as _httpx
     monkeypatch.setattr(_httpx, "AsyncClient", lambda **kw: GoodTransport())
+    monkeypatch.setattr(eh, "_client", None)  # shared pool caches fakes — reset
     r = asyncio.run(eh.get_json("https://api.example.com/x", source="bilibili"))
     assert r == {"ok": 1}
 
@@ -1152,6 +1153,7 @@ def test_facade_remaining_branches(monkeypatch):
                                   "text": "not json at all"})()
 
     monkeypatch.setattr(_httpx, "AsyncClient", lambda **kw: GarbageTransport())
+    monkeypatch.setattr(eh, "_client", None)
     try:
         asyncio.run(eh.get_json("https://api.example.com/x"))
         raise AssertionError("must raise")

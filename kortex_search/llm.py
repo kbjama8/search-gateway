@@ -25,6 +25,29 @@ from .extract.vault import load_secrets
 logger = logging.getLogger("kortex_search.llm")
 
 _api_key: str | None = None
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    """Shared DeepSeek pool (sweep 2026-08-31) — isolated from the facade
+    pool (tier-scoped clients keep cookie jars separate)."""
+    global _client
+    if _client is None or getattr(_client, "is_closed", False):
+        _client = httpx.AsyncClient(
+            timeout=httpx.Timeout(LLM_TIMEOUT, connect=5.0, pool=2.0),
+            limits=httpx.Limits(max_connections=10,
+                                max_keepalive_connections=5,
+                                keepalive_expiry=60.0),
+            trust_env=False,
+        )
+    return _client
+
+
+async def aclose() -> None:
+    global _client
+    if _client is not None and not _client.is_closed:
+        await _client.aclose()
+    _client = None
 
 
 def get_api_key() -> str:
@@ -42,7 +65,8 @@ def available() -> bool:
 
 async def complete(messages: list[dict], max_tokens: int = 2048,
                    temperature: float = 0.3, thinking: bool = True,
-                   reasoning_effort: str = "high") -> str:
+                   reasoning_effort: str = "high",
+                   json_mode: bool = False) -> str:
     """Chat completion. Returns the assistant `content` (not reasoning).
 
     DeepSeek v4 specifics (from api-docs.deepseek.com):
@@ -52,6 +76,10 @@ async def complete(messages: list[dict], max_tokens: int = 2048,
         only set `temperature` when thinking is disabled.
       - Reasoning tokens count toward `max_tokens`; budget generously when
         thinking is on, and trim when off.
+      - `json_mode`: response_format={"type": "json_object"} (Chat
+        Completions) — schema-free JSON; the prompt must carry the word
+        "json" and a shape example, and truncated/empty content is a
+        documented failure mode callers must tolerate.
     """
     key = get_api_key()
     if not key:
@@ -68,14 +96,15 @@ async def complete(messages: list[dict], max_tokens: int = 2048,
         payload["reasoning_effort"] = reasoning_effort
     else:
         payload["temperature"] = temperature
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
 
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     try:
-        async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as client:
-            resp = await client.post(f"{DEEPSEEK_BASE_URL}/chat/completions",
-                                     headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+        resp = await _get_client().post(f"{DEEPSEEK_BASE_URL}/chat/completions",
+                                        headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
     except httpx.HTTPError as exc:
         raise RuntimeError(f"deepseek request failed: {exc}") from exc
 

@@ -31,6 +31,51 @@ logger = logging.getLogger("kortex_search.sources.web")
 _MIN_USABLE = 50
 _CAP = 20000
 
+# Scrape-tier shared pools (sweep 2026-08-31): redirect-following stages
+# reuse per-origin keep-alive connections too; the per-hop SSRF guard is
+# registered at construction (event_hooks are client-level). Async for the
+# jina stage, sync for readability's to_thread fetch. Reset by the conftest
+# autouse fixture; closed by the graceful-shutdown paths.
+_scrape: httpx.AsyncClient | None = None
+_scrape_sync: httpx.Client | None = None
+
+_SCRAPE_TIMEOUT = httpx.Timeout(30.0, connect=5.0, pool=2.0)
+_SCRAPE_LIMITS = httpx.Limits(max_connections=50,
+                              max_keepalive_connections=10,
+                              keepalive_expiry=60.0)
+
+
+def _get_scrape_client() -> httpx.AsyncClient:
+    global _scrape
+    if _scrape is None or getattr(_scrape, "is_closed", False):
+        _scrape = httpx.AsyncClient(timeout=_SCRAPE_TIMEOUT,
+                                    limits=_SCRAPE_LIMITS,
+                                    follow_redirects=True,
+                                    trust_env=False,
+                                    event_hooks={"request": [_hop_guard]})
+    return _scrape
+
+
+def _get_scrape_sync() -> httpx.Client:
+    global _scrape_sync
+    if _scrape_sync is None or getattr(_scrape_sync, "is_closed", False):
+        _scrape_sync = httpx.Client(timeout=_SCRAPE_TIMEOUT,
+                                    limits=_SCRAPE_LIMITS,
+                                    follow_redirects=True,
+                                    trust_env=False,
+                                    event_hooks={"request": [_hop_guard]})
+    return _scrape_sync
+
+
+async def aclose() -> None:
+    global _scrape, _scrape_sync
+    if _scrape is not None and not _scrape.is_closed:
+        await _scrape.aclose()
+    _scrape = None
+    if _scrape_sync is not None and not _scrape_sync.is_closed:
+        _scrape_sync.close()  # noqa: ASYNC212 — sync Client closes synchronously
+    _scrape_sync = None
+
 
 def _jina_url(target: str) -> str:
     """Compose the r.jina.ai request for `target`.
@@ -97,12 +142,10 @@ class WebSource(Source):
         proxy = jina_header()
         if proxy:
             headers["X-Proxy-Url"] = proxy
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True,
-                                     event_hooks={"request": [_hop_guard]}
-                                     ) as client:
-            resp = await client.get(_jina_url(url), headers=headers)
-            resp.raise_for_status()
-            return resp.text
+        client = _get_scrape_client()
+        resp = await client.get(_jina_url(url), headers=headers)
+        resp.raise_for_status()
+        return resp.text
 
     async def _read_trafilatura(self, url: str) -> str:
         # pre-nav only: trafilatura's own fetcher exposes no final URL —
@@ -122,20 +165,18 @@ class WebSource(Source):
         assert_egress(url, "web")
 
         def _sync() -> str:
-            import httpx as _httpx
             from lxml import html as lxml_html
             from readability import Document
             # per-hop guard: every redirect hop passes the floor BEFORE the
             # connection is made (stronger than the old post-hoc final-URL
             # check, which let intermediate private hops connect first)
-            with _httpx.Client(timeout=30.0, follow_redirects=True,
-                               event_hooks={"request": [_hop_guard]}) as client:
-                resp = client.get(url)
-                resp.raise_for_status()
-                doc = Document(resp.text)
-                summary = doc.summary()
-                if not summary:
-                    return ""
-                return " ".join(
-                    lxml_html.fromstring(summary).text_content().split())
+            client = _get_scrape_sync()
+            resp = client.get(url)
+            resp.raise_for_status()
+            doc = Document(resp.text)
+            summary = doc.summary()
+            if not summary:
+                return ""
+            return " ".join(
+                lxml_html.fromstring(summary).text_content().split())
         return await asyncio.to_thread(_sync)
