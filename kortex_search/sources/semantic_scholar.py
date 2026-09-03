@@ -1,15 +1,41 @@
-"""Semantic Scholar academic source (free; optional fallback, rate-limited)."""
+"""Semantic Scholar academic source (free; optional fallback, rate-limited).
+
+S2's unauthenticated API rate-limits hard (429). A 429 now sets a
+process-wide cooldown and fails FAST: the old behavior burned ~12s
+retrying a wall, and every subsequent fallback call repeated the burn
+(sweep 2026-09-03). Runtime citation/reference chains are OpenAlex-first;
+S2 remains an explicit-source option and a cooldown-gated last resort.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import time
 
+from ..config import S2_COOLDOWN
 from ..extract.http import HttpError, request
 from ..models import Result
 from .base import Source, SourceError, normalize_published
 
 _FIELDS = ("title,abstract,year,venue,externalIds,authors,citationCount,"
            "openAccessPdf,publicationTypes")
+
+# monotonic cooldown deadline (0.0 = clear); module state on purpose —
+# one process, one S2 API budget
+_until: float = 0.0
+
+
+def rate_limited_until() -> float:
+    """Monotonic deadline of the active 429 cooldown (0.0 when clear)."""
+    return _until if _until > time.monotonic() else 0.0
+
+
+def _check_cooldown() -> None:
+    if rate_limited_until():
+        raise SourceError(
+            "semantic scholar rate-limited (429); "
+            f"cooldown active for {rate_limited_until() - time.monotonic():.0f}s "
+            "— use openalex/crossref")
 
 
 class SemanticScholarSource(Source):
@@ -58,16 +84,22 @@ class SemanticScholarSource(Source):
                                   safe=":")
 
     async def _get_json(self, url: str, params: dict, retries: int = 3) -> dict:
-        """GET with retry/backoff — S2 is 429-prone without a key."""
+        """GET with retry/backoff for transient errors. A 429 is NOT
+        transient: it sets the process-wide cooldown and fails fast — the
+        old retry-then-fail burn (~12s per call) was pure latency with no
+        chance of success against a rate-limit wall."""
+        _check_cooldown()
         last: Exception | None = None
         for attempt in range(retries):
             try:
                 resp = await request("GET", url, source="semantic_scholar",
                                      params=params, timeout=20.0)
                 if resp.status_code == 429:
-                    last = SourceError("semantic scholar rate-limited (429)")
-                    await asyncio.sleep(2 * (attempt + 1))
-                    continue
+                    global _until
+                    _until = time.monotonic() + S2_COOLDOWN
+                    raise SourceError(
+                        "semantic scholar rate-limited (429); "
+                        f"cooldown set for {S2_COOLDOWN}s — use openalex/crossref")
                 resp.raise_for_status()
                 return resp.json()
             except HttpError as exc:
@@ -102,12 +134,18 @@ class SemanticScholarSource(Source):
         )
 
     async def available(self) -> tuple[bool, str]:
+        if rate_limited_until():
+            return False, (f"rate-limited (cooldown "
+                           f"{rate_limited_until() - time.monotonic():.0f}s)")
         try:
             r = await request("GET",
                               "https://api.semanticscholar.org/graph/v1/paper/search",
                               source="semantic_scholar",
                               params={"query": "test", "limit": 1, "fields": "title"},
                               timeout=10.0)
+            if r.status_code == 429:
+                global _until
+                _until = time.monotonic() + S2_COOLDOWN
             return r.status_code == 200, f"http {r.status_code}"
         except HttpError as exc:
             return False, str(exc)

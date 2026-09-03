@@ -166,7 +166,13 @@ class WebSource(Source):
 
         def _sync() -> str:
             from lxml import html as lxml_html
-            from readability import Document
+
+            # Document lives in the submodule on readability-lxml forks
+            # (the package __init__ does not re-export it — sweep 2026-09-03)
+            try:
+                from readability import Document
+            except ImportError:
+                from readability.readability import Document
             # per-hop guard: every redirect hop passes the floor BEFORE the
             # connection is made (stronger than the old post-hoc final-URL
             # check, which let intermediate private hops connect first)

@@ -88,6 +88,13 @@ async def report() -> dict:
             "rate_limited": (probe.startswith("down")
                              and ("429" in probe or "rate" in probe.lower())),
         }
+    # S2 cooldown (sweep 2026-09-03): a 429 sets a process-wide fast-fail
+    # window; surface the remaining seconds so operators see the gate
+    import time
+
+    from .sources.semantic_scholar import rate_limited_until
+    out["academic"]["semantic_scholar"]["cooldown_s"] = int(
+        max(0.0, rate_limited_until() - time.monotonic()))
     return out
 
 

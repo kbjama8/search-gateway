@@ -198,7 +198,10 @@ async def get_paper(identifier: str) -> dict:
 
 @mcp.tool()
 async def get_citations(identifier: str, limit: int = 20) -> dict:
-    """Papers citing a given identifier (DOI / arXiv ID / OpenAlex ID)."""
+    """Papers citing a given identifier (DOI / arXiv ID / OpenAlex ID).
+
+    OpenAlex first; Semantic Scholar is the fallback and fails fast while
+    its 429 cooldown is active (see sources/semantic_scholar.py)."""
     kind, val = _normalize_identifier(identifier)
     target = val if kind == "doi" else (f"10.48550/arxiv.{val}" if kind == "arxiv" else val)
     try:
@@ -216,7 +219,8 @@ async def get_citations(identifier: str, limit: int = 20) -> dict:
 
 @mcp.tool()
 async def get_references(identifier: str, limit: int = 20) -> dict:
-    """Reference list for a given paper (Crossref full refs, OpenAlex fallback)."""
+    """Reference list for a given paper (Crossref full refs, OpenAlex second,
+    cooldown-gated Semantic Scholar last)."""
     kind, val = _normalize_identifier(identifier)
     if kind == "doi":
         try:

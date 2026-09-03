@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-09-03
+
+"OpenAlex-first academics, pacing discipline, social-strategy research."
+
+### Changed
+- **Academic fallbacks are OpenAlex-first with a cooldown-gated Semantic
+  Scholar**: a 429 now fails FAST and sets a process-wide cooldown
+  (`KORTEX_SEARCH_S2_COOLDOWN`, 900s default) instead of the old ~12s
+  retry burn per call; the cooldown surfaces in `doctor`
+  (`academic.semantic_scholar.cooldown_s`) and gates `available()` probes
+  too.
+- **Pacing discipline** (social-strategy research, sweep 2026-09-03):
+  `RATE_LIMIT_INTERVAL` default 2.5s → 5.0s and the Redis pacing gate now
+  jitters the interval at production scale (fixed intervals are themselves
+  a fingerprint); `PROXY_STICKY_TTL` default 30m → 24h (IP rotation per
+  account is one of the strongest bot signals).
+
+### Fixed
+- `read_url` readability stage: `Document` now imports from
+  `readability.readability` (the package `__init__` does not re-export it
+  on this install — the fallback stage was dead).
+
+### Added
+- `docs/extraction/SOCIAL-STRATEGY-2026.md` — evidence-backed social-tier
+  strategy from a deep-research run across CN forums (52pojie/V2EX/
+  bilibili), RU forums (zenno.club/lolz/habr), stealth-engineering sources
+  (Camoufox, rebrowser-patches), and red-team counter-sources. Ledger:
+  `~/research_runs/social-strategy-2026-09-03/`.
+- S2 429 fast-fail/cooldown regression tests + per-test cooldown reset
+  fixture.
+
 ## [0.7.1] - 2026-09-03
 
 "Event-loop sweep" — root-caused the recurring MCP crash/timeout the whole

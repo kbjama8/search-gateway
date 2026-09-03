@@ -53,6 +53,10 @@ DEFAULT_SOURCES = ["searxng", "exa", "github", "youtube", "bilibili", "v2ex"]
 WEB_SOURCES = ["searxng", "exa"]
 SOCIAL_SOURCES = ["twitter", "reddit", "facebook", "instagram"]
 ACADEMIC_SOURCES = ["arxiv", "openalex", "crossref"]  # semantic_scholar optional
+# Semantic Scholar's free API rate-limits hard (429). A 429 sets a
+# process-wide fast-fail cooldown instead of the old multi-retry burn;
+# citation/reference chains are OpenAlex-first (sweep 2026-09-03).
+S2_COOLDOWN = _env_int("KORTEX_SEARCH_S2_COOLDOWN", 900)
 # polite-pool email for OpenAlex/Crossref (not an API key — just courteous)
 MAILTO = _env("KORTEX_SEARCH_MAILTO", "kaichen.research@proton.me")
 DEFAULT_LIMIT = 10
@@ -79,7 +83,10 @@ RETRYABLE_EXIT_CODES = (1, 8, 52, 56)  # curl-style transient codes; skip on aut
 
 # --- rate limiting for cookie-logged sources (Phase 3) ---
 RATE_LIMITED_SOURCES = {"twitter", "reddit", "facebook", "instagram"}
-RATE_LIMIT_INTERVAL = _env_float("KORTEX_SEARCH_RATE_LIMIT", 2.5)  # min seconds between queries
+# Min seconds between queries to a cookie-logged source. Research (sweep
+# 2026-09-03): fixed short intervals read as automation; pacing must be
+# conservative AND jittered (see RATE_LIMIT_JITTER in the extraction layer).
+RATE_LIMIT_INTERVAL = _env_float("KORTEX_SEARCH_RATE_LIMIT", 5.0)
 
 # --- fusion / re-rank / diversity (Phases 1-2) ---
 RRF_K = 60
@@ -275,7 +282,11 @@ PROXY_PASSWORD = _env("KORTEX_SEARCH_PROXY_PASSWORD", "")
 PROXY_ENV_FILE = _env("KORTEX_SEARCH_PROXY_AUTH_FILE",
                       os.path.expanduser(f"{VAULT_DIR}/{PERSONA}/proxy.env"))
 PROXY_COUNTRY = _env("KORTEX_SEARCH_PROXY_COUNTRY", "")       # "" = provider default
-PROXY_STICKY_TTL = _env("KORTEX_SEARCH_PROXY_STICKY_TTL", "30m")
+# Sticky-session lifetime per profile. Research (sweep 2026-09-03): IP
+# rotation per account is one of the strongest bot signals — account-bearing
+# profiles want lifetime-sticky sessions. 24h is the compromise default;
+# operators with account farms should raise it further.
+PROXY_STICKY_TTL = _env("KORTEX_SEARCH_PROXY_STICKY_TTL", "24h")
 # Geo-consistency (Phase 3.5): derive TZ/locale bundle from egress geo.
 PROXY_GEO_ALIGN = _env_bool("KORTEX_SEARCH_PROXY_GEO_ALIGN", True)
 

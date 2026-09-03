@@ -359,6 +359,42 @@ def test_semantic_scholar_year_published_normalized(monkeypatch):
         _mock_http(monkeypatch, mod, [FakeResp({}, status_code=429)])
         with pytest.raises(SourceError, match="429"):
             await _r("semantic_scholar").search("x")
+        mod._until = 0.0  # clear the process-wide cooldown for later tests
+
+    asyncio.run(run())
+
+
+def test_semantic_scholar_429_fast_fails_with_cooldown(monkeypatch):
+    """A 429 must fail FAST (single request, no retry burn) and set the
+    process-wide cooldown; subsequent calls raise without any HTTP request
+    (sweep 2026-09-03: the old retry-then-fail burned ~12s per call)."""
+    import time
+
+    import kortex_search.sources.semantic_scholar as mod
+
+    monkeypatch.setattr(mod, "_until", 0.0)
+    _mock_http(monkeypatch, mod, [FakeResp({}, status_code=429)])
+    calls: list[str] = []
+    orig_request = mod.request
+
+    async def counting_request(method, url, **kw):
+        calls.append(url)
+        return await orig_request(method, url, **kw)
+
+    monkeypatch.setattr(mod, "request", counting_request)
+
+    async def run():
+        t0 = time.monotonic()
+        with pytest.raises(SourceError, match="cooldown set"):
+            await _r("semantic_scholar").search("x")
+        assert time.monotonic() - t0 < 2.0, "429 must fail fast, not retry"
+        assert mod.rate_limited_until() > time.monotonic()
+        assert len(calls) == 1, "429 must not retry"
+        # cooldown active → raise without touching the network
+        with pytest.raises(SourceError, match="cooldown active"):
+            await _r("semantic_scholar").search("y")
+        assert len(calls) == 1, "cooldown-gated call must not hit the network"
+        mod._until = 0.0
 
     asyncio.run(run())
 

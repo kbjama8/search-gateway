@@ -9,11 +9,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import random
 import time
 
 import redis
 
-from .config import DAILY_QUERY_LIMIT, REDIS_URL
+from .config import DAILY_QUERY_LIMIT, RATE_LIMIT_JITTER, REDIS_URL
 from .sources.base import SourceError
 
 logger = logging.getLogger("kortex_search.ratelimit")
@@ -30,6 +31,16 @@ def _get_client() -> redis.Redis:
             socket_connect_timeout=1.0, socket_timeout=2.0,
         )
     return _client
+
+
+def _jit(interval: float) -> float:
+    """Jittered interval at production pacing scale (sweep 2026-09-03:
+    a fixed inter-query interval is itself a fingerprint; the CN/RU forum
+    consensus paces with randomness). Tiny test intervals stay exact."""
+    if interval < 0.5 or not RATE_LIMIT_JITTER:
+        return interval
+    frac = RATE_LIMIT_JITTER if 0 < RATE_LIMIT_JITTER < 1 else 0.0
+    return max(0.5, interval * random.uniform(1 - frac, 1 + frac))  # noqa: S311 — pacing jitter, not entropy
 
 
 async def enforce_daily_budget(source: str) -> None:
@@ -69,6 +80,7 @@ async def wait_if_needed(source: str, min_interval: float) -> None:
     ban-protection pacing (bug-sweep discovery 2026-08-26).
     """
     now = time.monotonic()
+    min_interval = _jit(min_interval)
     last = _local.get(source, 0.0)
     wait = last + min_interval - now
     if wait > 0:

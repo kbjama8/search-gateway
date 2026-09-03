@@ -175,3 +175,13 @@ def _reset_http_pools():
     for mod, attr in ((http, "_client"), (llm, "_client"),
                       (web, "_scrape"), (web, "_scrape_sync")):
         setattr(mod, attr, None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_s2_cooldown():
+    """The S2 429 cooldown is process-global module state — reset it after
+    every test so a real probe (doctor CLI tests) or a scripted 429 cannot
+    leak into later hermetic tests (sweep 2026-09-03)."""
+    yield
+    from kortex_search.sources import semantic_scholar
+    semantic_scholar._until = 0.0
