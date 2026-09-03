@@ -80,6 +80,9 @@ some academic APIs ask for, not an API key.*
 |----------|---------|---------|
 | `KORTEX_SEARCH_MAILTO` | `kaichen.research@proton.me` | polite-pool email for OpenAlex/Crossref (not a key) |
 | `KORTEX_SEARCH_TIMEOUT` | `50` | global fan-out budget (seconds per search) |
+| `KORTEX_SEARCH_TOTAL_TIMEOUT` | `45` | end-to-end budget per search tool call (fan-out + expansion + CPU legs must fit the client's request budget) |
+| `KORTEX_SEARCH_EXPANSION_LLM_TIMEOUT` | `12` | expansion LLM leg budget; slow completion degrades to "no variants" |
+| `KORTEX_SEARCH_ANSWER_LLM_TIMEOUT` | `25` | `research_answer` synthesis leg budget; slow completion degrades to an explicit timeout answer |
 | `KORTEX_SEARCH_SOURCE_TIMEOUT` | `18` | per-source timeout (seconds) |
 
 `KORTEX_SEARCH_TIMEOUT=50` bounds the whole fan-out in seconds (`config.py`).

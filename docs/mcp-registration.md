@@ -13,7 +13,7 @@ sequenceDiagram
     C->>S: initialize
     S-->>C: capabilities
     C->>S: tools/list
-    S-->>C: 14 tools (incl. saved_queries)
+    S-->>C: 15 tools (incl. saved_queries)
     C->>S: call_tool("search", …)
     S-->>C: fused results
 ```
@@ -150,6 +150,29 @@ Point a streamable-HTTP client at the systemd-managed server
 }
 ```
 
+### OpenCode (recommended: persistent gateway)
+
+The systemd-managed HTTP gateway serves all sessions from one warm process —
+no per-session cold model loads, no duplicated model RSS (sweep 2026-09-03;
+see `docs/adrs/0008-serving-topology.md`):
+
+```jsonc
+// ~/.config/opencode/opencode.jsonc
+"mcp": {
+  "kortex-search": {
+    "type": "remote",
+    "url": "http://127.0.0.1:8765/mcp",
+    "headers": { "Authorization": "Bearer {env:KORTEX_SEARCH_HTTP_TOKEN}" },
+    "timeout": 30000,
+    "enabled": true
+  }
+}
+```
+
+`KORTEX_SEARCH_HTTP_TOKEN` is exported from the 0600
+`~/.config/kortex-search/gateway.env` (see the `.bashrc` snippet in
+`docs/deployment.md`).
+
 ## Conformance
 
 Verify without any client:
@@ -161,7 +184,7 @@ curl http://127.0.0.1:8765/mcp/
 ```
 
 `tests/test_mcp_handshake.py` automates the stdio handshake (bare command and
-explicit `serve`); `tests/test_contract.py` asserts the 23 sources + 14 tools +
+explicit `serve`); `tests/test_contract.py` asserts the 25 sources + 15 tools +
 `Result.meta` keys are unchanged.
 
 ## Troubleshooting

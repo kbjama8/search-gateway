@@ -1,4 +1,4 @@
-"""Golden contract: 25 sources + 14 tools + Result surface unchanged.
+"""Golden contract: 25 sources + 15 tools + Result surface unchanged.
 
 Any change to a tool name, the source registry, or the `Result` shape is a
 SemVer-major event (see docs/api/tools.md + docs/meta-schema.md). These tests
@@ -28,7 +28,7 @@ EXPECTED_TOOLS = {
     "doctor", "get_citations", "get_paper", "get_references", "read_url",
     "research_answer", "saved_queries", "search", "search_academic",
     "search_news", "search_science", "search_social", "search_web",
-    "stats_report",
+    "stats_report", "warm",
 }
 
 # Standardized optional meta keys (docs/meta-schema.md).

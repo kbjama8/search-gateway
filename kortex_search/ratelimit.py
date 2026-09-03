@@ -25,7 +25,10 @@ _local: dict[str, float] = {}
 def _get_client() -> redis.Redis:
     global _client
     if _client is None:
-        _client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+        _client = redis.Redis.from_url(
+            REDIS_URL, decode_responses=True,
+            socket_connect_timeout=1.0, socket_timeout=2.0,
+        )
     return _client
 
 

@@ -151,8 +151,17 @@ async def run_cmd(
         if attempt > 0:
             await asyncio.sleep(RETRY_BACKOFF * (2 ** (attempt - 1)))
         try:
+            # stdin=DEVNULL is CRITICAL: children must never inherit the
+            # server's fd 0 — that is the MCP stdio protocol pipe. A child
+            # chain that reads its own stdin (mcporter → npx → the exa MCP
+            # server) becomes a second reader on the client's protocol
+            # stream and STEALS client messages. The session's receive loop
+            # then starves and unwinds, the process exits cleanly (rc=0)
+            # mid-request, and every in-flight call dies with "Connection
+            # closed" (root-caused 2026-09-03 via pipe-inode forensics).
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=full_env,

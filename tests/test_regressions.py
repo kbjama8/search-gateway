@@ -758,7 +758,7 @@ def _expansion_probe(monkeypatch, rds):
     monkeypatch.setattr(orch, "EMBEDDING_DEDUP", False)
     calls: list[str] = []
 
-    async def fake_expand(q):
+    async def fake_expand(q, budget=0.0):
         calls.append(q)
         return []
 

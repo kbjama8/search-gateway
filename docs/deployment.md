@@ -113,7 +113,31 @@ the HTTP port. Hardening (0.4.2): `LoadCredential=` for vault secrets,
 for the vault/profile dirs and the HF cache), `RestrictAddressFamilies`,
 `IPAddressDeny` for the service-level floor. Verified: `systemd-analyze
 verify` exits 0 on the shipped unit; the HTTP transport answers `tools/list`
-with 14 tools.
+with 15 tools.
+
+Model-load temp hygiene (0.7.1): `ProtectSystem=strict` makes /tmp read-only
+inside the unit, which broke optimum's ONNX load (`No usable temporary
+directory found`) and poisoned torch's artifact registry for every later
+load. The unit therefore sets `TMPDIR=%h/.config/kortex-search/tmp` (created
+by `ExecStartPre`; inside the unit's `ReadWritePaths`) instead of loosening
+the sandbox. After deploying, preheat the gateway so the first agent search
+is fast:
+
+```bash
+python3 -m kortex_search.cli warm   # preloads models in a throwaway process (CLI check)
+# or over the MCP surface: tools/call warm  (off-loop, keeps the gateway hot)
+```
+
+### OpenCode token export
+
+The opencode remote registration reads `{env:KORTEX_SEARCH_HTTP_TOKEN}`.
+Export it in `~/.bashrc` from the 0600 env file:
+
+```bash
+if [ -f "$HOME/.config/kortex-search/gateway.env" ]; then
+  export KORTEX_SEARCH_HTTP_TOKEN="$(grep -m1 '^KORTEX_SEARCH_HTTP_TOKEN=' "$HOME/.config/kortex-search/gateway.env" | cut -d= -f2-)"
+fi
+```
 
 ## 3.1 Secrets vault (0.4.1+)
 

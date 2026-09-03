@@ -23,6 +23,7 @@ from .config import (
     EMBED_MODEL_CJK,
     EMBED_REVISION,
 )
+from .inference import run_inference
 
 logger = logging.getLogger("kortex_search.embeddings")
 
@@ -110,6 +111,12 @@ def encode(texts: list[str], multilingual: bool = False) -> np.ndarray | None:
     except Exception as exc:  # noqa: BLE001
         logger.error("embed failed: %s", exc)
         return None
+
+
+async def encode_async(texts: list[str], multilingual: bool = False):
+    """Event-loop-safe `encode`: model load + batch run on the shared
+    inference worker (see inference.py). Returns None when unavailable."""
+    return await run_inference(encode, texts, multilingual)
 
 
 def cosine_matrix(vecs: np.ndarray) -> np.ndarray:

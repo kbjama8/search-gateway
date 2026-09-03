@@ -2,7 +2,7 @@
 
 The gateway's entire design bet is this: **the conformance check is the
 protocol handshake, so no client is the source of truth.** OpenCode, Claude
-Code, or a bespoke script all see the same 14 tools — because they all speak
+Code, or a bespoke script all see the same 15 tools — because they all speak
 MCP to the same server, and the server does not know any of them exist. This
 document is the map of that bet: how a search flows through the pipeline,
 what each module owns, how the system behaves when a piece of it fails, how
@@ -13,7 +13,7 @@ lives.
 
 ```mermaid
 flowchart TD
-    C["client — MCP stdio or HTTP"] --> S["server.py — 14 tools (FastMCP)"]
+    C["client — MCP stdio or HTTP"] --> S["server.py — 15 tools (FastMCP)"]
     S --> O["orchestrator.search()"]
     O --> Q["(opt) LLM query expansion — DeepSeek"]
     O --> FA["fan-out — asyncio.wait keeps completed sources on timeout"]
@@ -228,7 +228,7 @@ flowchart LR
         C["any MCP client"]
     end
     subgraph Gateway["kortex-search (this repo)"]
-        M["server.py — FastMCP, 14 tools"]
+        M["server.py — FastMCP, 15 tools"]
         SK["skills/ — orchestration"]
     end
     subgraph Deps["machine + SaaS"]

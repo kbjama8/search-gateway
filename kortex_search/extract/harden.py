@@ -163,7 +163,8 @@ def _run_nft(args: list[str]) -> tuple[int, str]:
         return 127, "nft not found"
     try:
         r = subprocess.run(  # noqa: S603 — operator-triggered hardening probe
-            [binary, *args], capture_output=True, text=True, timeout=10)
+            [binary, *args], capture_output=True, text=True, timeout=10,
+            stdin=subprocess.DEVNULL)
         return r.returncode, (r.stdout or r.stderr or "").strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 1, str(exc)
@@ -289,13 +290,15 @@ def _scope_cgroup_path() -> str | None:
     probe = subprocess.Popen(  # noqa: S603 — operator-triggered hardening probe
         [systemd_run, "--user", "--scope", "--collect", "--unit", "ks-egress",
          "--", "sleep", "5"],
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(0.7)  # let systemd create the scope and move the process
         r = subprocess.run(  # noqa: S603 — operator-triggered hardening probe
             [systemctl, "--user", "show", "ks-egress.scope",
              "-p", "ControlGroup", "--value"],
-            capture_output=True, text=True, timeout=5)
+            capture_output=True, text=True, timeout=5,
+            stdin=subprocess.DEVNULL)
         path = (r.stdout or "").strip()
         return path if path.startswith("/") else None
     finally:
@@ -312,7 +315,7 @@ def _unit_cgroup_path(unit: str) -> str | None:
     systemctl = shutil.which("systemctl") or "systemctl"
     r = subprocess.run(  # noqa: S603 — operator-triggered hardening probe
         [systemctl, "--user", "show", unit, "-p", "ControlGroup", "--value"],
-        capture_output=True, text=True, timeout=5)
+        capture_output=True, text=True, timeout=5, stdin=subprocess.DEVNULL)
     path = (r.stdout or "").strip()
     return path if path.startswith("/") else None
 

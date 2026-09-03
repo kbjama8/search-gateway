@@ -18,6 +18,7 @@ from . import health, llm, orchestrator, stats
 from . import saved_queries as sq
 from .config import (
     ACADEMIC_SOURCES,
+    ANSWER_LLM_TIMEOUT,
     DEFAULT_LIMIT,
     DEFAULT_SOURCES,
     HTTP_TOKEN,
@@ -456,12 +457,21 @@ async def research_answer(
     prompt = f"Question: {query}\n\nSources:\n{src}"
     raw = ""
     try:
-        raw = await llm.complete(
-            [{"role": "system", "content": system},
-             {"role": "user", "content": prompt}],
-            max_tokens=2048,
-            json_mode=True,
+        raw = await asyncio.wait_for(
+            llm.complete(
+                [{"role": "system", "content": system},
+                 {"role": "user", "content": prompt}],
+                max_tokens=2048,
+                json_mode=True,
+            ),
+            timeout=ANSWER_LLM_TIMEOUT,
         )
+    except TimeoutError:
+        # synthesis is a luxury on top of the search — a slow LLM must not
+        # push the tool past the client's request budget (sweep 2026-09-03)
+        return {"answer": "(answer synthesis timed out)",
+                "citations": [], "results": results,
+                "sources": search_result.get("sources", {})}
     except Exception as exc:  # noqa: BLE001
         return {"answer": f"(answer synthesis failed: {exc})",
                 "citations": [], "results": results,
@@ -513,6 +523,19 @@ async def doctor() -> dict:
     """Health report: Redis, models, every source, academic latency/rate-limit
     status, and ledger health."""
     return await health.report()
+
+
+@mcp.tool()
+async def warm() -> dict:
+    """Preload the rerank + embed models so the next search skips cold-model
+    latency. Loads run off-loop on the shared model worker (see
+    inference.py) — the MCP event loop stays live throughout."""
+    from . import embeddings, rerank
+    from .inference import run_inference
+
+    await run_inference(rerank._get_model)  # same-package preload (intentional)
+    await embeddings.encode_async(["warmup"])
+    return {"rerank": rerank.status(), "embed": embeddings.status()}
 
 
 @mcp.tool()

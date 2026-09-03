@@ -59,6 +59,19 @@ DEFAULT_LIMIT = 10
 GLOBAL_TIMEOUT = _env_int("KORTEX_SEARCH_TIMEOUT", 50)  # seconds per search
 PER_SOURCE_TIMEOUT = _env_int("KORTEX_SEARCH_SOURCE_TIMEOUT", 18)
 
+# --- end-to-end budget discipline (sweep 2026-09-03) ---
+# A single search tool call must fit inside the MCP client's request
+# budget. The historical worst case — fanout 50s + unbounded expansion LLM
+# (60s) + expansion fanout (50s) + CPU stages — exceeded 150s, which
+# clients read as -32001 timeouts; concurrent overruns froze the event
+# loop and killed the process. These knobs bound every leg of the pipeline.
+SEARCH_TOTAL_TIMEOUT = _env_int("KORTEX_SEARCH_TOTAL_TIMEOUT", 45)
+# The expansion LLM leg gets its own short budget (was: unbounded behind a
+# 60s client timeout). On expiry, expansion degrades to "no variants".
+EXPANSION_LLM_TIMEOUT = _env_float("KORTEX_SEARCH_EXPANSION_LLM_TIMEOUT", 12.0)
+# research_answer's synthesis leg (on top of the search itself).
+ANSWER_LLM_TIMEOUT = _env_float("KORTEX_SEARCH_ANSWER_LLM_TIMEOUT", 25.0)
+
 # --- retry (Phase 3) ---
 RETRY_COUNT = _env_int("KORTEX_SEARCH_RETRY_COUNT", 1)
 RETRY_BACKOFF = _env_float("KORTEX_SEARCH_RETRY_BACKOFF", 1.5)  # seconds, x2 per retry

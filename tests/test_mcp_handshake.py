@@ -45,8 +45,9 @@ def _call_tool(args: list[str], tool: str, arguments: dict) -> dict:
 
 
 def _assert_surface(names: list[str]) -> None:
-    assert len(names) == 14
+    assert len(names) == 15
     assert "saved_queries" in names
+    assert "warm" in names
     assert "search" in names and "research_answer" in names
 
 

@@ -1,10 +1,8 @@
 {
   "mcpServers": {
     "kortex-search": {
-      "command": "kortex-search",
-      "env": {
-        "KORTEX_SEARCH_REDIS_URL": "redis://127.0.0.1:6379/0"
-      }
+      "type": "http",
+      "url": "http://127.0.0.1:8765/mcp/"
     }
   }
 }

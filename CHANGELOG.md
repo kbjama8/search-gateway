@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-09-03
+
+"Event-loop sweep" — root-caused the recurring MCP crash/timeout the whole
+ecosystem kept hitting, and fixed the gateway's silently-broken model
+loading.
+
+### Fixed
+- **The crash**: `run_cmd` spawned sources with inherited stdio, so a child
+  chain that reads its own stdin (mcporter → npx → the exa MCP server)
+  became a *second reader on the client's MCP protocol pipe* and stole
+  client messages. The session's receive loop starved and unwound, the
+  server exited cleanly (rc=0) mid-request, and every in-flight call died
+  with -32000/-32001 — the exact "agents fall back to WebFetch" failure.
+  All source subprocesses now spawn with `stdin=DEVNULL` (root-caused via
+  pipe-inode forensics; reproduced with the official MCP client).
+- **The freeze**: CPU-bound model work (imports, lazy loads, batches) ran
+  synchronously on the asyncio event loop — a single measured 16.9s
+  blocking stretch. Encode/rerank now run off-loop on a single-worker
+  inference executor (`kortex_search/inference.py`); `max_workers=1` also
+  singleflights cold model loads.
+- **The gateway's silent model failure**: `ProtectSystem=strict` made /tmp
+  read-only inside the systemd unit; optimum's ONNX load failed
+  (`No usable temporary directory found`) and its half-finished torch
+  artifact registration then poisoned *every* subsequent model load in the
+  process. The unit now sets `TMPDIR` inside its `ReadWritePaths`.
+- **Budget discipline**: unbounded legs (50s fan-out + 60s expansion LLM +
+  50s expansion fan-out + CPU) could reach 150s+ per search. New
+  `KORTEX_SEARCH_TOTAL_TIMEOUT` (45s), `KORTEX_SEARCH_EXPANSION_LLM_TIMEOUT`
+  (12s), `KORTEX_SEARCH_ANSWER_LLM_TIMEOUT` (25s) bound every leg; the
+  expansion fan-out gates on remaining budget.
+- Sync redis-py clients across cache/ratelimit/stats/saved_queries/bilibili/
+  profiles/proxies now carry socket timeouts (1s connect / 2s socket) so a
+  stalled Redis can never hang the event loop.
+
+### Added
+- `warm` MCP tool — preload the rerank + embed models off-loop (15th tool;
+  contract + handshake tests updated).
+- Regression suite `tests/test_loop_liveness.py`: loop liveness under slow
+  model calls, worker serialization, expansion budget, end-to-end deadline,
+  synthesis budget, and subprocess-stdin isolation.
+- `docs/adrs/0008-serving-topology.md` — single gateway deployment for MCP
+  clients; stdio for direct dev.
+
+### Changed
+- Recommended opencode registration switches from per-session stdio
+  children to the persistent HTTP gateway (single warm process, no
+  per-spawn cold-model cost, no RSS duplication across concurrent
+  sessions); see `docs/mcp-registration.md`.
+
 ## [0.7.0] - 2026-09-01
 
 "Scale, ground, and pool" — two new sources, a shared-HTTP-pool

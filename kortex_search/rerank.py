@@ -19,6 +19,7 @@ from .config import (
     RERANK_REVISION,
     SEMANTIC_RERANK,
 )
+from .inference import run_inference
 from .models import Result
 
 logger = logging.getLogger("kortex_search.rerank")
@@ -97,6 +98,13 @@ def rerank(query: str, candidates: list[Result], top_k: int | None = None) -> li
         logger.error("re-rank failed: %s", exc)
         out = list(candidates)
         return out[:top_k] if top_k else out
+
+
+async def rerank_async(query: str, candidates: list[Result],
+                       top_k: int | None = None) -> list[Result]:
+    """Event-loop-safe `rerank`: lazy model load + predict run on the
+    shared inference worker (see inference.py)."""
+    return await run_inference(rerank, query, candidates, top_k)
 
 
 def status() -> dict:
