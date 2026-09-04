@@ -128,6 +128,28 @@ python3 -m kortex_search.cli warm   # preloads models in a throwaway process (CL
 # or over the MCP surface: tools/call warm  (off-loop, keeps the gateway hot)
 ```
 
+### Managed profile farm (0.8.0)
+
+The browser-backed social tier runs on self-managed Chrome profiles
+(`extract/browserfarm.py`, ADR-0009). Setup:
+
+```bash
+sudo dnf install xorg-x11-server-Xvfb          # once
+cp infra/systemd/xvfb.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now xvfb.service     # DISPLAY=:99
+
+kortex-search farm status                      # per-profile browser state
+kortex-search farm login reddit                # one-time headed login (QR/password)
+kortex-search farm login twitter
+kortex-search farm reap                        # shut down idle profiles
+```
+
+Login state persists in `~/.agent-reach/profiles/<platform>-<user>/` across
+browser and gateway restarts. A login wall is reported as "profile not
+logged in" (never quarantined); genuine blocks feed the healthy→cooldown→
+quarantined state machine.
+
 ### OpenCode token export
 
 The opencode remote registration reads `{env:KORTEX_SEARCH_HTTP_TOKEN}`.

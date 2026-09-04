@@ -111,6 +111,52 @@ def _cmd_warm(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_farm(args: argparse.Namespace) -> int:
+    """Managed profile farm: status | login <platform> [--headed] | reap."""
+    from .extract import browserfarm
+    from .extract.profiles import default_profile, store
+
+    if args.farm_command == "status":
+        profs = store.all() or [default_profile(p) for p in ("reddit", "twitter")]
+        out = asyncio.run(browserfarm.status(profs))
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.farm_command == "reap":
+        profs = store.all() or [default_profile(p) for p in ("reddit", "twitter")]
+        reaped = asyncio.run(browserfarm.reap_idle(profs))
+        print(json.dumps({"reaped": reaped}, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.farm_command == "login":
+        if not args.platform:
+            print("farm login needs <platform>", file=sys.stderr)
+            return 1
+        import os
+
+        from .extract.browserfarm import _base_env, _cmd, _profile_dir
+        prof = (store.all() or [default_profile(args.platform)])[0]
+        os.makedirs(_profile_dir(prof), exist_ok=True)
+        target = ("https://www.reddit.com/" if prof.platform == "reddit"
+                  else "https://x.com/")
+        argv = _cmd(["--profile", _profile_dir(prof), "open", target])
+        if args.headed or not _base_env().get("DISPLAY"):
+            argv.append("--headed")
+        print(f"opening headed browser for {prof.platform} login "
+              f"(profile dir: {_profile_dir(prof)})", file=sys.stderr)
+        code = asyncio.run(asyncio.create_subprocess_exec(
+            *argv, stdin=asyncio.subprocess.DEVNULL).wait())
+        return code
+    return 1
+    from . import embeddings, rerank
+
+    rerank._get_model()          # same-package preload (private, intentional)
+    embeddings._get_model()      # same-package preload (private, intentional)
+    print(json.dumps({"rerank": rerank.status(), "embed": embeddings.status()},
+                     ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="kortex-search",
@@ -129,6 +175,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("check", help="gate: 18 sources + Redis reachable (non-zero on failure)")
     sub.add_parser("version", help="print the package version")
     sub.add_parser("warm", help="preload the rerank + embed models")
+    farm = sub.add_parser("farm", help="managed profile farm control")
+    fsub = farm.add_subparsers(dest="farm_command")
+    fsub.add_parser("status", help="per-profile browser state (CDP, idle)")
+    flogin = fsub.add_parser("login", help="one-time interactive login for a profile")
+    flogin.add_argument("platform", help="platform name (reddit|twitter)")
+    flogin.add_argument("--headed", action="store_true",
+                        help="force a visible window (desktop login)")
+    fsub.add_parser("reap", help="shut down profiles idle beyond FARM_IDLE_TTL")
     vault = sub.add_parser("vault", help="per-persona secrets vault management")
     vsub = vault.add_subparsers(dest="vault_command")
     vmigrate = vsub.add_parser("migrate",
@@ -175,6 +229,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "check": _cmd_check,
         "version": _cmd_version,
         "warm": _cmd_warm,
+        "farm": _cmd_farm,
         "vault": _cmd_vault,
         "harden": _cmd_harden,
     }

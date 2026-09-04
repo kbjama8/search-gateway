@@ -281,6 +281,33 @@ async def run_opencli(cmd: list[str], timeout: int = PER_SOURCE_TIMEOUT,
                              source=source)
 
 
+async def run_profile(profile, argv: list[str],
+                      timeout: float = PER_SOURCE_TIMEOUT,
+                      source: str | None = None) -> tuple[int, str]:
+    """Run an agent-browser command against a managed profile farm browser.
+
+    The profile's browser is launched on first touch (egress-gated, see
+    `extract/browserfarm.py`) and its login state persists across calls.
+    Pacing is per-profile and jittered; the browser budget is the same
+    lease the OpenCLI tier uses. This is the farm tier of the fallback
+    ladder — callers try it before `run_opencli`.
+    """
+    from ..config import RATE_LIMIT_INTERVAL
+    from ..extract import browserfarm
+    from ..extract.scheduler import paced
+
+    await paced(profile.name, RATE_LIMIT_INTERVAL)
+    async with browser_lease(profile.name):
+        ok, detail = await browserfarm.ensure(profile)
+        if not ok:
+            raise SourceError(f"profile {profile.name} unavailable: {detail}")
+        code, out = await browserfarm.exec_sync(profile, argv, timeout=timeout)
+        blocked = _blocked_error(code, out, source)
+        if blocked is not None:
+            raise blocked
+        return code, out
+
+
 class Source(ABC):
     """A pluggable search backend."""
 

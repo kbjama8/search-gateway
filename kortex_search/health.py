@@ -62,7 +62,9 @@ async def report() -> dict:
         "vault": vault_status(),
         "blocks": stats.blocks_snapshot(),
         "profiles": profiles.store.status(),
+        "farm": {},
     }
+    farm_task = asyncio.ensure_future(_farm_status())
     tasks = {name: asyncio.ensure_future(_probe(name, src))
              for name, src in ALL_SOURCES.items()}
     await asyncio.wait(tasks.values(), timeout=DOCTOR_TIMEOUT)
@@ -95,7 +97,27 @@ async def report() -> dict:
     from .sources.semantic_scholar import rate_limited_until
     out["academic"]["semantic_scholar"]["cooldown_s"] = int(
         max(0.0, rate_limited_until() - time.monotonic()))
+    # farm browsers (sweep 2026-09-04): per-profile CDP state
+    if farm_task.done():
+        out["farm"] = farm_task.result() or {}
+    else:
+        farm_task.cancel()
+        out["farm"] = {"pending": True}
     return out
+
+
+async def _farm_status() -> dict:
+    """Per-profile farm browser state (CDP alive, idle time, dir)."""
+    from .config import FARM_ENABLED
+    if not FARM_ENABLED:
+        return {"enabled": False}
+    from .extract import browserfarm
+    from .extract.profiles import default_profile, store
+    profs = store.all()
+    if not profs:
+        profs = [default_profile(p) for p in ("reddit", "twitter")]
+    return {"enabled": True,
+            "browsers": await browserfarm.status(profs)}
 
 
 async def check() -> tuple[bool, dict]:

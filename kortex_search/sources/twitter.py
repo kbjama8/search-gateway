@@ -1,12 +1,60 @@
-"""Twitter/X source — twitter-cli first, opencli fallback (query-time failover)."""
+"""Twitter/X source — twitter-cli first, managed profile farm second,
+opencli fallback (query-time failover)."""
 
 from __future__ import annotations
 
 import os
+from urllib.parse import quote_plus
 
+from ..config import FARM_ENABLED
+from ..extract.profiles import default_profile, store
 from ..extract.vault import env_file_for
 from ..models import Result
-from .base import Source, guard_query, run_cmd, run_opencli
+from .base import Source, SourceError, guard_query, run_cmd, run_opencli, run_profile
+
+_FARM_JS = (
+    "JSON.stringify(Array.from(document.querySelectorAll('article')).slice(0,20)"
+    ".map(a=>({text:(a.innerText||'').slice(0,300),"
+    "href:(a.querySelector('a[href*=\"/status/\"]')||{}).href||'',"
+    "author:(a.querySelector('[data-testid=\"User-Name\"]')||{}).innerText||''})))"
+)
+
+
+def _farm_steps(query: str) -> list[list[str]]:
+    url = f"https://x.com/search?q={quote_plus(query)}&f=top"
+    return [
+        ["open", url],
+        ["wait", "5000"],
+        ["eval", _FARM_JS],
+    ]
+
+
+def _parse_farm(text: str, limit: int) -> list[Result]:
+    from .base import parse_json_or_yaml
+    data = parse_json_or_yaml(text)
+    if not isinstance(data, list):
+        return []
+    if not isinstance(data, list):
+        return []
+    results = []
+    for t in data[:limit]:
+        if not isinstance(t, dict):
+            continue
+        text = (t.get("text") or "").strip()
+        author = (t.get("author") or "").strip().split("\n")[0]
+        href = t.get("href") or ""
+        url = f"https://x.com{href}" if href.startswith("/") else href
+        if not text and not url:
+            continue
+        results.append(Result(
+            title=text[:120],
+            url=url,
+            snippet=text,
+            source="twitter",
+            engine="farm-cdp",
+            meta={"author": author, "engagement": {}},
+        ))
+    return results
 
 
 def _load_twitter_env() -> dict[str, str]:
@@ -51,7 +99,26 @@ class TwitterSource(Source):
         except Exception as exc:  # noqa: BLE001
             errors.append(f"twitter-cli error: {exc}")
 
-        # backend 2: opencli (browser session)
+        # backend 2: managed profile farm (x.com search over CDP)
+        if FARM_ENABLED:
+            profiles = [p for p in store.profiles_for("twitter")
+                        if store.available(p.name)] or [default_profile("twitter")]
+            for prof in profiles[:1]:
+                try:
+                    _last = ""
+                    for step in _farm_steps(query):
+                        _code, _last = await run_profile(prof, step,
+                                                         source="twitter")
+                    results = _parse_farm(_last, limit)
+                    if results:
+                        store.report_success(prof.name)
+                        return results
+                    errors.append(f"farm empty: {_last[:120]}")
+                except SourceError as exc:
+                    store.report_failure(prof.name, "farm")
+                    errors.append(f"farm error: {exc}")
+
+        # backend 3: opencli (browser session)
         try:
             _code, out = await run_opencli(
                 ["opencli", "twitter", "search", query, "-f", "json"]
@@ -64,7 +131,6 @@ class TwitterSource(Source):
             errors.append(f"opencli error: {exc}")
 
         if errors:
-            from .base import SourceError
             raise SourceError("; ".join(errors))
         return []
 

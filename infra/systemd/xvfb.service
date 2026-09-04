@@ -1,0 +1,29 @@
+# Kortex Search — virtual display for the managed profile farm (user unit).
+#
+# The farm launches headed-but-invisible Chrome profiles on DISPLAY=:99.
+# Headed rendering matters: headless-new mode is a measurable detection
+# vector (nodriver issue #1848; 2026 benchmark methodology runs headed).
+#
+# Requires the Xvfb package (Fedora):
+#   sudo dnf install xorg-x11-server-Xvfb
+#
+# Install + enable:
+#   cp xvfb.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now xvfb.service
+#
+# Then the gateway's farm tier picks the display up automatically via
+# KORTEX_SEARCH_FARM_DISPLAY=:99 (the default).
+
+[Unit]
+Description=Virtual display :99 for the Kortex Search profile farm
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

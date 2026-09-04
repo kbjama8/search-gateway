@@ -110,6 +110,9 @@ class ProfileStore:
         return [p for p in self._profiles.values()
                 if p.platform == platform or p.platform == ""]
 
+    def all(self) -> list[Profile]:
+        return list(self._profiles.values())
+
     def coherence_report(self) -> dict[str, list[str]]:
         return {p.name: lint_bundle(p.fingerprint)
                 for p in self._profiles.values() if p.fingerprint}

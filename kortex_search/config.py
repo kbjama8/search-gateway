@@ -168,9 +168,11 @@ EXPANSION_GATE_RESULTS = _env_int("KORTEX_SEARCH_EXPANSION_GATE", 6)
 # intended degrade order per channel class — enforced by the source adapters'
 # error semantics + the negative cache. "silent-throttle" = empty-but-200.
 FALLBACK_CHAINS: dict[str, list[str]] = {
-    # browser-backed channels (best-effort): fail → negative-cache skip
-    "twitter": ["twitter-cli", "opencli-twitter", "skip"],
-    "reddit": ["opencli-reddit", "skip"],
+    # browser-backed channels: managed profile farm first (self-hosted
+    # persistent Chrome over CDP), OpenCLI bridge second (operator's own
+    # browser), then skip (ADR-0009, sweep 2026-09-04)
+    "twitter": ["twitter-cli", "farm-cdp", "opencli-twitter", "skip"],
+    "reddit": ["farm-cdp", "opencli-reddit", "skip"],
     "facebook": ["opencli-facebook", "skip"],
     "instagram": ["opencli-instagram", "skip"],
     "xiaohongshu": ["opencli-xiaohongshu", "skip"],
@@ -268,6 +270,25 @@ RATE_LIMIT_JITTER = _env_float("KORTEX_SEARCH_RATE_LIMIT_JITTER", 0.3)  # ± fra
 # Stealth tier (Phase 3): Camoufox anonymous extraction, experimental.
 STEALTH_ENABLED = _env_bool("KORTEX_SEARCH_STEALTH", False)
 STEALTH_PROFILE = _env("KORTEX_SEARCH_STEALTH_PROFILE", "")  # fingerprint preset name
+
+# --- Managed profile farm (sweep 2026-09-04, ADR-0009) ---
+# Persistent per-profile Chrome instances driven over raw CDP by
+# agent-browser (Apache-2.0). Login state lives in a pinned user-data-dir
+# and survives browser restarts — the tier no longer depends on the
+# operator's own browser running (the OpenCLI bridge's failure mode).
+# Research: direct-CDP control planes are the 2026 benchmark's only
+# zero-block class; see docs/extraction/BROWSER-TIER-2026.md.
+FARM_ENABLED = _env_bool("KORTEX_SEARCH_FARM_ENABLED", True)
+FARM_BROWSER_BIN = _env("KORTEX_SEARCH_FARM_BROWSER_BIN", "agent-browser")
+# Virtual display for headed-but-invisible launches. ":99" = Xvfb (needs
+# xorg-x11-server-Xvfb); "" = agent-browser default (headless-new — more
+# detectable on hard targets, use only for tolerant ones).
+FARM_DISPLAY = _env("KORTEX_SEARCH_FARM_DISPLAY", ":99")
+FARM_LAUNCH_TIMEOUT = _env_int("KORTEX_SEARCH_FARM_LAUNCH_TIMEOUT", 60)
+FARM_COMMAND_TIMEOUT = _env_int("KORTEX_SEARCH_FARM_COMMAND_TIMEOUT", 45)
+# Idle profiles (no exec in this many seconds) are eligible for
+# `kortex-search farm reap` shutdown — memory discipline on small hosts.
+FARM_IDLE_TTL = _env_int("KORTEX_SEARCH_FARM_IDLE_TTL", 1800)
 
 # HTTP impersonation (Phase 3): curl_cffi TLS/JA3/HTTP2 for fingerprinted APIs.
 IMPERSONATE = _env_bool("KORTEX_SEARCH_IMPERSONATE", False)

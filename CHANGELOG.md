@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-04
+
+"Managed profile farm" — the browser-backed social tier no longer depends
+on the operator's own browser running.
+
+### Added
+- **`extract/browserfarm.py`** — profile-farm supervisor: idempotent
+  per-profile Chrome launches driven by agent-browser (raw CDP, no
+  Playwright shim — the 2026 benchmark's only zero-block class), Redis
+  CDP registry shared across gateway processes, per-profile launch locks,
+  TCP liveness probes (CLI probes would auto-resurrect browsers), stale
+  egress-scope cleanup, `reap_idle`, `status`. Launches are gated by the
+  L3 filter and scoped under `ks-egress-<profile>` transient scopes.
+- **`sources/base.py::run_profile`** — jittered per-profile pacing +
+  browser-budget lease + ensure/exec + block detection.
+- **Farm tiers in ladders**: reddit = farm (old.reddit DOM eval) →
+  opencli; twitter = twitter-cli → farm (x.com DOM eval) → opencli.
+  Login walls are NOT counted as profile failures (no quarantine for
+  healthy-but-unauthenticated profiles). `FALLBACK_CHAINS` updated.
+- **CLI**: `kortex-search farm status|login <platform>|reap`; doctor gains
+  a `farm` section.
+- **`infra/systemd/xvfb.service`** — headed-but-invisible rendering
+  (headless-new is a measured detection vector). Knobs:
+  `KORTEX_SEARCH_FARM_*` (enabled/browser-bin/display/launch+command
+  timeouts/idle TTL).
+- 9 hermetic farm tests (`tests/test_browserfarm.py`).
+
+### Changed
+- Docs: `docs/extraction/BROWSER-TIER-2026.md` (evidence spine +
+  architecture), ADR-0009, deployment notes.
+
+### Notes
+- Reddit now login-walls all of old.reddit (even /r/rust) — `kortex-search
+  farm login reddit` is a hard prerequisite for that source; until then
+  the ladder degrades honestly (farm → opencli).
+- Xvfb installed + enabled via the user unit on this host (DISPLAY=:99).
+
 ## [0.7.2] - 2026-09-03
 
 "OpenAlex-first academics, pacing discipline, social-strategy research."
