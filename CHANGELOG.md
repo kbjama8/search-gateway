@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-09-04
+
+### Fixed
+- `kortex-search farm login` now works end-to-end: agent-browser keeps ONE
+  daemon per user (launch flags are honored only by a fresh daemon), so
+  login stops the daemon and settles until it is really gone before
+  relaunching headed on the desktop; systemd-run transient units do not
+  inherit the caller's env — DISPLAY/XAUTHORITY/TMPDIR/XDG_RUNTIME_DIR are
+  forwarded via `--setenv=` (the two-token `--setenv K=V` form was wrong);
+  Chrome needs XAUTHORITY to reach the desktop X server (added to the
+  allowlists); `input()` moved off the async path with an EOFError guard
+  for non-interactive stdin.
+- xvfb.service now runs with `-ac` (the gateway unit has no xauth cookie;
+  display is loopback-only).
+
 ## [0.8.0] - 2026-09-04
 
 "Managed profile farm" — the browser-backed social tier no longer depends

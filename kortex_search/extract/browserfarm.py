@@ -80,7 +80,7 @@ def _keys(name: str) -> tuple[str, str]:
 def _base_env() -> dict[str, str]:
     """Minimal subprocess env: essentials + optional virtual display."""
     keep = {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL",
-            "LC_CTYPE", "XDG_RUNTIME_DIR", "TMPDIR", "DISPLAY",
+            "LC_CTYPE", "XDG_RUNTIME_DIR", "TMPDIR", "DISPLAY", "XAUTHORITY",
             "AGENT_BROWSER_ENCRYPTION_KEY"}
     env = {k: v for k, v in os.environ.items() if k in keep}
     if FARM_DISPLAY:
@@ -130,7 +130,8 @@ def _cmd(base: list[str]) -> list[str]:
     return [FARM_BROWSER_BIN, *base]
 
 
-def _scoped(argv: list[str], scope_name: str) -> list[str]:
+def _scoped(argv: list[str], scope_name: str,
+            extra_env: dict[str, str] | None = None) -> list[str]:
     """Wrap a browser LAUNCH in a per-profile systemd scope when the L3
     nft filter is installed but the gateway itself is not inside the
     covered cgroup — the browser's sockets must sit under the kernel
@@ -141,6 +142,10 @@ def _scoped(argv: list[str], scope_name: str) -> list[str]:
     (localhost IPC to the daemon) must NOT reuse the scope name — a live
     daemon keeps the transient scope loaded, and systemd-run would refuse
     a second scope with the same name.
+
+    systemd-run transient units do NOT inherit the caller's environment,
+    so display/path vars must be forwarded explicitly via --setenv
+    (otherwise Chrome fails with "Missing X server or $DISPLAY").
     """
     from . import harden
     try:
@@ -148,8 +153,13 @@ def _scoped(argv: list[str], scope_name: str) -> list[str]:
     except Exception:  # noqa: BLE001
         return argv
     if st.get("installed") and not st.get("covered"):
-        return ["systemd-run", "--user", "--scope", "--quiet", "--collect",
-                "--unit", f"ks-egress-{scope_name}", *argv]
+        args = ["systemd-run", "--user", "--scope", "--quiet", "--collect",
+                "--unit", f"ks-egress-{scope_name}"]
+        for k in ("DISPLAY", "XAUTHORITY", "TMPDIR", "XDG_RUNTIME_DIR"):
+            v = (extra_env or {}).get(k)
+            if v:
+                args += [f"--setenv={k}={v}"]
+        return [*args, *argv]
     return argv
 
 
@@ -171,11 +181,12 @@ async def _clean_stale_scope(scope_name: str) -> None:
 
 
 async def _spawn(argv: list[str], timeout: float,
-                 scope_name: str = "") -> tuple[int, str]:
+                 scope_name: str = "",
+                 scope_env: dict[str, str] | None = None) -> tuple[int, str]:
     """Spawn an agent-browser process with DEVNULL stdin (children must
     never inherit the MCP protocol pipe — sweep 2026-09-03)."""
     if scope_name:
-        argv = _scoped(argv, scope_name)
+        argv = _scoped(argv, scope_name, extra_env=scope_env)
     proc = await asyncio.create_subprocess_exec(
         *argv,
         stdin=asyncio.subprocess.DEVNULL,

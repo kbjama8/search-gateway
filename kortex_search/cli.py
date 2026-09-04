@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import signal
 import sys
@@ -134,18 +135,82 @@ def _cmd_farm(args: argparse.Namespace) -> int:
             return 1
         import os
 
-        from .extract.browserfarm import _base_env, _cmd, _profile_dir
+        from .extract.browserfarm import (
+            _clean_stale_scope,
+            _cmd,
+            _profile_dir,
+            _scoped,
+        )
         prof = (store.all() or [default_profile(args.platform)])[0]
-        os.makedirs(_profile_dir(prof), exist_ok=True)
+        pdir = _profile_dir(prof)
+        os.makedirs(pdir, exist_ok=True)
         target = ("https://www.reddit.com/" if prof.platform == "reddit"
                   else "https://x.com/")
-        argv = _cmd(["--profile", _profile_dir(prof), "open", target])
-        if args.headed or not _base_env().get("DISPLAY"):
-            argv.append("--headed")
-        print(f"opening headed browser for {prof.platform} login "
-              f"(profile dir: {_profile_dir(prof)})", file=sys.stderr)
-        code = asyncio.run(asyncio.create_subprocess_exec(
-            *argv, stdin=asyncio.subprocess.DEVNULL).wait())
+        desktop = os.environ.get("DISPLAY")
+        if not desktop:
+            print("no DISPLAY in environment — cannot open a headed window",
+                  file=sys.stderr)
+            return 1
+        env = {k: v for k, v in os.environ.items()
+               if k in {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG",
+                        "LC_ALL", "LC_CTYPE", "DISPLAY", "XAUTHORITY",
+                        "XDG_RUNTIME_DIR", "TMPDIR",
+                        "AGENT_BROWSER_ENCRYPTION_KEY"}}
+        env["DISPLAY"] = desktop  # never the farm display for login
+
+        async def _run(argv: list[str]) -> int:
+            proc = await asyncio.create_subprocess_exec(
+                *argv, stdin=asyncio.subprocess.DEVNULL, env=env)
+            return await proc.wait()
+
+        async def _daemon_free() -> bool:
+            proc = await asyncio.create_subprocess_exec(
+                *_cmd(["doctor"]), stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL)
+            out, _ = await proc.communicate()
+            return b"No active daemons" in out
+
+        async def _stop_daemon() -> bool:
+            # agent-browser keeps ONE daemon per user; launch flags are
+            # honored only by a fresh daemon. Stop it (settling until it is
+            # really gone) so the login window opens headed on THIS desktop
+            # rather than attaching to the farm's invisible :99 daemon.
+            for _ in range(8):
+                await _run(_cmd(["close", "--all"]))
+                if await _daemon_free():
+                    return True
+                await asyncio.sleep(1.5)
+            return False
+
+        async def _login() -> int:
+            if not await _stop_daemon():
+                print("could not stop the running browser daemon",
+                      file=sys.stderr)
+                return 1
+            argv = _scoped(
+                _cmd(["--profile", pdir, "open", target, "--headed"]),
+                prof.name, extra_env=env)
+            code = await _run(argv)
+            if code != 0:
+                await _clean_stale_scope(prof.name)  # stale scope race
+                code = await _run(argv)
+            if code != 0:
+                print(f"browser launch failed (rc={code})", file=sys.stderr)
+                return code
+            return 0  # browser up; human interaction happens outside
+
+        code = asyncio.run(_login())
+        if code != 0:
+            return code
+        print(f"Log in to {prof.platform} in the opened window, then "
+              f"press Enter to finish (profile: {pdir})", file=sys.stderr)
+        with contextlib.suppress(EOFError):  # non-interactive stdin
+            input()
+        # stop the daemon: the farm relaunches headed on its own display
+        # with the login state persisted in the profile dir
+        code = asyncio.run(_run(_cmd(["close", "--all"])))
+        print("login window closed — session state saved.", file=sys.stderr)
         return code
     return 1
     from . import embeddings, rerank
