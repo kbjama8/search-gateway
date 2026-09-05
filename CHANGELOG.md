@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for non-interactive stdin.
 - xvfb.service now runs with `-ac` (the gateway unit has no xauth cookie;
   display is loopback-only).
+- agent-browser only honors daemon-level flags in the PRE-command position:
+  `--headed` after `open` silently kept `headless=new`; both farm launch
+  sites now pass `--headed` before the subcommand (pinned empirically).
 
 ## [0.8.0] - 2026-09-04
 

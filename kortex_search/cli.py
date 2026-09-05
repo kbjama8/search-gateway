@@ -189,7 +189,7 @@ def _cmd_farm(args: argparse.Namespace) -> int:
                       file=sys.stderr)
                 return 1
             argv = _scoped(
-                _cmd(["--profile", pdir, "open", target, "--headed"]),
+                _cmd(["--headed", "--profile", pdir, "open", target]),
                 prof.name, extra_env=env)
             code = await _run(argv)
             if code != 0:

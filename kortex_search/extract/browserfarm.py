@@ -231,8 +231,12 @@ async def ensure(profile: Profile) -> tuple[bool, str]:
             return False, str(exc)
         os.makedirs(pdir, exist_ok=True)
         headed = bool(FARM_DISPLAY)
-        argv = _cmd(["--profile", pdir, "open", "about:blank"]
-                    + (["--headed"] if headed else []))
+        # NOTE: --headed must precede the subcommand — agent-browser only
+        # honors daemon-level flags in the pre-command position (a
+        # trailing flag silently keeps headless=new; pinned 2026-09-04)
+        argv = (_cmd(["--headed", "--profile", pdir, "open", "about:blank"])
+                if headed
+                else _cmd(["--profile", pdir, "open", "about:blank"]))
         code, out = await _spawn(argv, timeout=FARM_LAUNCH_TIMEOUT,
                                  scope_name=name)
         if code != 0:
