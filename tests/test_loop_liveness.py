@@ -283,3 +283,44 @@ def test_run_cmd_children_do_not_inherit_server_stdin():
     ], retries=0))
     assert code == 0
     assert "EOF" in out, f"child stdin was NOT isolated: {out!r}"
+
+
+def test_research_answer_retries_when_reasoning_starves_budget(monkeypatch, rds):
+    """deepseek-v4 reasoning tokens count toward max_tokens — json_mode +
+    thinking=high can return an EMPTY answer. research_answer must retry
+    once with thinking disabled instead of serving an empty string
+    (smoke-test discovery 2026-09-04)."""
+    import kortex_search.llm as llm
+    import kortex_search.orchestrator as orch
+    import kortex_search.server as srv
+
+    monkeypatch.setattr(srv, "ANSWER_LLM_TIMEOUT", 10)
+
+    async def fake_search(query, sources, limit, **kwargs):
+        return {"results": [
+            {"title": "Source One", "url": "https://one.example/",
+             "snippet": "the first source snippet"},
+        ], "sources": {"searxng": "ok (1)"}}
+
+    monkeypatch.setattr(orch, "search", fake_search)
+
+    calls = []
+
+    async def fake_complete(messages, **kwargs):
+        calls.append(kwargs.get("thinking", "default"))
+        if len(calls) == 1:
+            return ""  # reasoning ate the whole budget
+        return ('{"answer_md": "Retry worked [1]", '
+                '"citations": [{"id": 1, "quote": "the first source snippet"}],'
+                ' "insufficient_evidence": false}')
+
+    monkeypatch.setattr(llm, "complete", fake_complete)
+
+    async def run():
+        return await srv.research_answer("synthesis retry", limit=4)
+
+    out = asyncio.run(run())
+    assert len(calls) == 2, calls
+    assert calls[1] is False, calls  # retry runs with thinking disabled
+    assert "Retry worked" in out["answer"]
+    assert out["verification"]["status"] == "verified"

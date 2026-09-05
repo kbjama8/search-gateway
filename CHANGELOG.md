@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-09-04
+
+### Fixed
+- `research_answer` could return an EMPTY answer: deepseek-v4 reasoning
+  tokens count toward `max_tokens`, so json_mode + thinking=high sometimes
+  consumed the whole budget (smoke-test discovery). An empty first
+  completion now retries once with thinking disabled; regression test
+  added.
+- `kortex-search serve --warm`: preloads the rerank+embed models in-process
+  after startup (background thread, off the event loop) so a gateway
+  restart no longer makes the first search pay the full cold-load cost.
+  The systemd unit enables it (`--warm` on ExecStart).
+
 ## [0.8.1] - 2026-09-04
 
 ### Fixed

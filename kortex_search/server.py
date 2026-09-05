@@ -480,6 +480,25 @@ async def research_answer(
         return {"answer": f"(answer synthesis failed: {exc})",
                 "citations": [], "results": results,
                 "sources": search_result.get("sources", {})}
+    if not raw.strip():
+        # deepseek-v4 reasoning tokens count toward max_tokens — with
+        # json_mode + thinking=high the budget can be consumed entirely by
+        # reasoning, yielding an EMPTY answer (smoke-test discovery
+        # 2026-09-04). Retry once with thinking disabled: the full budget
+        # then goes to the answer itself.
+        try:
+            raw = await asyncio.wait_for(
+                llm.complete(
+                    [{"role": "system", "content": system},
+                     {"role": "user", "content": prompt}],
+                    max_tokens=2048, thinking=False, json_mode=True,
+                ),
+                timeout=ANSWER_LLM_TIMEOUT,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return {"answer": f"(answer synthesis failed: {exc})",
+                    "citations": [], "results": results,
+                    "sources": search_result.get("sources", {})}
 
     parsed = _parse_grounded_json(raw)
     if parsed is None:

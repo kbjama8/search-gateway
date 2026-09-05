@@ -6,8 +6,10 @@ import argparse
 import asyncio
 import contextlib
 import json
+import logging
 import signal
 import sys
+import threading
 from collections.abc import Sequence
 
 from . import __version__, health
@@ -24,6 +26,38 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     # Map SIGTERM (systemd stop) to the same clean unwind FastMCP uses for
     # SIGINT, so the running loop cancels tasks and exits without corruption.
     signal.signal(signal.SIGTERM, _graceful)
+
+    # Self-warm: preload the models in-process off the serving path. After
+    # a restart the first search would otherwise pay the full cold-load
+    # cost (imports + weights) inside the request budget — with --warm a
+    # background thread loads them once the server is up (models run on the
+    # shared inference executor, never the event loop).
+    if getattr(args, "warm", False):
+
+        def _warm_worker() -> None:
+            import asyncio as _asyncio
+            import time as _time
+
+            from . import embeddings, rerank
+            from .inference import run_inference
+            _time.sleep(5)  # let initialize/tools-list settle first
+
+            async def _load() -> None:
+                try:
+                    await run_inference(rerank._get_model)
+                    await embeddings.encode_async(["warmup"])
+                except Exception as exc:  # noqa: BLE001
+                    logging.getLogger("kortex_search.cli").warning(
+                        "serve warm-up failed: %s", exc)
+
+            try:
+                _asyncio.run(_load())
+            except Exception as exc:  # noqa: BLE001
+                logging.getLogger("kortex_search.cli").warning(
+                    "serve warm-up thread failed: %s", exc)
+
+        threading.Thread(target=_warm_worker, daemon=True,
+                         name="ks-warmup").start()
 
     # `--transport/--host/--port` live on the `serve` subparser, so the bare
     # `kortex-search` command (no subcommand) — which also routes here — does
@@ -236,6 +270,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help=f"bind host for http/sse (default: {MCP_HOST})")
     serve.add_argument("--port", type=int, default=MCP_PORT,
                        help=f"bind port for http/sse (default: {MCP_PORT})")
+    serve.add_argument("--warm", action="store_true",
+                       help="preload the rerank+embed models in-process "
+                            "after startup (gateway deployments)")
     sub.add_parser("doctor", help="print the full health report as JSON")
     sub.add_parser("check", help="gate: 18 sources + Redis reachable (non-zero on failure)")
     sub.add_parser("version", help="print the package version")

@@ -51,7 +51,7 @@ Environment=KORTEX_SEARCH_LOG_FMT=json
 ExecStartPre=%h/.local/bin/kortex-search check
 # non-fatal: reports state; the root loader unit performs the install
 ExecStartPre=-%h/.local/bin/kortex-search harden --status
-ExecStart=%h/.local/bin/kortex-search serve --transport http --host 127.0.0.1 --port %i
+ExecStart=%h/.local/bin/kortex-search serve --transport http --host 127.0.0.1 --port %i --warm
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30
