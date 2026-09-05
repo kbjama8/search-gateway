@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-09-04
+
+### Added
+- **Fresh-agent journey smoke** integrated into the suite
+  (`tests/test_smoke_agent.py`): the full MCP tool surface driven like a
+  research agent over stdio — doctor → search_web → CN search →
+  search_academic → get_paper → research_answer → read_url → stats_report
+  → saved_queries → warm — asserting tool CONTRACTS (envelope shapes,
+  non-empty/graceful answers), never specific results. Pins the two bugs
+  the original live smoke caught (empty research_answer, missing envelope
+  fields). A `slow` social-ladder journey guards honest degradation for
+  reddit/twitter. A `gateway`-marked test wraps the live smoke.
+- `scripts/smoke_gateway.py`: the live gateway journey (expanded from the
+  one-off run) with exit codes — `python3 scripts/smoke_gateway.py` or
+  `KORTEX_SEARCH_SMOKE_GATEWAY=1 pytest -m gateway -s`.
+
 ## [0.8.2] - 2026-09-04
 
 ### Fixed

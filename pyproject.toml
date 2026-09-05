@@ -56,7 +56,8 @@ version = { attr = "kortex_search.__version__" }
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
-markers = ["slow: requires downloaded models"]
+markers = ["slow: requires downloaded models",
+           "gateway: live-gateway journey smoke (env-gated)"]
 
 [tool.ruff]
 line-length = 100
@@ -87,6 +88,8 @@ ignore = [
 # blocking paths inside async context
 "tests/**" = ["S101", "S105", "S106", "S603", "B011", "ASYNC230", "PT011",
               "ASYNC221", "ASYNC240"]
+# asserts are the point of the journey smoke script too
+"scripts/**" = ["S101"]
 
 [tool.bandit]
 # Run: bandit -c pyproject.toml -r kortex_search -ll
